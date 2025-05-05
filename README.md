@@ -50,8 +50,8 @@ A modern, full-stack portfolio and blog application built with Next.js, Supabase
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/your-username/raihan-portfolio-blog.git
-   cd raihan-portfolio-blog
+   git clone https://github.com/Raihan-Sharif/portfolio-blog-app.git
+   cd portfolio-blog-app
    ```
 
 2. Install dependencies:
