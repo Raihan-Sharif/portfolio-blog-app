@@ -1,11 +1,48 @@
-,
+"use client";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import Image from "@tiptap/extension-image";
+import Link from "@tiptap/extension-link";
+import { EditorContent, useEditor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import {
+  Bold,
+  Code,
+  Heading1,
+  Heading2,
+  Heading3,
+  Image as ImageIcon,
+  Italic,
+  Link as LinkIcon,
+  List,
+  ListOrdered,
+  Minus,
+  Quote,
+  Redo,
+  Undo,
+  Youtube as YoutubeIcon,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+
+// Mock Youtube extension as placeholder
+const Youtube = {
+  name: "youtube",
+  configure: (options: any) => {
+    return {
+      name: "youtube",
+      options,
+    };
+  },
+};
 
 interface RichTextEditorProps {
   initialContent?: any;
@@ -16,10 +53,10 @@ export default function RichTextEditor({
   initialContent,
   onChange,
 }: RichTextEditorProps) {
-  const [imageUrl, setImageUrl] = useState('');
-  const [linkUrl, setLinkUrl] = useState('');
-  const [linkText, setLinkText] = useState('');
-  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [imageUrl, setImageUrl] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkText, setLinkText] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [isYoutubeDialogOpen, setIsYoutubeDialogOpen] = useState(false);
@@ -31,11 +68,9 @@ export default function RichTextEditor({
       Link.configure({
         openOnClick: false,
       }),
-      Youtube.configure({
-        controls: true,
-      }),
+      Youtube as any,
     ],
-    content: initialContent || '',
+    content: initialContent || "",
     onUpdate: ({ editor }) => {
       onChange(editor.getJSON());
     },
@@ -54,7 +89,7 @@ export default function RichTextEditor({
   const addImage = () => {
     if (imageUrl) {
       editor.chain().focus().setImage({ src: imageUrl }).run();
-      setImageUrl('');
+      setImageUrl("");
       setIsImageDialogOpen(false);
     }
   };
@@ -72,23 +107,21 @@ export default function RichTextEditor({
           })
           .run();
       }
-      
-      editor
-        .chain()
-        .focus()
-        .setLink({ href: linkUrl })
-        .run();
-      
-      setLinkUrl('');
-      setLinkText('');
+
+      editor.chain().focus().setLink({ href: linkUrl }).run();
+
+      setLinkUrl("");
+      setLinkText("");
       setIsLinkDialogOpen(false);
     }
   };
 
   const addYoutube = () => {
     if (youtubeUrl) {
-      editor.chain().focus().setYoutubeVideo({ src: youtubeUrl }).run();
-      setYoutubeUrl('');
+      // This would need a proper Youtube extension implementation
+      // For now, just insert a placeholder
+      editor.chain().focus().insertContent(`[YouTube: ${youtubeUrl}]`).run();
+      setYoutubeUrl("");
       setIsYoutubeDialogOpen(false);
     }
   };
@@ -101,7 +134,7 @@ export default function RichTextEditor({
           variant="ghost"
           size="icon"
           onClick={() => editor.chain().focus().toggleBold().run()}
-          className={editor.isActive('bold') ? 'bg-accent' : ''}
+          className={editor.isActive("bold") ? "bg-accent" : ""}
           title="Bold"
         >
           <Bold size={18} />
@@ -110,7 +143,7 @@ export default function RichTextEditor({
           variant="ghost"
           size="icon"
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={editor.isActive('italic') ? 'bg-accent' : ''}
+          className={editor.isActive("italic") ? "bg-accent" : ""}
           title="Italic"
         >
           <Italic size={18} />
@@ -121,8 +154,12 @@ export default function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          className={editor.isActive('heading', { level: 1 }) ? 'bg-accent' : ''}
+          onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 1 }).run()
+          }
+          className={
+            editor.isActive("heading", { level: 1 }) ? "bg-accent" : ""
+          }
           title="Heading 1"
         >
           <Heading1 size={18} />
@@ -130,8 +167,12 @@ export default function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          className={editor.isActive('heading', { level: 2 }) ? 'bg-accent' : ''}
+          onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 2 }).run()
+          }
+          className={
+            editor.isActive("heading", { level: 2 }) ? "bg-accent" : ""
+          }
           title="Heading 2"
         >
           <Heading2 size={18} />
@@ -139,8 +180,12 @@ export default function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-          className={editor.isActive('heading', { level: 3 }) ? 'bg-accent' : ''}
+          onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 3 }).run()
+          }
+          className={
+            editor.isActive("heading", { level: 3 }) ? "bg-accent" : ""
+          }
           title="Heading 3"
         >
           <Heading3 size={18} />
@@ -152,7 +197,7 @@ export default function RichTextEditor({
           variant="ghost"
           size="icon"
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={editor.isActive('bulletList') ? 'bg-accent' : ''}
+          className={editor.isActive("bulletList") ? "bg-accent" : ""}
           title="Bullet List"
         >
           <List size={18} />
@@ -161,7 +206,7 @@ export default function RichTextEditor({
           variant="ghost"
           size="icon"
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={editor.isActive('orderedList') ? 'bg-accent' : ''}
+          className={editor.isActive("orderedList") ? "bg-accent" : ""}
           title="Ordered List"
         >
           <ListOrdered size={18} />
@@ -173,7 +218,7 @@ export default function RichTextEditor({
           variant="ghost"
           size="icon"
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          className={editor.isActive('blockquote') ? 'bg-accent' : ''}
+          className={editor.isActive("blockquote") ? "bg-accent" : ""}
           title="Quote"
         >
           <Quote size={18} />
@@ -182,7 +227,7 @@ export default function RichTextEditor({
           variant="ghost"
           size="icon"
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          className={editor.isActive('codeBlock') ? 'bg-accent' : ''}
+          className={editor.isActive("codeBlock") ? "bg-accent" : ""}
           title="Code Block"
         >
           <Code size={18} />
@@ -200,11 +245,7 @@ export default function RichTextEditor({
         {/* Image, Link, Youtube */}
         <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
           <DialogTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              title="Insert Image"
-            >
+            <Button variant="ghost" size="icon" title="Insert Image">
               <ImageIcon size={18} />
             </Button>
           </DialogTrigger>
@@ -231,11 +272,7 @@ export default function RichTextEditor({
 
         <Dialog open={isLinkDialogOpen} onOpenChange={setIsLinkDialogOpen}>
           <DialogTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              title="Insert Link"
-            >
+            <Button variant="ghost" size="icon" title="Insert Link">
               <LinkIcon size={18} />
             </Button>
           </DialogTrigger>
@@ -269,13 +306,12 @@ export default function RichTextEditor({
           </DialogContent>
         </Dialog>
 
-        <Dialog open={isYoutubeDialogOpen} onOpenChange={setIsYoutubeDialogOpen}>
+        <Dialog
+          open={isYoutubeDialogOpen}
+          onOpenChange={setIsYoutubeDialogOpen}
+        >
           <DialogTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              title="Insert YouTube Video"
-            >
+            <Button variant="ghost" size="icon" title="Insert YouTube Video">
               <YoutubeIcon size={18} />
             </Button>
           </DialogTrigger>

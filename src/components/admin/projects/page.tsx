@@ -1,7 +1,6 @@
 "use client";
 
 import AdminLayout from "@/components/admin/admin-layout";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,77 +22,63 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import {
   AlertCircle,
+  Briefcase,
   Edit,
-  Eye,
-  FileText,
+  ExternalLink,
+  Github,
   Plus,
   Search,
+  Star,
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-interface Post {
+interface Project {
   id: number;
   title: string;
   slug: string;
-  published: boolean;
+  description?: string;
+  image_url?: string;
+  github_url?: string;
+  demo_url?: string;
+  featured: boolean;
   created_at: string;
-  updated_at: string;
-  view_count: number;
-  category: {
-    name: string;
-  } | null;
-  author: {
-    full_name: string;
-  } | null;
 }
 
-export default function AdminBlogPage() {
+export default function AdminProjectsPage() {
   const router = useRouter();
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [postToDelete, setPostToDelete] = useState<Post | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    fetchPosts();
+    fetchProjects();
   }, []);
 
-  const fetchPosts = async () => {
+  const fetchProjects = async () => {
     try {
       setLoading(true);
       setError(null);
 
       const { data, error } = await supabase
-        .from("posts")
-        .select(
-          `
-          id,
-          title,
-          slug,
-          published,
-          created_at,
-          updated_at,
-          view_count,
-          category:categories(name),
-          author:profiles(full_name)
-        `
-        )
+        .from("projects")
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (error) {
         throw error;
       }
 
-      setPosts(data || []);
+      setProjects(data || []);
     } catch (err: any) {
-      console.error("Error fetching posts:", err);
-      setError(err.message || "Failed to fetch posts. Please try again.");
+      console.error("Error fetching projects:", err);
+      setError(err.message || "Failed to fetch projects. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -101,47 +86,69 @@ export default function AdminBlogPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // Filter posts client-side for simplicity
+    // Filter projects client-side for simplicity
   };
 
-  const filteredPosts = posts.filter((post) => {
+  const filteredProjects = projects.filter((project) => {
     const searchLower = searchQuery.toLowerCase();
     return (
-      post.title.toLowerCase().includes(searchLower) ||
-      post.slug.toLowerCase().includes(searchLower) ||
-      post.category?.name?.toLowerCase().includes(searchLower) ||
-      post.author?.full_name?.toLowerCase().includes(searchLower)
+      project.title.toLowerCase().includes(searchLower) ||
+      project.slug.toLowerCase().includes(searchLower) ||
+      (project.description || "").toLowerCase().includes(searchLower)
     );
   });
 
-  const handleDeleteClick = (post: Post) => {
-    setPostToDelete(post);
+  const handleDeleteClick = (project: Project) => {
+    setProjectToDelete(project);
     setDeleteDialogOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
-    if (!postToDelete) return;
+    if (!projectToDelete) return;
 
     try {
       setIsDeleting(true);
 
       const { error } = await supabase
-        .from("posts")
+        .from("projects")
         .delete()
-        .eq("id", postToDelete.id);
+        .eq("id", projectToDelete.id);
 
       if (error) {
         throw error;
       }
 
-      // Remove post from state
-      setPosts((prev) => prev.filter((p) => p.id !== postToDelete.id));
+      // Remove project from state
+      setProjects((prev) => prev.filter((p) => p.id !== projectToDelete.id));
       setDeleteDialogOpen(false);
     } catch (err: any) {
-      console.error("Error deleting post:", err);
-      alert("Failed to delete post. Please try again.");
+      console.error("Error deleting project:", err);
+      alert("Failed to delete project. Please try again.");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const toggleFeatured = async (project: Project) => {
+    try {
+      const { error } = await supabase
+        .from("projects")
+        .update({ featured: !project.featured })
+        .eq("id", project.id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update project in state
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.id === project.id ? { ...p, featured: !p.featured } : p
+        )
+      );
+    } catch (err: any) {
+      console.error("Error toggling featured status:", err);
+      alert("Failed to update project. Please try again.");
     }
   };
 
@@ -149,12 +156,12 @@ export default function AdminBlogPage() {
     <AdminLayout>
       <div className="container px-4 py-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Blog Posts</h1>
+          <h1 className="text-2xl font-bold">Projects</h1>
 
-          <Link href="/admin/blog/new">
+          <Link href="/admin/projects/new">
             <Button className="gap-2">
               <Plus size={18} />
-              New Post
+              New Project
             </Button>
           </Link>
         </div>
@@ -171,7 +178,7 @@ export default function AdminBlogPage() {
             <form onSubmit={handleSearch} className="flex w-full gap-2">
               <Input
                 type="search"
-                placeholder="Search posts..."
+                placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full max-w-md"
@@ -187,10 +194,8 @@ export default function AdminBlogPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Title</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Author</TableHead>
-                  <TableHead>Views</TableHead>
+                  <TableHead>Featured</TableHead>
+                  <TableHead>Links</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -198,46 +203,85 @@ export default function AdminBlogPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={5} className="text-center py-8">
                       Loading...
                     </TableCell>
                   </TableRow>
-                ) : filteredPosts.length === 0 ? (
+                ) : filteredProjects.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
-                      No posts found
+                    <TableCell colSpan={5} className="text-center py-8">
+                      No projects found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredPosts.map((post) => (
-                    <TableRow key={post.id}>
+                  filteredProjects.map((project) => (
+                    <TableRow key={project.id}>
                       <TableCell className="font-medium max-w-md truncate">
                         <div className="flex items-center gap-2">
-                          <FileText
+                          <Briefcase
                             size={16}
                             className="text-muted-foreground flex-shrink-0"
                           />
-                          <span className="truncate">{post.title}</span>
+                          <span className="truncate">{project.title}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={post.published ? "default" : "outline"}
-                          className={post.published ? "bg-green-500" : ""}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => toggleFeatured(project)}
+                          title={
+                            project.featured
+                              ? "Remove from featured"
+                              : "Add to featured"
+                          }
                         >
-                          {post.published ? "Published" : "Draft"}
-                        </Badge>
+                          <Star
+                            size={16}
+                            className={
+                              project.featured
+                                ? "fill-yellow-400 text-yellow-400"
+                                : "text-muted-foreground"
+                            }
+                          />
+                        </Button>
                       </TableCell>
-                      <TableCell>{post.category?.name || "-"}</TableCell>
-                      <TableCell>{post.author?.full_name || "-"}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Eye size={14} className="text-muted-foreground" />
-                          {post.view_count || 0}
+                        <div className="flex gap-2">
+                          {project.github_url && (
+                            <a
+                              href={project.github_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="GitHub Repository"
+                              >
+                                <Github size={16} />
+                              </Button>
+                            </a>
+                          )}
+                          {project.demo_url && (
+                            <a
+                              href={project.demo_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Live Demo"
+                              >
+                                <ExternalLink size={16} />
+                              </Button>
+                            </a>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
-                        {new Date(post.created_at).toLocaleDateString()}
+                        {new Date(project.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -245,7 +289,7 @@ export default function AdminBlogPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() =>
-                              router.push(`/admin/blog/${post.id}`)
+                              router.push(`/admin/projects/${project.id}`)
                             }
                             title="Edit"
                           >
@@ -254,20 +298,11 @@ export default function AdminBlogPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleDeleteClick(post)}
+                            onClick={() => handleDeleteClick(project)}
                             title="Delete"
                           >
                             <Trash2 size={16} />
                           </Button>
-                          <Link
-                            href={`/blog/${post.slug}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Button variant="ghost" size="icon" title="View">
-                              <Eye size={16} />
-                            </Button>
-                          </Link>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -285,7 +320,7 @@ export default function AdminBlogPage() {
               <DialogTitle>Confirm Deletion</DialogTitle>
               <DialogDescription>
                 Are you sure you want to delete{" "}
-                <span className="font-semibold">{postToDelete?.title}</span>?
+                <span className="font-semibold">{projectToDelete?.title}</span>?
                 This action cannot be undone.
               </DialogDescription>
             </DialogHeader>

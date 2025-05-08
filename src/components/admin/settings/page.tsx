@@ -443,14 +443,6 @@ export default function SettingsPage() {
                       value={formState.text_color}
                       onChange={handleChange}
                       type="color"
-                      className="h-# Admin Dashboard     8 w-full"
-                    />
-                    <Input
-                      id="text_color"
-                      name="text_color"
-                      value={formState.text_color}
-                      onChange={handleChange}
-                      type="color"
                       className="h-8 w-full"
                     />
                   </div>
