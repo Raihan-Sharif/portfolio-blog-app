@@ -15,6 +15,7 @@ export default function Contact() {
     message: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Removed the error variable completely
   const [submitStatus, setSubmitStatus] = useState<{
     success?: boolean;
     message?: string;
@@ -42,7 +43,9 @@ export default function Contact() {
         message: "Thank you! Your message has been sent.",
       });
       setFormData({ name: "", email: "", subject: "", message: "" });
-    } catch (error) {
+    } catch (submitError) {
+      // Using submitError to avoid the variable name 'error'
+      console.error("Error submitting form:", submitError);
       setSubmitStatus({
         success: false,
         message: "There was an error sending your message. Please try again.",

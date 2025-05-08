@@ -3,8 +3,16 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
+// Define a type for the blog content
+interface BlogContentType {
+  type?: string;
+  content?: string | Record<string, unknown>;
+  html?: string;
+  [key: string]: unknown;
+}
+
 interface BlogContentProps {
-  content: any;
+  content: BlogContentType;
 }
 
 export default function BlogContent({ content }: BlogContentProps) {
@@ -23,6 +31,11 @@ export default function BlogContent({ content }: BlogContentProps) {
         // If it's HTML string (simple case)
         setRenderedContent(
           <div dangerouslySetInnerHTML={{ __html: content }} />
+        );
+      } else if (content.html && typeof content.html === "string") {
+        // If it has an html property
+        setRenderedContent(
+          <div dangerouslySetInnerHTML={{ __html: content.html }} />
         );
       } else {
         // For complex JSON content from Tiptap/ProseMirror

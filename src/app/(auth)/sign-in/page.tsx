@@ -9,6 +9,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+// Define proper types for the role response
+interface RoleData {
+  name: string;
+}
+
+interface UserRolesResponse {
+  roles: RoleData;
+}
+
 export default function SignInPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -53,7 +62,10 @@ export default function SignInPage() {
           .eq("user_id", data.session.user.id)
           .single();
 
-        if (userRoles?.roles?.name === "admin") {
+        // Type-cast userRoles to the correct type
+        const roleData = userRoles as UserRolesResponse | null;
+
+        if (roleData?.roles?.name === "admin") {
           router.push("/admin/dashboard");
         } else {
           router.push("/");

@@ -16,10 +16,25 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase/client";
 import { slugify } from "@/lib/utils";
-import { Category, Tag } from "@/types";
 import { AlertCircle, ArrowLeft, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+
+// Define types inline if the @/types module isn't found
+interface Category {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  created_at: string;
+}
+
+interface Tag {
+  id: number;
+  name: string;
+  slug: string;
+  created_at: string;
+}
 
 interface PostEditorProps {
   params: {
@@ -132,7 +147,8 @@ export default function PostEditor({ params }: PostEditorProps) {
     }
   };
 
-  const handleSelectChange = (name: string, value: string) => {
+  // Updated to accept string | number | null
+  const handleSelectChange = (name: string, value: string | number | null) => {
     setFormState((prev) => ({
       ...prev,
       [name]: value,

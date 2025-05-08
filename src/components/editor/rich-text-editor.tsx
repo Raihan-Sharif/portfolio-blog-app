@@ -33,21 +33,22 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+// Define types for the RichTextEditor
+interface RichTextEditorProps {
+  initialContent?: Record<string, unknown>;
+  onChange: (content: Record<string, unknown>) => void;
+}
+
 // Mock Youtube extension as placeholder
 const Youtube = {
   name: "youtube",
-  configure: (options: any) => {
+  configure: (options: Record<string, unknown>) => {
     return {
       name: "youtube",
       options,
     };
   },
 };
-
-interface RichTextEditorProps {
-  initialContent?: any;
-  onChange: (content: any) => void;
-}
 
 export default function RichTextEditor({
   initialContent,
@@ -68,7 +69,7 @@ export default function RichTextEditor({
       Link.configure({
         openOnClick: false,
       }),
-      Youtube as any,
+      Youtube as any, // Using any here since this is a mock
     ],
     content: initialContent || "",
     onUpdate: ({ editor }) => {

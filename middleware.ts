@@ -2,6 +2,15 @@ import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
+// Define proper types for the role response
+interface RoleData {
+  name: string;
+}
+
+interface UserRolesResponse {
+  roles: RoleData;
+}
+
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
   const supabase = createMiddlewareClient({ req, res });
@@ -24,7 +33,9 @@ export async function middleware(req: NextRequest) {
       .eq("user_id", session.user.id)
       .single();
 
-    if (!userRoles || !userRoles.roles || userRoles.roles.name !== "admin") {
+    // Use the properly typed check
+    const roleData = userRoles as UserRolesResponse | null;
+    if (!roleData || !roleData.roles || roleData.roles.name !== "admin") {
       return NextResponse.redirect(new URL("/", req.url));
     }
   }
@@ -41,10 +52,12 @@ export async function middleware(req: NextRequest) {
       .eq("user_id", session.user.id)
       .single();
 
+    // Use the properly typed check
+    const roleData = userRoles as UserRolesResponse | null;
     if (
-      !userRoles ||
-      !userRoles.roles ||
-      (userRoles.roles.name !== "editor" && userRoles.roles.name !== "admin")
+      !roleData ||
+      !roleData.roles ||
+      (roleData.roles.name !== "editor" && roleData.roles.name !== "admin")
     ) {
       return NextResponse.redirect(new URL("/", req.url));
     }

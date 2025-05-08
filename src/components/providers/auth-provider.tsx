@@ -1,13 +1,20 @@
 "use client";
 
 import { supabase } from "@/lib/supabase/client";
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 
 type User = {
   id: string;
   email?: string;
   full_name?: string;
   avatar_url?: string;
+  bio?: string;
   role?: string;
 };
 
@@ -67,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
 
@@ -88,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     // Initial user fetch
@@ -116,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [refreshUser]);
 
   const signOut = async () => {
     await supabase.auth.signOut();

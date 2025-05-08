@@ -89,7 +89,9 @@ export default async function BlogPage({
 
   // Execute the query
   const { data: posts, error } = await query;
-
+  if (error) {
+    console.error("Error fetching posts:", error);
+  }
   // Get count for pagination
   let countQuery = supabase
     .from("posts")

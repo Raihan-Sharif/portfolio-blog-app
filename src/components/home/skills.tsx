@@ -18,25 +18,25 @@ export default function Skills({ skills }: SkillsProps) {
         <div className="text-center mb-16">
           <h2 className="text-3xl font-bold mb-4">My Skills</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Technologies and tools I've worked with over my 6+ years in software
-            development.
+            Technologies and tools I&apos;ve worked with over my 6+ years in
+            software development.
           </p>
         </div>
 
         <div className="space-y-12">
-          {categories.map((category, index) => (
+          {categories.map((category) => (
             <div key={category}>
               <h3 className="text-xl font-semibold mb-6">{category}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {skills
                   .filter((skill) => skill.category === category)
-                  .map((skill, skillIndex) => (
+                  .map((skill, index) => (
                     <motion.div
                       key={skill.id}
                       initial={{ opacity: 0, y: 20 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       viewport={{ once: true }}
-                      transition={{ duration: 0.3, delay: skillIndex * 0.05 }}
+                      transition={{ duration: 0.3, delay: index * 0.05 }}
                       className="bg-card shadow rounded-lg p-6"
                     >
                       <div className="mb-4">

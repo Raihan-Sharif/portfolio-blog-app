@@ -1,22 +1,30 @@
 "use client";
 
+import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ModeToggle } from "@/components/ui/mode-toggle";
-import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { Menu, X } from "lucide-react";
+import { LogOut, Menu, User, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const { user, loading, signOut } = useAuth();
   const pathname = usePathname();
-  const { theme } = useTheme();
+  const router = useRouter();
+  const {} = useTheme();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -27,27 +35,13 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  useEffect(() => {
-    const getUser = async () => {
-      const { data } = await supabase.auth.getSession();
-      setUser(data.session?.user || null);
-    };
-
-    getUser();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user || null);
-      }
-    );
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
-
   const toggleMenu = () => setIsOpen(!isOpen);
   const closeMenu = () => setIsOpen(false);
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push("/");
+  };
 
   const navLinks = [
     { href: "/", label: "Home" },
@@ -91,18 +85,49 @@ export function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              {user ? (
-                <Link href="/admin/dashboard">
-                  <Button variant="outline" size="sm">
-                    Dashboard
-                  </Button>
-                </Link>
-              ) : (
-                <Link href="/sign-in">
-                  <Button variant="outline" size="sm">
-                    Sign In
-                  </Button>
-                </Link>
+
+              {!loading && (
+                <>
+                  {user ? (
+                    <div className="flex items-center gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center gap-2"
+                          >
+                            <User size={16} />
+                            <span className="hidden lg:inline">
+                              {user.full_name || "Account"}
+                            </span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href="/profile">Profile</Link>
+                          </DropdownMenuItem>
+                          {user.role === "admin" && (
+                            <DropdownMenuItem asChild>
+                              <Link href="/admin/dashboard">Dashboard</Link>
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={handleSignOut}>
+                            <LogOut className="mr-2 h-4 w-4" />
+                            <span>Sign Out</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  ) : (
+                    <Link href="/sign-in">
+                      <Button variant="outline" size="sm">
+                        Sign In
+                      </Button>
+                    </Link>
+                  )}
+                </>
               )}
               <ModeToggle />
             </div>
@@ -111,6 +136,34 @@ export function Navbar() {
           {/* Mobile menu button */}
           <div className="flex md:hidden items-center space-x-2">
             <ModeToggle />
+            {!loading && user && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 rounded-full"
+                  >
+                    <User size={16} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile">Profile</Link>
+                  </DropdownMenuItem>
+                  {user.role === "admin" && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/dashboard">Dashboard</Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sign Out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -153,15 +206,7 @@ export function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              {user ? (
-                <Link
-                  href="/admin/dashboard"
-                  onClick={closeMenu}
-                  className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent hover:text-accent-foreground"
-                >
-                  Dashboard
-                </Link>
-              ) : (
+              {!loading && !user && (
                 <Link
                   href="/sign-in"
                   onClick={closeMenu}

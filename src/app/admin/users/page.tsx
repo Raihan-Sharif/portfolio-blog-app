@@ -31,6 +31,28 @@ import { supabase } from "@/lib/supabase/client";
 import { AlertCircle, CheckCircle, Search, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 
+// Define interfaces for type safety
+interface Role {
+  id: number;
+  name: string;
+}
+
+interface UserRole {
+  user_id: string;
+  roles: Role;
+}
+
+interface Profile {
+  id: string;
+  full_name: string;
+  created_at: string;
+}
+
+interface AuthUser {
+  id: string;
+  email: string;
+}
+
 interface User {
   id: string;
   email: string;
@@ -99,15 +121,20 @@ export default function UsersPage() {
       }
 
       // Combine the data
-      const combinedUsers = profiles.map((profile) => {
-        const authUser = authUsers.users.find((u: any) => u.id === profile.id);
-        const userRole = userRoles.find((ur) => ur.user_id === profile.id);
+      const combinedUsers = profiles.map((profile: Profile) => {
+        const authUser = authUsers.users.find(
+          (u: AuthUser) => u.id === profile.id
+        );
+        const userRole = userRoles.find(
+          (ur: UserRole) => ur.user_id === profile.id
+        );
 
         return {
           id: profile.id,
           email: authUser?.email || "No email found",
           full_name: profile.full_name,
           created_at: profile.created_at,
+          // Fix the type issue here - properly handle the nested roles object
           role: userRole?.roles?.name || "No role",
         };
       });

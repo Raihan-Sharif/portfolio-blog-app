@@ -1,10 +1,10 @@
 export type Profile = {
   id: string;
-  full_name: string;
+  full_name?: string;
   avatar_url?: string;
   bio?: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 };
 
 export type Role = {
@@ -32,7 +32,7 @@ export type Project = {
   demo_url?: string;
   featured: boolean;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 };
 
 export type Skill = {
@@ -58,7 +58,7 @@ export type Post = {
   category?: Category;
   view_count: number;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
   tags?: Tag[];
 };
 
@@ -96,5 +96,14 @@ export type SocialLink = {
   url: string;
   icon?: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 };
+
+// Supabase response types
+export interface RoleData {
+  name: string;
+}
+
+export interface UserRolesResponse {
+  roles: RoleData;
+}
