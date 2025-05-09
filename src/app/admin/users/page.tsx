@@ -29,16 +29,9 @@ import {
 } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
 import { AlertCircle, CheckCircle, Search, UserPlus } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 // Define interfaces for type safety
-interface Role {
-  id: number;
-  name: string;
-}
-
-// Update to match the actual structure from the database
 interface UserRoleData {
   user_id: string;
   roles: {
@@ -67,7 +60,7 @@ interface User {
 }
 
 export default function UsersPage() {
-  const router = useRouter(); // Used in handleAddUser completion
+  // Removed router import and reference
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,12 +121,12 @@ export default function UsersPage() {
 
       // Combine the data
       const combinedUsers = profiles.map((profile: Profile) => {
-        // Fix the type issue by properly typing the authUsers data
+        // Find auth user
         const authUser = authUsers.users.find((u) => u.id === profile.id) as
           | AuthUser
           | undefined;
 
-        // Fix the userRole type issue by removing the explicit type annotation
+        // Find user role
         const userRole = userRoles.find((ur) => ur.user_id === profile.id) as
           | UserRoleData
           | undefined;
@@ -176,7 +169,6 @@ export default function UsersPage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     // Filter users client-side for simplicity
-    // In a production app, you might want to implement server-side filtering
   };
 
   const filteredUsers = users.filter((user) => {

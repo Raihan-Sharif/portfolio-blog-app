@@ -1,12 +1,34 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Post } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import { ArrowRight, Calendar, User } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+
+// Define the Post interface directly
+interface Post {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt?: string;
+  content?: any;
+  cover_image_url?: string;
+  published: boolean;
+  author_id: string;
+  author?: {
+    full_name: string;
+  } | null;
+  category_id?: number;
+  category?: {
+    name: string;
+    slug: string;
+  } | null;
+  view_count: number;
+  created_at: string;
+  updated_at?: string;
+}
 
 interface LatestBlogPostsProps {
   posts: Post[];

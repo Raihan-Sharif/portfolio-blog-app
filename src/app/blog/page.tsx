@@ -1,8 +1,40 @@
 import BlogGrid from "@/components/blog/blog-grid";
 import BlogHeader from "@/components/blog/blog-header";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { Category, Post, Tag } from "@/types";
 import { Metadata } from "next";
+
+// Define the types locally instead of importing from @/types
+interface Category {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  created_at: string;
+}
+
+interface Post {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt?: string;
+  content?: any;
+  cover_image_url?: string;
+  published: boolean;
+  author_id: string;
+  author?: any;
+  category_id?: number;
+  category?: Category;
+  view_count: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+interface Tag {
+  id: number;
+  name: string;
+  slug: string;
+  created_at: string;
+}
 
 export const metadata: Metadata = {
   title: "Blog | Raihan Sharif",

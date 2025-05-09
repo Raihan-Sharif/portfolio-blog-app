@@ -2,11 +2,20 @@
 
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase/client";
-import { SocialLink } from "@/types";
 import { motion } from "framer-motion";
 import { ArrowDown, Github, Linkedin, Mail } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+
+// Define the SocialLink interface directly
+interface SocialLink {
+  id: number;
+  platform: string;
+  url: string;
+  icon?: string;
+  created_at: string;
+  updated_at?: string;
+}
 
 export default function Hero() {
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);

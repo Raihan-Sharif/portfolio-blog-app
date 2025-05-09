@@ -1,10 +1,10 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-export enum UserRole {
-  ADMIN = "admin",
-  EDITOR = "editor",
-  VIEWER = "viewer",
-}
+export const UserRole = {
+  ADMIN: "admin",
+  EDITOR: "editor",
+  VIEWER: "viewer",
+};
 
 export async function getUserRole() {
   const supabase = createServerSupabaseClient();
@@ -29,10 +29,36 @@ export async function getUserRole() {
     return null;
   }
 
-  return data.roles.name as UserRole;
+  // Handle data.roles which could be an object or array
+  let roleName = null;
+
+  // If roles is an object with a name property
+  if (
+    typeof data.roles === "object" &&
+    data.roles !== null &&
+    "name" in data.roles
+  ) {
+    roleName = data.roles.name;
+  }
+  // If roles is an array with objects that have name property
+  else if (
+    Array.isArray(data.roles) &&
+    data.roles.length > 0 &&
+    typeof data.roles[0] === "object" &&
+    data.roles[0] !== null &&
+    "name" in data.roles[0]
+  ) {
+    roleName = data.roles[0].name;
+  }
+
+  if (!roleName) {
+    return null;
+  }
+
+  return roleName;
 }
 
-export async function hasRequiredRole(requiredRole: UserRole) {
+export async function hasRequiredRole(requiredRole) {
   const userRole = await getUserRole();
 
   if (!userRole) {

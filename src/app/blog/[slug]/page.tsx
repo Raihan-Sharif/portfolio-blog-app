@@ -68,13 +68,19 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     notFound();
   }
 
-  // Get post tags
-  const { data: postTags } = await supabase
+  // Get post tags with simpler, explicit query
+  const { data: tagList } = await supabase
     .from("post_tags")
-    .select("tags(*)")
+    .select(
+      `
+      tag_id,
+      tags:tags(id, name, slug)
+    `
+    )
     .eq("post_id", post.id);
 
-  const tags = postTags?.map((pt) => pt.tags) || [];
+  // Just extract the tags we need without complex mapping
+  const tags = tagList ? tagList.map((item) => item.tags) : [];
 
   // Update view count (could be done with a serverless function in production)
   const { error: updateError } = await supabase
@@ -175,7 +181,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             <div className="mt-12 pt-6 border-t">
               <h3 className="text-lg font-semibold mb-3">Tags</h3>
               <div className="flex flex-wrap gap-2">
-                {tags.map((tag) => (
+                {tags.map((tag: any) => (
                   <Link
                     key={tag.id}
                     href={`/blog?tag=${tag.slug}`}

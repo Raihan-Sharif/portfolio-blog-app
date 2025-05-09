@@ -2,12 +2,20 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Category } from "@/types";
 import { motion } from "framer-motion";
 import { Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+
+// Define the Category interface directly
+interface Category {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  created_at: string;
+}
 
 interface BlogHeaderProps {
   categories: Category[];

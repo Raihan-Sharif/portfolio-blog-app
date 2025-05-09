@@ -2,11 +2,25 @@
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Project } from "@/types";
 import { motion } from "framer-motion";
 import { ArrowRight, ExternalLink, Github } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+
+// Define the Project interface directly
+interface Project {
+  id: number;
+  title: string;
+  slug: string;
+  description?: string;
+  content?: any;
+  image_url?: string;
+  github_url?: string;
+  demo_url?: string;
+  featured: boolean;
+  created_at: string;
+  updated_at?: string;
+}
 
 interface FeaturedProjectsProps {
   projects: Project[];

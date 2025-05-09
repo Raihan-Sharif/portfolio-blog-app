@@ -63,10 +63,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error("Error fetching user role:", roleError);
       }
 
+      // Safely extract the role name with type checking
+      let roleName = "viewer"; // Default role
+
+      if (userRole && userRole.roles) {
+        // Handle if roles is an object with name property
+        if (
+          typeof userRole.roles === "object" &&
+          userRole.roles !== null &&
+          "name" in userRole.roles
+        ) {
+          roleName = userRole.roles.name as string;
+        }
+        // Handle if roles is an array with objects that have name property
+        else if (
+          Array.isArray(userRole.roles) &&
+          userRole.roles.length > 0 &&
+          typeof userRole.roles[0] === "object" &&
+          userRole.roles[0] !== null &&
+          "name" in userRole.roles[0]
+        ) {
+          roleName = userRole.roles[0].name as string;
+        }
+      }
+
       return {
         id: userId,
         ...profile,
-        role: userRole?.roles?.name || "viewer",
+        role: roleName,
       };
     } catch (err) {
       console.error("Error getting user details:", err);

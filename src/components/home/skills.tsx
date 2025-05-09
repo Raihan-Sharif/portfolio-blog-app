@@ -1,16 +1,31 @@
 "use client";
 
-import { Skill } from "@/types";
 import { motion } from "framer-motion";
+
+// Define the Skill interface directly
+interface Skill {
+  id: number;
+  name: string;
+  category?: string;
+  proficiency?: number;
+  icon?: string;
+  created_at: string;
+}
 
 interface SkillsProps {
   skills: Skill[];
 }
 
 export default function Skills({ skills }: SkillsProps) {
-  const categories = [
-    ...new Set(skills.map((skill) => skill.category || "Other")),
-  ];
+  // Alternative approach to get unique categories without using Set
+  const categoryMap: Record<string, boolean> = {};
+  skills.forEach((skill) => {
+    const category = skill.category || "Other";
+    categoryMap[category] = true;
+  });
+
+  // Get array of unique categories
+  const categories = Object.keys(categoryMap);
 
   return (
     <section className="py-20 bg-accent/30">
@@ -29,7 +44,7 @@ export default function Skills({ skills }: SkillsProps) {
               <h3 className="text-xl font-semibold mb-6">{category}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {skills
-                  .filter((skill) => skill.category === category)
+                  .filter((skill) => (skill.category || "Other") === category)
                   .map((skill, index) => (
                     <motion.div
                       key={skill.id}

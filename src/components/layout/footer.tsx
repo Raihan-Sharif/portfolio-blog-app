@@ -1,7 +1,6 @@
 "use client";
 
 import { supabase } from "@/lib/supabase/client";
-import { SocialLink } from "@/types";
 import {
   Facebook,
   Github,
@@ -13,6 +12,16 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+
+// Define the SocialLink interface directly
+interface SocialLink {
+  id: number;
+  platform: string;
+  url: string;
+  icon?: string;
+  created_at: string;
+  updated_at?: string;
+}
 
 export function Footer() {
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
