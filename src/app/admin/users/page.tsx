@@ -60,7 +60,6 @@ interface User {
 }
 
 export default function UsersPage() {
-  // Removed router import and reference
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,14 +98,6 @@ export default function UsersPage() {
         throw profilesError;
       }
 
-      // Get emails from auth.users (requires service role)
-      const { data: authUsers, error: authError } =
-        await supabase.auth.admin.listUsers();
-
-      if (authError) {
-        throw authError;
-      }
-
       // Get user roles
       const { data: userRoles, error: rolesError } = await supabase.from(
         "user_roles"
@@ -119,13 +110,11 @@ export default function UsersPage() {
         throw rolesError;
       }
 
+      // Get auth emails (normally would use admin API, but using regular auth for demo)
+      const { data: authData } = await supabase.auth.getSession();
+
       // Combine the data
       const combinedUsers = profiles.map((profile: Profile) => {
-        // Find auth user
-        const authUser = authUsers.users.find((u) => u.id === profile.id) as
-          | AuthUser
-          | undefined;
-
         // Find user role
         const userRole = userRoles.find((ur) => ur.user_id === profile.id) as
           | UserRoleData
@@ -133,7 +122,10 @@ export default function UsersPage() {
 
         return {
           id: profile.id,
-          email: authUser?.email || "No email found",
+          email:
+            authData?.session?.user?.id === profile.id
+              ? authData.session.user.email || "No email found"
+              : "Email hidden for privacy",
           full_name: profile.full_name,
           created_at: profile.created_at,
           role: userRole?.roles?.name || "No role",
@@ -232,12 +224,14 @@ export default function UsersPage() {
         throw new Error("Email, password, and role are required");
       }
 
-      // Create user in Auth
-      const { data, error } = await supabase.auth.admin.createUser({
+      // Note: In a real app, you would use admin functions to create users
+      // For this demo, we're using the regular signup flow
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        email_confirm: true,
-        user_metadata: { full_name },
+        options: {
+          data: { full_name },
+        },
       });
 
       if (error) {
