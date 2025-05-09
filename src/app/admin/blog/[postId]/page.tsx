@@ -1,17 +1,9 @@
 "use client";
 
 import AdminLayout from "@/components/admin/admin-layout";
-import RichTextEditor from "@/components/editor/rich-text-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase/client";
@@ -20,120 +12,75 @@ import { AlertCircle, ArrowLeft, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-// Define types inline if the @/types module isn't found
-interface Category {
-  id: number;
-  name: string;
-  slug: string;
-  description?: string;
-  created_at: string;
-}
-
-interface Tag {
-  id: number;
-  name: string;
-  slug: string;
-  created_at: string;
-}
-
-interface PostEditorProps {
+interface ProjectEditorProps {
   params: {
-    postId: string;
+    projectId: string;
   };
 }
 
-export default function PostEditor({ params }: PostEditorProps) {
+export default function ProjectEditor({ params }: ProjectEditorProps) {
   const router = useRouter();
-  const isNewPost = params.postId === "new";
-  const [loading, setLoading] = useState(true);
+  const isNewProject = params.projectId === "new";
+  const [loading, setLoading] = useState(!isNewProject);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [allTags, setAllTags] = useState<Tag[]>([]);
-  const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [formState, setFormState] = useState({
     title: "",
     slug: "",
-    excerpt: "",
+    description: "",
     content: {},
-    cover_image_url: "",
-    published: false,
-    category_id: null as number | null,
+    image_url: "",
+    github_url: "",
+    demo_url: "",
+    featured: false,
   });
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
+    if (!isNewProject) {
+      fetchProject();
+    }
+  }, [params.projectId, isNewProject]);
 
-        // Fetch categories
-        const { data: categoriesData } = await supabase
-          .from("categories")
-          .select("*")
-          .order("name");
+  const fetchProject = async () => {
+    try {
+      setLoading(true);
+      const { data: project, error: projectError } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("id", params.projectId)
+        .single();
 
-        setCategories(categoriesData || []);
-
-        // Fetch tags
-        const { data: tagsData } = await supabase
-          .from("tags")
-          .select("*")
-          .order("name");
-
-        setAllTags(tagsData || []);
-
-        // If editing an existing post, fetch its data
-        if (!isNewPost) {
-          const { data: post, error: postError } = await supabase
-            .from("posts")
-            .select("*")
-            .eq("id", params.postId)
-            .single();
-
-          if (postError) {
-            throw postError;
-          }
-
-          if (post) {
-            setFormState({
-              title: post.title || "",
-              slug: post.slug || "",
-              excerpt: post.excerpt || "",
-              content: post.content || {},
-              cover_image_url: post.cover_image_url || "",
-              published: post.published || false,
-              category_id: post.category_id,
-            });
-
-            // Fetch post tags
-            const { data: postTags } = await supabase
-              .from("post_tags")
-              .select("tag_id")
-              .eq("post_id", post.id);
-
-            if (postTags) {
-              setSelectedTags(postTags.map((pt) => pt.tag_id));
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching data:", err);
-        setError("Failed to load data. Please try again.");
-      } finally {
-        setLoading(false);
+      if (projectError) {
+        throw projectError;
       }
-    };
 
-    fetchData();
-  }, [params.postId, isNewPost]);
+      if (project) {
+        setFormState({
+          title: project.title || "",
+          slug: project.slug || "",
+          description: project.description || "",
+          content: project.content || {},
+          image_url: project.image_url || "",
+          github_url: project.github_url || "",
+          demo_url: project.demo_url || "",
+          featured: project.featured || false,
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching project:", err);
+      setError("Failed to load project data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
 
-    // Auto-generate slug from title if it's a new post
-    if (name === "title" && (isNewPost || formState.slug === "")) {
+    // Auto-generate slug from title if it's a new project
+    if (name === "title" && (isNewProject || formState.slug === "")) {
       setFormState((prev) => ({
         ...prev,
         [name]: value,
@@ -147,14 +94,6 @@ export default function PostEditor({ params }: PostEditorProps) {
     }
   };
 
-  // Updated to accept string | number | null
-  const handleSelectChange = (name: string, value: string | number | null) => {
-    setFormState((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
   const handleToggleChange = (name: string, checked: boolean) => {
     setFormState((prev) => ({
       ...prev,
@@ -162,22 +101,27 @@ export default function PostEditor({ params }: PostEditorProps) {
     }));
   };
 
-  const handleContentChange = (content: any) => {
-    setFormState((prev) => ({
-      ...prev,
-      content,
-    }));
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    try {
+      // Try to parse as JSON if it's a string representation
+      const contentValue = e.target.value.trim().startsWith("{")
+        ? JSON.parse(e.target.value)
+        : e.target.value;
+
+      setFormState((prev) => ({
+        ...prev,
+        content: contentValue,
+      }));
+    } catch (err) {
+      // If parsing fails, just store as a string
+      setFormState((prev) => ({
+        ...prev,
+        content: e.target.value,
+      }));
+    }
   };
 
-  const handleTagToggle = (tagId: number) => {
-    setSelectedTags((prev) =>
-      prev.includes(tagId)
-        ? prev.filter((id) => id !== tagId)
-        : [...prev, tagId]
-    );
-  };
-
-  const savePost = async () => {
+  const saveProject = async () => {
     try {
       setSaving(true);
       setError(null);
@@ -185,97 +129,71 @@ export default function PostEditor({ params }: PostEditorProps) {
       const {
         title,
         slug,
-        excerpt,
+        description,
         content,
-        cover_image_url,
-        published,
-        category_id,
+        image_url,
+        github_url,
+        demo_url,
+        featured,
       } = formState;
 
       if (!title || !slug) {
         throw new Error("Title and slug are required");
       }
 
-      let postId = params.postId;
-
-      // Get the current user's ID
+      // Get the current user's ID for audit trail
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (!user) {
-        throw new Error("You must be logged in to save a post");
+        throw new Error("You must be logged in to save a project");
       }
 
-      if (isNewPost) {
-        // Create new post
-        const { data: newPost, error: insertError } = await supabase
-          .from("posts")
-          .insert({
-            title,
-            slug,
-            excerpt,
-            content,
-            cover_image_url,
-            published,
-            category_id,
-            author_id: user.id,
-          })
-          .select("id")
-          .single();
+      if (isNewProject) {
+        // Create new project
+        const { error: insertError } = await supabase.from("projects").insert({
+          title,
+          slug,
+          description,
+          content,
+          image_url,
+          github_url,
+          demo_url,
+          featured,
+        });
 
         if (insertError) {
           throw insertError;
         }
-
-        postId = newPost.id;
       } else {
-        // Update existing post
+        // Update existing project
         const { error: updateError } = await supabase
-          .from("posts")
+          .from("projects")
           .update({
             title,
             slug,
-            excerpt,
+            description,
             content,
-            cover_image_url,
-            published,
-            category_id,
+            image_url,
+            github_url,
+            demo_url,
+            featured,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", postId);
+          .eq("id", params.projectId);
 
         if (updateError) {
           throw updateError;
         }
       }
 
-      // Handle tags - first delete existing tags then add new ones
-      if (!isNewPost) {
-        await supabase.from("post_tags").delete().eq("post_id", postId);
-      }
-
-      if (selectedTags.length > 0) {
-        const tagInserts = selectedTags.map((tagId) => ({
-          post_id: postId,
-          tag_id: tagId,
-        }));
-
-        const { error: tagError } = await supabase
-          .from("post_tags")
-          .insert(tagInserts);
-
-        if (tagError) {
-          throw tagError;
-        }
-      }
-
-      // Redirect to the post list
-      router.push("/admin/blog");
+      // Redirect to the projects list
+      router.push("/admin/projects");
       router.refresh();
     } catch (err: any) {
-      console.error("Error saving post:", err);
-      setError(err.message || "Failed to save post. Please try again.");
+      console.error("Error saving project:", err);
+      setError(err.message || "Failed to save project. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -291,6 +209,11 @@ export default function PostEditor({ params }: PostEditorProps) {
     );
   }
 
+  const contentValue =
+    typeof formState.content === "object"
+      ? JSON.stringify(formState.content, null, 2)
+      : String(formState.content || "");
+
   return (
     <AdminLayout>
       <div className="container px-4 py-6">
@@ -299,16 +222,16 @@ export default function PostEditor({ params }: PostEditorProps) {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => router.push("/admin/blog")}
+              onClick={() => router.push("/admin/projects")}
               className="mr-2"
             >
               <ArrowLeft size={18} />
             </Button>
             <h1 className="text-2xl font-bold">
-              {isNewPost ? "Create New Post" : "Edit Post"}
+              {isNewProject ? "Create New Project" : "Edit Project"}
             </h1>
           </div>
-          <Button onClick={savePost} disabled={saving} className="gap-2">
+          <Button onClick={saveProject} disabled={saving} className="gap-2">
             <Save size={16} />
             {saving ? "Saving..." : "Save"}
           </Button>
@@ -331,7 +254,7 @@ export default function PostEditor({ params }: PostEditorProps) {
                   name="title"
                   value={formState.title}
                   onChange={handleChange}
-                  placeholder="Post title"
+                  placeholder="Project title"
                 />
               </div>
               <div>
@@ -341,85 +264,61 @@ export default function PostEditor({ params }: PostEditorProps) {
                   name="slug"
                   value={formState.slug}
                   onChange={handleChange}
-                  placeholder="post-url-slug"
+                  placeholder="project-url-slug"
                 />
               </div>
               <div>
-                <Label htmlFor="excerpt">Excerpt</Label>
+                <Label htmlFor="description">Description</Label>
                 <Textarea
-                  id="excerpt"
-                  name="excerpt"
-                  value={formState.excerpt || ""}
+                  id="description"
+                  name="description"
+                  value={formState.description || ""}
                   onChange={handleChange}
-                  placeholder="Brief summary of the post"
+                  placeholder="Brief description of the project"
                   rows={3}
                 />
               </div>
             </div>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="cover_image_url">Cover Image URL</Label>
+                <Label htmlFor="image_url">Image URL</Label>
                 <Input
-                  id="cover_image_url"
-                  name="cover_image_url"
-                  value={formState.cover_image_url || ""}
+                  id="image_url"
+                  name="image_url"
+                  value={formState.image_url || ""}
                   onChange={handleChange}
                   placeholder="https://example.com/image.jpg"
                 />
               </div>
               <div>
-                <Label htmlFor="category">Category</Label>
-                <Select
-                  value={formState.category_id?.toString() || ""}
-                  onValueChange={(value) =>
-                    handleSelectChange(
-                      "category_id",
-                      value ? parseInt(value) : null
-                    )
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem
-                        key={category.id}
-                        value={category.id.toString()}
-                      >
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="github_url">GitHub URL</Label>
+                <Input
+                  id="github_url"
+                  name="github_url"
+                  value={formState.github_url || ""}
+                  onChange={handleChange}
+                  placeholder="https://github.com/username/project"
+                />
               </div>
               <div>
-                <Label className="mb-2 block">Tags</Label>
-                <div className="flex flex-wrap gap-2">
-                  {allTags.map((tag) => (
-                    <div
-                      key={tag.id}
-                      className={`px-3 py-1 rounded-full text-xs cursor-pointer transition-colors ${
-                        selectedTags.includes(tag.id)
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-accent hover:bg-primary/20"
-                      }`}
-                      onClick={() => handleTagToggle(tag.id)}
-                    >
-                      {tag.name}
-                    </div>
-                  ))}
-                </div>
+                <Label htmlFor="demo_url">Demo URL</Label>
+                <Input
+                  id="demo_url"
+                  name="demo_url"
+                  value={formState.demo_url || ""}
+                  onChange={handleChange}
+                  placeholder="https://demo-site.com"
+                />
               </div>
               <div className="flex items-center space-x-2">
                 <Switch
-                  id="published"
-                  checked={formState.published}
+                  id="featured"
+                  checked={formState.featured}
                   onCheckedChange={(checked) =>
-                    handleToggleChange("published", checked)
+                    handleToggleChange("featured", checked)
                   }
                 />
-                <Label htmlFor="published">Published</Label>
+                <Label htmlFor="featured">Featured Project</Label>
               </div>
             </div>
           </div>
@@ -428,9 +327,13 @@ export default function PostEditor({ params }: PostEditorProps) {
             <Label htmlFor="content" className="mb-2 block">
               Content
             </Label>
-            <RichTextEditor
-              initialContent={formState.content}
+            <Textarea
+              id="content"
+              name="content"
+              value={contentValue}
               onChange={handleContentChange}
+              rows={10}
+              placeholder="Detailed project description and technologies used..."
             />
           </div>
         </div>

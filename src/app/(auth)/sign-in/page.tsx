@@ -9,15 +9,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-// Define proper types for the role response
-interface RoleData {
-  name: string;
-}
-
-interface UserRolesResponse {
-  roles: RoleData;
-}
-
 export default function SignInPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -56,16 +47,30 @@ export default function SignInPage() {
 
       if (data?.session) {
         // Check user role to determine redirect
-        const { data: userRoles } = await supabase
+        const { data: userRolesData } = await supabase
           .from("user_roles")
-          .select("roles(name)")
-          .eq("user_id", data.session.user.id)
-          .single();
+          .select("role_id")
+          .eq("user_id", data.session.user.id);
 
-        // Type-cast userRoles to the correct type
-        const roleData = userRoles as UserRolesResponse | null;
+        // Default to viewer role
+        let isAdmin = false;
 
-        if (roleData?.roles?.name === "admin") {
+        if (userRolesData && userRolesData.length > 0) {
+          const roleId = userRolesData[0].role_id;
+
+          // Get the role name
+          const { data: roleData } = await supabase
+            .from("roles")
+            .select("name")
+            .eq("id", roleId)
+            .single();
+
+          if (roleData && roleData.name === "admin") {
+            isAdmin = true;
+          }
+        }
+
+        if (isAdmin) {
           router.push("/admin/dashboard");
         } else {
           router.push("/");

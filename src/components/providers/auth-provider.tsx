@@ -26,10 +26,6 @@ interface AuthContextType {
   refreshUser: () => Promise<void>;
 }
 
-interface RoleData {
-  name: string;
-}
-
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
@@ -61,38 +57,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return null;
       }
 
-      // Get user role
-      const { data: userRole, error: roleError } = await supabase
-        .from("user_roles")
-        .select("roles(name)")
-        .eq("user_id", userId)
-        .single();
-
-      if (roleError) {
-        console.error("Error fetching user role:", roleError);
-      }
-
-      // Safely extract the role name with type checking
+      // Get user role - Using a more resilient approach
       let roleName = "viewer"; // Default role
 
-      if (userRole && userRole.roles) {
-        // Handle if roles is an object with name property
-        if (
-          typeof userRole.roles === "object" &&
-          userRole.roles !== null &&
-          "name" in userRole.roles
-        ) {
-          roleName = (userRole.roles as RoleData).name;
-        }
-        // Handle if roles is an array with objects that have name property
-        else if (
-          Array.isArray(userRole.roles) &&
-          userRole.roles.length > 0 &&
-          typeof userRole.roles[0] === "object" &&
-          userRole.roles[0] !== null &&
-          "name" in userRole.roles[0]
-        ) {
-          roleName = (userRole.roles[0] as RoleData).name;
+      const { data: userRolesData, error: roleError } = await supabase
+        .from("user_roles")
+        .select("role_id")
+        .eq("user_id", userId);
+
+      console.log("User Roles Data:", userRolesData);
+
+      if (!roleError && userRolesData && userRolesData.length > 0) {
+        const roleId = userRolesData[0].role_id;
+
+        // Get the role name
+        const { data: roleData } = await supabase
+          .from("roles")
+          .select("name")
+          .eq("id", roleId)
+          .single();
+
+        console.log("Role Data:", roleData);
+
+        if (roleData && roleData.name) {
+          roleName = roleData.name;
         }
       }
 

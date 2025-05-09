@@ -2,15 +2,6 @@ import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-// Define proper types for the role response
-interface RoleData {
-  name: string;
-}
-
-interface UserRolesResponse {
-  roles: RoleData;
-}
-
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
   const supabase = createMiddlewareClient({ req, res });
@@ -26,16 +17,24 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL("/sign-in", req.url));
     }
 
-    // Check for admin role
+    // Check for admin role using a more direct approach
     const { data: userRoles } = await supabase
       .from("user_roles")
-      .select("roles(name)")
-      .eq("user_id", session.user.id)
+      .select("role_id")
+      .eq("user_id", session.user.id);
+
+    if (!userRoles || userRoles.length === 0) {
+      return NextResponse.redirect(new URL("/", req.url));
+    }
+
+    // Get the role name
+    const { data: roleData } = await supabase
+      .from("roles")
+      .select("name")
+      .eq("id", userRoles[0].role_id)
       .single();
 
-    // Use the properly typed check
-    const roleData = userRoles as UserRolesResponse | null;
-    if (!roleData || !roleData.roles || roleData.roles.name !== "admin") {
+    if (!roleData || roleData.name !== "admin") {
       return NextResponse.redirect(new URL("/", req.url));
     }
   }
@@ -48,16 +47,23 @@ export async function middleware(req: NextRequest) {
     // Check for editor or admin role
     const { data: userRoles } = await supabase
       .from("user_roles")
-      .select("roles(name)")
-      .eq("user_id", session.user.id)
+      .select("role_id")
+      .eq("user_id", session.user.id);
+
+    if (!userRoles || userRoles.length === 0) {
+      return NextResponse.redirect(new URL("/", req.url));
+    }
+
+    // Get the role name
+    const { data: roleData } = await supabase
+      .from("roles")
+      .select("name")
+      .eq("id", userRoles[0].role_id)
       .single();
 
-    // Use the properly typed check
-    const roleData = userRoles as UserRolesResponse | null;
     if (
       !roleData ||
-      !roleData.roles ||
-      (roleData.roles.name !== "editor" && roleData.roles.name !== "admin")
+      (roleData.name !== "editor" && roleData.name !== "admin")
     ) {
       return NextResponse.redirect(new URL("/", req.url));
     }

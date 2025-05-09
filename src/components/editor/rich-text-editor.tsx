@@ -35,17 +35,18 @@ import { useEffect, useState } from "react";
 
 // Define types for the RichTextEditor
 interface RichTextEditorProps {
-  initialContent?: Record<string, unknown>;
+  initialContent?: Record<string, unknown> | string;
   onChange: (content: Record<string, unknown>) => void;
 }
 
-// Mock Youtube extension as placeholder
+// Create a simplified YouTube extension
 const Youtube = {
   name: "youtube",
-  configure: (options: Record<string, unknown>) => {
+  addOptions() {
     return {
-      name: "youtube",
-      options,
+      width: 640,
+      height: 480,
+      controls: true,
     };
   },
 };
@@ -69,7 +70,7 @@ export default function RichTextEditor({
       Link.configure({
         openOnClick: false,
       }),
-      Youtube as any, // Using any here since this is a mock
+      Youtube as any, // Using any here for demo purposes
     ],
     content: initialContent || "",
     onUpdate: ({ editor }) => {
@@ -79,7 +80,23 @@ export default function RichTextEditor({
 
   useEffect(() => {
     if (editor && initialContent) {
-      editor.commands.setContent(initialContent);
+      try {
+        // Handle different types of initialContent
+        if (typeof initialContent === "string") {
+          editor.commands.setContent(initialContent);
+        } else if (
+          typeof initialContent === "object" &&
+          Object.keys(initialContent).length > 0
+        ) {
+          editor.commands.setContent(initialContent);
+        } else {
+          // Default empty content
+          editor.commands.setContent("");
+        }
+      } catch (error) {
+        console.error("Error setting editor content:", error);
+        editor.commands.setContent("");
+      }
     }
   }, [editor, initialContent]);
 
@@ -119,8 +136,8 @@ export default function RichTextEditor({
 
   const addYoutube = () => {
     if (youtubeUrl) {
-      // This would need a proper Youtube extension implementation
-      // For now, just insert a placeholder
+      // In a real implementation, we would use a proper YouTube extension
+      // For now, just insert text representing the embed
       editor.chain().focus().insertContent(`[YouTube: ${youtubeUrl}]`).run();
       setYoutubeUrl("");
       setIsYoutubeDialogOpen(false);
@@ -137,6 +154,7 @@ export default function RichTextEditor({
           onClick={() => editor.chain().focus().toggleBold().run()}
           className={editor.isActive("bold") ? "bg-accent" : ""}
           title="Bold"
+          type="button"
         >
           <Bold size={18} />
         </Button>
@@ -146,6 +164,7 @@ export default function RichTextEditor({
           onClick={() => editor.chain().focus().toggleItalic().run()}
           className={editor.isActive("italic") ? "bg-accent" : ""}
           title="Italic"
+          type="button"
         >
           <Italic size={18} />
         </Button>
@@ -162,6 +181,7 @@ export default function RichTextEditor({
             editor.isActive("heading", { level: 1 }) ? "bg-accent" : ""
           }
           title="Heading 1"
+          type="button"
         >
           <Heading1 size={18} />
         </Button>
@@ -175,6 +195,7 @@ export default function RichTextEditor({
             editor.isActive("heading", { level: 2 }) ? "bg-accent" : ""
           }
           title="Heading 2"
+          type="button"
         >
           <Heading2 size={18} />
         </Button>
@@ -188,6 +209,7 @@ export default function RichTextEditor({
             editor.isActive("heading", { level: 3 }) ? "bg-accent" : ""
           }
           title="Heading 3"
+          type="button"
         >
           <Heading3 size={18} />
         </Button>
@@ -200,6 +222,7 @@ export default function RichTextEditor({
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           className={editor.isActive("bulletList") ? "bg-accent" : ""}
           title="Bullet List"
+          type="button"
         >
           <List size={18} />
         </Button>
@@ -209,6 +232,7 @@ export default function RichTextEditor({
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           className={editor.isActive("orderedList") ? "bg-accent" : ""}
           title="Ordered List"
+          type="button"
         >
           <ListOrdered size={18} />
         </Button>
@@ -221,6 +245,7 @@ export default function RichTextEditor({
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
           className={editor.isActive("blockquote") ? "bg-accent" : ""}
           title="Quote"
+          type="button"
         >
           <Quote size={18} />
         </Button>
@@ -230,6 +255,7 @@ export default function RichTextEditor({
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
           className={editor.isActive("codeBlock") ? "bg-accent" : ""}
           title="Code Block"
+          type="button"
         >
           <Code size={18} />
         </Button>
@@ -238,6 +264,7 @@ export default function RichTextEditor({
           size="icon"
           onClick={() => editor.chain().focus().setHorizontalRule().run()}
           title="Horizontal Rule"
+          type="button"
         >
           <Minus size={18} />
         </Button>
@@ -246,7 +273,12 @@ export default function RichTextEditor({
         {/* Image, Link, Youtube */}
         <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="ghost" size="icon" title="Insert Image">
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Insert Image"
+              type="button"
+            >
               <ImageIcon size={18} />
             </Button>
           </DialogTrigger>
@@ -264,7 +296,7 @@ export default function RichTextEditor({
                   onChange={(e) => setImageUrl(e.target.value)}
                 />
               </div>
-              <Button onClick={addImage} className="w-full">
+              <Button onClick={addImage} className="w-full" type="button">
                 Insert
               </Button>
             </div>
@@ -273,7 +305,12 @@ export default function RichTextEditor({
 
         <Dialog open={isLinkDialogOpen} onOpenChange={setIsLinkDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="ghost" size="icon" title="Insert Link">
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Insert Link"
+              type="button"
+            >
               <LinkIcon size={18} />
             </Button>
           </DialogTrigger>
@@ -300,7 +337,7 @@ export default function RichTextEditor({
                   onChange={(e) => setLinkUrl(e.target.value)}
                 />
               </div>
-              <Button onClick={addLink} className="w-full">
+              <Button onClick={addLink} className="w-full" type="button">
                 Insert
               </Button>
             </div>
@@ -312,7 +349,12 @@ export default function RichTextEditor({
           onOpenChange={setIsYoutubeDialogOpen}
         >
           <DialogTrigger asChild>
-            <Button variant="ghost" size="icon" title="Insert YouTube Video">
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Insert YouTube Video"
+              type="button"
+            >
               <YoutubeIcon size={18} />
             </Button>
           </DialogTrigger>
@@ -330,7 +372,7 @@ export default function RichTextEditor({
                   onChange={(e) => setYoutubeUrl(e.target.value)}
                 />
               </div>
-              <Button onClick={addYoutube} className="w-full">
+              <Button onClick={addYoutube} className="w-full" type="button">
                 Insert
               </Button>
             </div>
@@ -345,6 +387,7 @@ export default function RichTextEditor({
           onClick={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().undo()}
           title="Undo"
+          type="button"
         >
           <Undo size={18} />
         </Button>
@@ -354,6 +397,7 @@ export default function RichTextEditor({
           onClick={() => editor.chain().focus().redo().run()}
           disabled={!editor.can().redo()}
           title="Redo"
+          type="button"
         >
           <Redo size={18} />
         </Button>

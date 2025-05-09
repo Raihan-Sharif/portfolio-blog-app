@@ -159,7 +159,7 @@ export default function AdminProjectsPage() {
           <h1 className="text-2xl font-bold">Projects</h1>
 
           <Link href="/admin/projects/new">
-            <Button className="gap-2">
+            <Button className="gap-2" type="button">
               <Plus size={18} />
               New Project
             </Button>
@@ -235,6 +235,7 @@ export default function AdminProjectsPage() {
                               ? "Remove from featured"
                               : "Add to featured"
                           }
+                          type="button"
                         >
                           <Star
                             size={16}
@@ -258,6 +259,7 @@ export default function AdminProjectsPage() {
                                 variant="ghost"
                                 size="icon"
                                 title="GitHub Repository"
+                                type="button"
                               >
                                 <Github size={16} />
                               </Button>
@@ -273,6 +275,7 @@ export default function AdminProjectsPage() {
                                 variant="ghost"
                                 size="icon"
                                 title="Live Demo"
+                                type="button"
                               >
                                 <ExternalLink size={16} />
                               </Button>
@@ -292,6 +295,7 @@ export default function AdminProjectsPage() {
                               router.push(`/admin/projects/${project.id}`)
                             }
                             title="Edit"
+                            type="button"
                           >
                             <Edit size={16} />
                           </Button>
@@ -300,6 +304,7 @@ export default function AdminProjectsPage() {
                             size="icon"
                             onClick={() => handleDeleteClick(project)}
                             title="Delete"
+                            type="button"
                           >
                             <Trash2 size={16} />
                           </Button>
@@ -329,6 +334,7 @@ export default function AdminProjectsPage() {
                 variant="outline"
                 onClick={() => setDeleteDialogOpen(false)}
                 disabled={isDeleting}
+                type="button"
               >
                 Cancel
               </Button>
@@ -336,6 +342,7 @@ export default function AdminProjectsPage() {
                 variant="destructive"
                 onClick={handleDeleteConfirm}
                 disabled={isDeleting}
+                type="button"
               >
                 {isDeleting ? "Deleting..." : "Delete"}
               </Button>

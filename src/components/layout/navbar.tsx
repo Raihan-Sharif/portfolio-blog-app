@@ -12,7 +12,7 @@ import {
 import { ModeToggle } from "@/components/ui/mode-toggle";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { LogOut, Menu, User, X } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, User, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -52,6 +52,11 @@ export function Navbar() {
     { href: "/contact", label: "Contact" },
   ];
 
+  // Add dashboard link for admin users
+  if (user && user.role === "admin") {
+    navLinks.push({ href: "/admin/dashboard", label: "Dashboard" });
+  }
+
   const navbarClasses = cn("fixed w-full z-50 transition-all duration-300", {
     "bg-background/80 backdrop-blur-md shadow-md": isScrolled,
     "bg-transparent": !isScrolled,
@@ -81,6 +86,7 @@ export function Navbar() {
                       ? "bg-primary text-primary-foreground"
                       : "text-foreground hover:bg-accent hover:text-accent-foreground"
                   )}
+                  onClick={closeMenu}
                 >
                   {link.label}
                 </Link>
@@ -109,7 +115,10 @@ export function Navbar() {
                           </DropdownMenuItem>
                           {user.role === "admin" && (
                             <DropdownMenuItem asChild>
-                              <Link href="/admin/dashboard">Dashboard</Link>
+                              <Link href="/admin/dashboard">
+                                <LayoutDashboard className="mr-2 h-4 w-4" />
+                                <span>Dashboard</span>
+                              </Link>
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />
@@ -153,7 +162,10 @@ export function Navbar() {
                   </DropdownMenuItem>
                   {user.role === "admin" && (
                     <DropdownMenuItem asChild>
-                      <Link href="/admin/dashboard">Dashboard</Link>
+                      <Link href="/admin/dashboard">
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        <span>Dashboard</span>
+                      </Link>
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />

@@ -29,14 +29,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
   }, [user, loading, router]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
   const handleSignOut = async () => {
     await signOut();
     router.push("/");
@@ -69,6 +61,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: <Settings size={18} />,
     },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background min-h-screen flex">
@@ -133,6 +133,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               variant="outline"
               className="w-full justify-start gap-2 mt-2"
               onClick={handleSignOut}
+              type="button"
             >
               <LogOut size={16} />
               Sign Out
@@ -146,7 +147,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <Link href="/" className="font-bold text-lg">
           Admin Panel
         </Link>
-        <Button variant="outline" size="sm" onClick={handleSignOut}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSignOut}
+          type="button"
+        >
           <LogOut size={16} />
         </Button>
       </div>
