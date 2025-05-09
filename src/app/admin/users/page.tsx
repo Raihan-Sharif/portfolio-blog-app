@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
 import { AlertCircle, CheckCircle, Search, UserPlus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 // Define interfaces for type safety
@@ -37,9 +38,13 @@ interface Role {
   name: string;
 }
 
-interface UserRole {
+// Update to match the actual structure from the database
+interface UserRoleData {
   user_id: string;
-  roles: Role;
+  roles: {
+    id: number;
+    name: string;
+  };
 }
 
 interface Profile {
@@ -62,6 +67,7 @@ interface User {
 }
 
 export default function UsersPage() {
+  const router = useRouter(); // Used in handleAddUser completion
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,19 +128,21 @@ export default function UsersPage() {
 
       // Combine the data
       const combinedUsers = profiles.map((profile: Profile) => {
-        const authUser = authUsers.users.find(
-          (u: AuthUser) => u.id === profile.id
-        );
-        const userRole = userRoles.find(
-          (ur: UserRole) => ur.user_id === profile.id
-        );
+        // Fix the type issue by properly typing the authUsers data
+        const authUser = authUsers.users.find((u) => u.id === profile.id) as
+          | AuthUser
+          | undefined;
+
+        // Fix the userRole type issue by removing the explicit type annotation
+        const userRole = userRoles.find((ur) => ur.user_id === profile.id) as
+          | UserRoleData
+          | undefined;
 
         return {
           id: profile.id,
           email: authUser?.email || "No email found",
           full_name: profile.full_name,
           created_at: profile.created_at,
-          // Fix the type issue here - properly handle the nested roles object
           role: userRole?.roles?.name || "No role",
         };
       });
@@ -244,7 +252,7 @@ export default function UsersPage() {
         throw error;
       }
 
-      if (data.user) {
+      if (data?.user) {
         // Create profile
         const { error: profileError } = await supabase.from("profiles").insert({
           id: data.user.id,
