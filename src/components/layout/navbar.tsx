@@ -43,7 +43,10 @@ export function Navbar() {
     router.push("/");
   };
 
-  const navLinks = [
+  console.log("Current user in navbar:", user);
+
+  // Base navigation links
+  const baseNavLinks = [
     { href: "/", label: "Home" },
     { href: "/about", label: "About" },
     { href: "/projects", label: "Projects" },
@@ -52,9 +55,13 @@ export function Navbar() {
     { href: "/contact", label: "Contact" },
   ];
 
-  // Add dashboard link for admin users
-  if (user && user.role === "admin") {
-    navLinks.push({ href: "/admin/dashboard", label: "Dashboard" });
+  // Determine if we should add admin dashboard link
+  const showAdminLink = user && user.role === "admin";
+  const navLinks = [...baseNavLinks];
+
+  // For debugging
+  if (user) {
+    console.log("User role in navbar:", user.role);
   }
 
   const navbarClasses = cn("fixed w-full z-50 transition-all duration-300", {
@@ -113,7 +120,7 @@ export function Navbar() {
                           <DropdownMenuItem asChild>
                             <Link href="/profile">Profile</Link>
                           </DropdownMenuItem>
-                          {user.role === "admin" && (
+                          {showAdminLink && (
                             <DropdownMenuItem asChild>
                               <Link href="/admin/dashboard">
                                 <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -160,7 +167,7 @@ export function Navbar() {
                   <DropdownMenuItem asChild>
                     <Link href="/profile">Profile</Link>
                   </DropdownMenuItem>
-                  {user.role === "admin" && (
+                  {showAdminLink && (
                     <DropdownMenuItem asChild>
                       <Link href="/admin/dashboard">
                         <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -218,6 +225,15 @@ export function Navbar() {
                   {link.label}
                 </Link>
               ))}
+              {showAdminLink && (
+                <Link
+                  href="/admin/dashboard"
+                  onClick={closeMenu}
+                  className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent hover:text-accent-foreground"
+                >
+                  Admin Dashboard
+                </Link>
+              )}
               {!loading && !user && (
                 <Link
                   href="/sign-in"

@@ -26,6 +26,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   useEffect(() => {
     if (!loading && !user) {
       router.push("/sign-in");
+    } else if (!loading && user && user.role !== "admin") {
+      // If user doesn't have admin role, redirect to home
+      router.push("/");
     }
   }, [user, loading, router]);
 

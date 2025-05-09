@@ -46,11 +46,23 @@ export default function SignInPage() {
       }
 
       if (data?.session) {
-        // Check user role to determine redirect
-        const { data: userRolesData } = await supabase
+        // After sign-in, check user role
+        const userId = data.session.user.id;
+
+        // First get user roles
+        const { data: userRolesData, error: roleError } = await supabase
           .from("user_roles")
           .select("role_id")
-          .eq("user_id", data.session.user.id);
+          .eq("user_id", userId);
+
+        console.log("User roles data:", userRolesData);
+
+        if (roleError) {
+          console.error("Error fetching user roles:", roleError);
+          // Default to home page if error
+          router.push("/");
+          return;
+        }
 
         // Default to viewer role
         let isAdmin = false;
@@ -64,6 +76,8 @@ export default function SignInPage() {
             .select("name")
             .eq("id", roleId)
             .single();
+
+          console.log("Role data:", roleData);
 
           if (roleData && roleData.name === "admin") {
             isAdmin = true;

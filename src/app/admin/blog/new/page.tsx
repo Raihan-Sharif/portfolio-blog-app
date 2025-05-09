@@ -20,15 +20,8 @@ import { AlertCircle, ArrowLeft, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-interface BlogNewPostPageProps {
-  params: {
-    postId: string;
-  };
-}
-
-export default function BlogNewPostPage({ params }: BlogNewPostPageProps) {
+export default function BlogNewPostPage() {
   const router = useRouter();
-  const isNewPost = params.postId === "new";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,41 +58,6 @@ export default function BlogNewPostPage({ params }: BlogNewPostPageProps) {
           .order("name");
 
         setAllTags(tagsData || []);
-
-        // If editing an existing post, fetch its data
-        if (!isNewPost) {
-          const { data: post, error: postError } = await supabase
-            .from("posts")
-            .select("*")
-            .eq("id", params.postId)
-            .single();
-
-          if (postError) {
-            throw postError;
-          }
-
-          if (post) {
-            setFormState({
-              title: post.title || "",
-              slug: post.slug || "",
-              excerpt: post.excerpt || "",
-              content: post.content || {},
-              cover_image_url: post.cover_image_url || "",
-              published: post.published || false,
-              category_id: post.category_id,
-            });
-
-            // Fetch post tags
-            const { data: postTags } = await supabase
-              .from("post_tags")
-              .select("tag_id")
-              .eq("post_id", post.id);
-
-            if (postTags) {
-              setSelectedTags(postTags.map((pt) => pt.tag_id));
-            }
-          }
-        }
       } catch (err) {
         console.error("Error fetching data:", err);
         setError("Failed to load data. Please try again.");
@@ -109,15 +67,15 @@ export default function BlogNewPostPage({ params }: BlogNewPostPageProps) {
     };
 
     fetchData();
-  }, [params.postId, isNewPost]);
+  }, []);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
 
-    // Auto-generate slug from title if it's a new post
-    if (name === "title" && (isNewPost || formState.slug === "")) {
+    // Auto-generate slug from title for new posts
+    if (name === "title" && formState.slug === "") {
       setFormState((prev) => ({
         ...prev,
         [name]: value,
@@ -179,8 +137,6 @@ export default function BlogNewPostPage({ params }: BlogNewPostPageProps) {
         throw new Error("Title and slug are required");
       }
 
-      let postId = params.postId;
-
       // Get the current user's ID
       const {
         data: { user },
@@ -190,57 +146,30 @@ export default function BlogNewPostPage({ params }: BlogNewPostPageProps) {
         throw new Error("You must be logged in to save a post");
       }
 
-      if (isNewPost) {
-        // Create new post
-        const { data: newPost, error: insertError } = await supabase
-          .from("posts")
-          .insert({
-            title,
-            slug,
-            excerpt,
-            content,
-            cover_image_url,
-            published,
-            category_id,
-            author_id: user.id,
-          })
-          .select("id")
-          .single();
+      // Create new post
+      const { data: newPost, error: insertError } = await supabase
+        .from("posts")
+        .insert({
+          title,
+          slug,
+          excerpt,
+          content,
+          cover_image_url,
+          published,
+          category_id,
+          author_id: user.id,
+        })
+        .select("id")
+        .single();
 
-        if (insertError) {
-          throw insertError;
-        }
-
-        postId = newPost.id;
-      } else {
-        // Update existing post
-        const { error: updateError } = await supabase
-          .from("posts")
-          .update({
-            title,
-            slug,
-            excerpt,
-            content,
-            cover_image_url,
-            published,
-            category_id,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", postId);
-
-        if (updateError) {
-          throw updateError;
-        }
+      if (insertError) {
+        throw insertError;
       }
 
-      // Handle tags - first delete existing tags then add new ones
-      if (!isNewPost) {
-        await supabase.from("post_tags").delete().eq("post_id", postId);
-      }
-
-      if (selectedTags.length > 0) {
+      // Handle tags if any are selected
+      if (selectedTags.length > 0 && newPost) {
         const tagInserts = selectedTags.map((tagId) => ({
-          post_id: postId,
+          post_id: newPost.id,
           tag_id: tagId,
         }));
 
@@ -288,9 +217,7 @@ export default function BlogNewPostPage({ params }: BlogNewPostPageProps) {
             >
               <ArrowLeft size={18} />
             </Button>
-            <h1 className="text-2xl font-bold">
-              {isNewPost ? "Create New Post" : "Edit Post"}
-            </h1>
+            <h1 className="text-2xl font-bold">Create New Post</h1>
           </div>
           <Button
             onClick={savePost}
@@ -418,7 +345,7 @@ export default function BlogNewPostPage({ params }: BlogNewPostPageProps) {
               Content
             </Label>
             <RichTextEditor
-              initialContent={formState.content}
+              initialContent={{}}
               onChange={handleContentChange}
             />
           </div>

@@ -47,6 +47,26 @@ export default function NewProjectPage() {
     }
   };
 
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    try {
+      // Try to parse as JSON if it's a string representation
+      const contentValue = e.target.value.trim().startsWith("{")
+        ? JSON.parse(e.target.value)
+        : e.target.value;
+
+      setFormState((prev) => ({
+        ...prev,
+        content: contentValue,
+      }));
+    } catch (err) {
+      // If parsing fails, just store as a string
+      setFormState((prev) => ({
+        ...prev,
+        content: e.target.value,
+      }));
+    }
+  };
+
   const handleToggleChange = (name: string, checked: boolean) => {
     setFormState((prev) => ({
       ...prev,
@@ -101,6 +121,7 @@ export default function NewProjectPage() {
 
       // Redirect to the projects list
       router.push("/admin/projects");
+      router.refresh();
     } catch (err: any) {
       console.error("Error saving project:", err);
       setError(err.message || "Failed to save project. Please try again.");
@@ -119,12 +140,18 @@ export default function NewProjectPage() {
               size="icon"
               onClick={() => router.push("/admin/projects")}
               className="mr-2"
+              type="button"
             >
               <ArrowLeft size={18} />
             </Button>
             <h1 className="text-2xl font-bold">Create New Project</h1>
           </div>
-          <Button onClick={saveProject} disabled={saving} className="gap-2">
+          <Button
+            onClick={saveProject}
+            disabled={saving}
+            className="gap-2"
+            type="button"
+          >
             <Save size={16} />
             {saving ? "Saving..." : "Save"}
           </Button>
@@ -225,6 +252,7 @@ export default function NewProjectPage() {
               name="content"
               rows={10}
               placeholder="Detailed project description and technologies used..."
+              onChange={handleContentChange}
             />
           </div>
         </div>

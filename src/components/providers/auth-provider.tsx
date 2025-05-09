@@ -57,29 +57,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return null;
       }
 
-      // Get user role - Using a more resilient approach
-      let roleName = "viewer"; // Default role
-
-      const { data: userRolesData, error: roleError } = await supabase
+      // Get user role using a more direct approach
+      const { data: userRoles, error: roleError } = await supabase
         .from("user_roles")
         .select("role_id")
         .eq("user_id", userId);
 
-      console.log("User Roles Data:", userRolesData);
+      if (roleError) {
+        console.error("Error fetching user roles:", roleError);
+      }
 
-      if (!roleError && userRolesData && userRolesData.length > 0) {
-        const roleId = userRolesData[0].role_id;
+      let roleName = "viewer"; // Default role
 
+      if (userRoles && userRoles.length > 0) {
         // Get the role name
         const { data: roleData } = await supabase
           .from("roles")
           .select("name")
-          .eq("id", roleId)
+          .eq("id", userRoles[0].role_id)
           .single();
 
-        console.log("Role Data:", roleData);
-
-        if (roleData && roleData.name) {
+        if (roleData) {
           roleName = roleData.name;
         }
       }
@@ -132,6 +130,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log("Auth state changed:", event);
+
         if (session?.user) {
           const userDetails = await getUserDetails(session.user.id);
 
