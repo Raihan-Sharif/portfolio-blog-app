@@ -3,6 +3,7 @@
 import { supabase } from "@/lib/supabase/client";
 import {
   createContext,
+  ReactNode,
   useCallback,
   useContext,
   useEffect,
@@ -25,6 +26,10 @@ interface AuthContextType {
   refreshUser: () => Promise<void>;
 }
 
+interface RoleData {
+  name: string;
+}
+
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
@@ -34,7 +39,11 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -73,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           userRole.roles !== null &&
           "name" in userRole.roles
         ) {
-          roleName = userRole.roles.name as string;
+          roleName = (userRole.roles as RoleData).name;
         }
         // Handle if roles is an array with objects that have name property
         else if (
@@ -83,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           userRole.roles[0] !== null &&
           "name" in userRole.roles[0]
         ) {
-          roleName = userRole.roles[0].name as string;
+          roleName = (userRole.roles[0] as RoleData).name;
         }
       }
 
@@ -105,11 +114,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (sessionData?.session?.user) {
         const userDetails = await getUserDetails(sessionData.session.user.id);
 
-        setUser({
-          id: sessionData.session.user.id,
-          email: sessionData.session.user.email,
-          ...userDetails,
-        });
+        if (userDetails) {
+          setUser({
+            id: sessionData.session.user.id,
+            email: sessionData.session.user.email,
+            ...userDetails,
+          });
+        } else {
+          setUser({
+            id: sessionData.session.user.id,
+            email: sessionData.session.user.email,
+          });
+        }
       } else {
         setUser(null);
       }
@@ -131,11 +147,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           const userDetails = await getUserDetails(session.user.id);
 
-          setUser({
-            id: session.user.id,
-            email: session.user.email,
-            ...userDetails,
-          });
+          if (userDetails) {
+            setUser({
+              id: session.user.id,
+              email: session.user.email,
+              ...userDetails,
+            });
+          } else {
+            setUser({
+              id: session.user.id,
+              email: session.user.email,
+            });
+          }
         } else {
           setUser(null);
         }

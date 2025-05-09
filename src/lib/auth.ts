@@ -6,6 +6,10 @@ export const UserRole = {
   VIEWER: "viewer",
 };
 
+interface RoleData {
+  name: string;
+}
+
 export async function getUserRole() {
   const supabase = createServerSupabaseClient();
 
@@ -38,7 +42,7 @@ export async function getUserRole() {
     data.roles !== null &&
     "name" in data.roles
   ) {
-    roleName = data.roles.name;
+    roleName = (data.roles as RoleData).name;
   }
   // If roles is an array with objects that have name property
   else if (
@@ -48,7 +52,7 @@ export async function getUserRole() {
     data.roles[0] !== null &&
     "name" in data.roles[0]
   ) {
-    roleName = data.roles[0].name;
+    roleName = (data.roles[0] as RoleData).name;
   }
 
   if (!roleName) {
@@ -58,7 +62,7 @@ export async function getUserRole() {
   return roleName;
 }
 
-export async function hasRequiredRole(requiredRole) {
+export async function hasRequiredRole(requiredRole: string) {
   const userRole = await getUserRole();
 
   if (!userRole) {
