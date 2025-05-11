@@ -62,7 +62,7 @@ export function Navbar() {
       const checkRole = async () => {
         try {
           const { data, error } = await supabase.rpc("get_user_with_role", {
-            user_id: user.id,
+            p_user_id: user.id,
           });
 
           console.log("Navbar - Direct role check result:", data);

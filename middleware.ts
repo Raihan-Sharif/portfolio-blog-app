@@ -19,7 +19,7 @@ export async function middleware(req: NextRequest) {
 
     // Use our RPC function to check role
     const { data, error } = await supabase.rpc("get_user_with_role", {
-      user_id: session.user.id,
+      p_user_id: session.user.id,
     });
 
     if (error) {

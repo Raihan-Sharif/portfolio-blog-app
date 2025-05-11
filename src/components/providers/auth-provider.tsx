@@ -47,7 +47,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       // Call our custom function
       const { data, error } = await supabase.rpc("get_user_with_role", {
-        user_id: userId,
+        p_user_id: userId,
       });
 
       console.log("User details from DB function:", data);

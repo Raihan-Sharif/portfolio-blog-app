@@ -47,7 +47,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       // If that doesn't work, check directly with our RPC function
       try {
         const { data, error } = await supabase.rpc("get_user_with_role", {
-          user_id: user.id,
+          p_user_id: user.id,
         });
 
         console.log("AdminLayout - Direct role check result:", data);
