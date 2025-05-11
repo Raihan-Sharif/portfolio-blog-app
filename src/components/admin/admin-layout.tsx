@@ -23,12 +23,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
 
+  // Fix src/components/admin/admin-layout.tsx
+  // Update the useEffect hook
+
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/sign-in");
-    } else if (!loading && user && user.role !== "admin") {
-      // If user doesn't have admin role, redirect to home
-      router.push("/");
+    if (!loading) {
+      if (!user) {
+        // Not logged in, redirect to sign in
+        router.push("/sign-in");
+      } else if (user.role !== "admin") {
+        // Not admin, redirect to home
+        console.log("User role is not admin:", user.role);
+        router.push("/");
+      }
     }
   }, [user, loading, router]);
 

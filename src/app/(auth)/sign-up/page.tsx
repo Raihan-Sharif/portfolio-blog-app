@@ -32,6 +32,7 @@ export default function SignUpPage() {
     checkUser();
   }, [router]);
 
+  // Update the handleSignUp function
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -60,8 +61,8 @@ export default function SignUpPage() {
       }
 
       if (data.user) {
-        // Create profile
-        const { error: profileError } = await supabase.from("profiles").insert({
+        // Create profile explicitly - don't rely solely on trigger
+        const { error: profileError } = await supabase.from("profiles").upsert({
           id: data.user.id,
           full_name: fullName,
         });
@@ -77,11 +78,21 @@ export default function SignUpPage() {
           .eq("name", "viewer")
           .single();
 
-        if (!roleError && roleData) {
-          await supabase.from("user_roles").insert({
-            user_id: data.user.id,
-            role_id: roleData.id,
-          });
+        if (roleError) {
+          console.error("Error fetching viewer role:", roleError);
+        } else if (roleData) {
+          const { error: userRoleError } = await supabase
+            .from("user_roles")
+            .insert({
+              user_id: data.user.id,
+              role_id: roleData.id,
+            });
+
+          if (userRoleError) {
+            console.error("Error assigning viewer role:", userRoleError);
+          } else {
+            console.log("Successfully assigned viewer role");
+          }
         }
 
         setSuccess(true);

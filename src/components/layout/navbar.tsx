@@ -24,7 +24,7 @@ export function Navbar() {
   const { user, loading, signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const {} = useTheme();
+  const { resolvedTheme } = useTheme();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -43,7 +43,13 @@ export function Navbar() {
     router.push("/");
   };
 
-  console.log("Current user in navbar:", user);
+  // For debugging
+  useEffect(() => {
+    if (user) {
+      console.log("Current user in navbar:", user);
+      console.log("User role in navbar:", user.role);
+    }
+  }, [user]);
 
   // Base navigation links
   const baseNavLinks = [
@@ -57,12 +63,6 @@ export function Navbar() {
 
   // Determine if we should add admin dashboard link
   const showAdminLink = user && user.role === "admin";
-  const navLinks = [...baseNavLinks];
-
-  // For debugging
-  if (user) {
-    console.log("User role in navbar:", user.role);
-  }
 
   const navbarClasses = cn("fixed w-full z-50 transition-all duration-300", {
     "bg-background/80 backdrop-blur-md shadow-md": isScrolled,
@@ -83,7 +83,7 @@ export function Navbar() {
           {/* Desktop Navigation */}
           <div className="hidden md:block">
             <div className="ml-10 flex items-center space-x-4">
-              {navLinks.map((link) => (
+              {baseNavLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
@@ -210,7 +210,7 @@ export function Navbar() {
             className="md:hidden bg-background/95 backdrop-blur-md shadow-lg"
           >
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-              {navLinks.map((link) => (
+              {baseNavLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}

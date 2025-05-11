@@ -57,33 +57,61 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return null;
       }
 
-      // Get user role using a more direct approach
-      const { data: userRoles, error: roleError } = await supabase
+      // Get user role - modified query to handle no roles case
+      let { data: userRoles, error: roleError } = await supabase
         .from("user_roles")
-        .select("role_id")
+        .select("role_id, roles(name)")
         .eq("user_id", userId);
+
+      // Fallback: If roles(name) is null, fetch role name manually
+      if (
+        userRoles &&
+        userRoles.length > 0 &&
+        (!userRoles[0].roles || !userRoles[0].roles.name)
+      ) {
+        userRoles = await Promise.all(
+          userRoles.map(async (ur) => {
+            const { data: roleRow } = await supabase
+              .from("roles")
+              .select("name")
+              .eq("id", ur.role_id)
+              .single();
+            return { ...ur, roles: { name: roleRow?.name } };
+          })
+        );
+      }
+
+      // Default to viewer role
+      let roleName = "viewer";
 
       if (roleError) {
         console.error("Error fetching user roles:", roleError);
-      }
+      } else if (userRoles && userRoles.length > 0 && userRoles[0].roles) {
+        roleName = userRoles[0].roles.name;
+      } else {
+        // Insert the viewer role if no role found
+        try {
+          // First get the viewer role ID
+          const { data: viewerRole } = await supabase
+            .from("roles")
+            .select("id")
+            .eq("name", "viewer")
+            .single();
 
-      let roleName = "viewer"; // Default role
-
-      if (userRoles && userRoles.length > 0) {
-        // Get the role name
-        const { data: roleData } = await supabase
-          .from("roles")
-          .select("name")
-          .eq("id", userRoles[0].role_id)
-          .single();
-
-        if (roleData) {
-          roleName = roleData.name;
+          if (viewerRole) {
+            // Then insert the role assignment
+            await supabase.from("user_roles").insert({
+              user_id: userId,
+              role_id: viewerRole.id,
+            });
+            console.log("Added viewer role to user");
+          }
+        } catch (insertError) {
+          console.error("Error assigning default role:", insertError);
         }
       }
 
       return {
-        id: userId,
         ...profile,
         role: roleName,
       };

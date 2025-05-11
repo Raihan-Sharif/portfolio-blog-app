@@ -49,40 +49,55 @@ export default function SignInPage() {
         // After sign-in, check user role
         const userId = data.session.user.id;
 
-        // First get user roles
-        const { data: userRolesData, error: roleError } = await supabase
+        // Step 1: Get all role_ids for the user
+        const { data: userRolesData, error: userRolesError } = await supabase
           .from("user_roles")
           .select("role_id")
           .eq("user_id", userId);
 
-        console.log("User roles data:", userRolesData);
+        let roleNames: string[] = [];
 
-        if (roleError) {
-          console.error("Error fetching user roles:", roleError);
-          // Default to home page if error
-          router.push("/");
-          return;
-        }
-
-        // Default to viewer role
-        let isAdmin = false;
-
-        if (userRolesData && userRolesData.length > 0) {
-          const roleId = userRolesData[0].role_id;
-
-          // Get the role name
-          const { data: roleData } = await supabase
+        if (userRolesError) {
+          console.error("Error fetching user roles:", userRolesError);
+        } else if (userRolesData && userRolesData.length > 0) {
+          // Step 2: Fetch role names for those role_ids
+          const roleIds = userRolesData.map((ur) => ur.role_id);
+          const { data: rolesData, error: rolesError } = await supabase
             .from("roles")
             .select("name")
-            .eq("id", roleId)
-            .single();
+            .in("id", roleIds);
 
-          console.log("Role data:", roleData);
+          if (rolesError) {
+            console.error("Error fetching roles:", rolesError);
+          } else if (rolesData) {
+            roleNames = rolesData.map((r) => r.name);
+          }
+        } else {
+          // No roles found, try to assign the default viewer role
+          try {
+            const { data: viewerRole } = await supabase
+              .from("roles")
+              .select("id")
+              .eq("name", "viewer")
+              .single();
 
-          if (roleData && roleData.name === "admin") {
-            isAdmin = true;
+            if (viewerRole) {
+              await supabase.from("user_roles").insert({
+                user_id: userId,
+                role_id: viewerRole.id,
+              });
+              console.log("Added viewer role to user during sign-in");
+              roleNames = ["viewer"];
+            }
+          } catch (insertError) {
+            console.error(
+              "Error assigning default role during sign-in:",
+              insertError
+            );
           }
         }
+
+        const isAdmin = roleNames.includes("admin");
 
         if (isAdmin) {
           router.push("/admin/dashboard");
