@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ModeToggle } from "@/components/ui/mode-toggle";
+import { supabase } from "@/lib/supabase/client"; // Import supabase
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { LayoutDashboard, LogOut, Menu, User, X } from "lucide-react";
@@ -24,7 +25,7 @@ export function Navbar() {
   const { user, loading, signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const { resolvedTheme } = useTheme();
+  const { theme } = useTheme(); // Changed from resolvedTheme to theme
 
   useEffect(() => {
     const handleScroll = () => {
@@ -43,11 +44,52 @@ export function Navbar() {
     router.push("/");
   };
 
-  // For debugging
+  // Check for admin role directly
+  const [isAdmin, setIsAdmin] = useState(false);
+
   useEffect(() => {
     if (user) {
       console.log("Current user in navbar:", user);
       console.log("User role in navbar:", user.role);
+
+      // If we already know they're an admin from the context, use that
+      if (user.role === "admin") {
+        setIsAdmin(true);
+        return;
+      }
+
+      // Otherwise check directly
+      const checkRole = async () => {
+        try {
+          // Get user role using a more direct approach
+          const { data: userRoles } = await supabase
+            .from("user_roles")
+            .select("role_id")
+            .eq("user_id", user.id);
+
+          if (!userRoles || userRoles.length === 0) {
+            return;
+          }
+
+          // Get the role name
+          const { data: roleData } = await supabase
+            .from("roles")
+            .select("name")
+            .eq("id", userRoles[0].role_id)
+            .single();
+
+          if (roleData && roleData.name === "admin") {
+            setIsAdmin(true);
+            console.log("Direct role check in navbar: admin");
+          }
+        } catch (err) {
+          console.error("Error checking role directly:", err);
+        }
+      };
+
+      checkRole();
+    } else {
+      setIsAdmin(false);
     }
   }, [user]);
 
@@ -60,9 +102,6 @@ export function Navbar() {
     { href: "/blog", label: "Blog" },
     { href: "/contact", label: "Contact" },
   ];
-
-  // Determine if we should add admin dashboard link
-  const showAdminLink = user && user.role === "admin";
 
   const navbarClasses = cn("fixed w-full z-50 transition-all duration-300", {
     "bg-background/80 backdrop-blur-md shadow-md": isScrolled,
@@ -120,7 +159,7 @@ export function Navbar() {
                           <DropdownMenuItem asChild>
                             <Link href="/profile">Profile</Link>
                           </DropdownMenuItem>
-                          {showAdminLink && (
+                          {isAdmin && (
                             <DropdownMenuItem asChild>
                               <Link href="/admin/dashboard">
                                 <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -167,7 +206,7 @@ export function Navbar() {
                   <DropdownMenuItem asChild>
                     <Link href="/profile">Profile</Link>
                   </DropdownMenuItem>
-                  {showAdminLink && (
+                  {isAdmin && (
                     <DropdownMenuItem asChild>
                       <Link href="/admin/dashboard">
                         <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -225,7 +264,7 @@ export function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              {showAdminLink && (
+              {isAdmin && (
                 <Link
                   href="/admin/dashboard"
                   onClick={closeMenu}

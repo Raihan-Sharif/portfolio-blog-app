@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase/client";
 import {
   Briefcase,
   FileText,
@@ -12,7 +13,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -22,21 +23,62 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-
-  // Fix src/components/admin/admin-layout.tsx
-  // Update the useEffect hook
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
 
   useEffect(() => {
-    if (!loading) {
+    const checkAdminStatus = async () => {
+      if (loading) return;
+
       if (!user) {
-        // Not logged in, redirect to sign in
         router.push("/sign-in");
-      } else if (user.role !== "admin") {
-        // Not admin, redirect to home
-        console.log("User role is not admin:", user.role);
-        router.push("/");
+        return;
       }
-    }
+
+      // First check the user.role from auth provider
+      if (user.role === "admin") {
+        setIsAdmin(true);
+        setCheckingAdmin(false);
+        return;
+      }
+
+      // If that doesn't work, check directly with the database
+      try {
+        // Get user role using a more direct approach
+        const { data: userRoles } = await supabase
+          .from("user_roles")
+          .select("role_id")
+          .eq("user_id", user.id);
+
+        if (!userRoles || userRoles.length === 0) {
+          console.log("No roles found for user");
+          router.push("/");
+          return;
+        }
+
+        // Get the role name
+        const { data: roleData } = await supabase
+          .from("roles")
+          .select("name")
+          .eq("id", userRoles[0].role_id)
+          .single();
+
+        if (!roleData || roleData.name !== "admin") {
+          console.log("User does not have admin role");
+          router.push("/");
+          return;
+        }
+
+        setIsAdmin(true);
+      } catch (err) {
+        console.error("Error in admin check:", err);
+        router.push("/");
+      } finally {
+        setCheckingAdmin(false);
+      }
+    };
+
+    checkAdminStatus();
   }, [user, loading, router]);
 
   const handleSignOut = async () => {
@@ -72,12 +114,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     },
   ];
 
-  if (loading) {
+  if (loading || checkingAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p>Loading...</p>
       </div>
     );
+  }
+
+  if (!isAdmin) {
+    return null; // Will redirect in the effect
   }
 
   return (
@@ -123,10 +169,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 <div className="h-10 w-10 rounded-full bg-accent flex items-center justify-center">
                   <span className="font-medium">
                     {user?.full_name
-                      ?.split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase() || "U"}
+                      ? user.full_name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()
+                      : "U"}
                   </span>
                 </div>
               </div>
