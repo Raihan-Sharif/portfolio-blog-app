@@ -319,4 +319,46 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+
 ```
+
+-- Function to get user role by user ID
+CREATE OR REPLACE FUNCTION get_user_with_role(p_user_id UUID)
+RETURNS TABLE (
+id UUID,
+full_name TEXT,
+avatar_url TEXT,
+bio TEXT,
+created_at TIMESTAMPTZ,
+updated_at TIMESTAMPTZ,
+role_id INTEGER,
+role_name TEXT
+) AS $$
+BEGIN
+RETURN QUERY
+SELECT
+p.id,
+p.full_name,
+p.avatar_url,
+p.bio,
+p.created_at,
+p.updated_at,
+ur.role_id,
+r.name AS role_name
+FROM
+profiles p
+INNER JOIN user_roles ur ON p.id = ur.user_id
+INNER JOIN roles r ON ur.role_id = r.id
+WHERE
+p.id = p_user_id ;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Test the function
+-- SELECT * FROM get_user_with_role('2b1a7dd6-f4b5-4b70-a5b3-545371800242');
+
+--DROP FUNCTION get_user_with_role(uuid)
+$$

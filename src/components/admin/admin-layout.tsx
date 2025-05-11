@@ -35,6 +35,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         return;
       }
 
+      console.log("AdminLayout - User role check:", user.role);
+
       // First check the user.role from auth provider
       if (user.role === "admin") {
         setIsAdmin(true);
@@ -42,34 +44,26 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         return;
       }
 
-      // If that doesn't work, check directly with the database
+      // If that doesn't work, check directly with our RPC function
       try {
-        // Get user role using a more direct approach
-        const { data: userRoles } = await supabase
-          .from("user_roles")
-          .select("role_id")
-          .eq("user_id", user.id);
+        const { data, error } = await supabase.rpc("get_user_with_role", {
+          user_id: user.id,
+        });
 
-        if (!userRoles || userRoles.length === 0) {
-          console.log("No roles found for user");
+        console.log("AdminLayout - Direct role check result:", data);
+
+        if (error) {
+          console.error("Error checking admin role:", error);
           router.push("/");
           return;
         }
 
-        // Get the role name
-        const { data: roleData } = await supabase
-          .from("roles")
-          .select("name")
-          .eq("id", userRoles[0].role_id)
-          .single();
-
-        if (!roleData || roleData.name !== "admin") {
-          console.log("User does not have admin role");
+        if (data && data.length > 0 && data[0].role_name === "admin") {
+          setIsAdmin(true);
+        } else {
+          console.log("User does not have admin role, redirecting");
           router.push("/");
-          return;
         }
-
-        setIsAdmin(true);
       } catch (err) {
         console.error("Error in admin check:", err);
         router.push("/");

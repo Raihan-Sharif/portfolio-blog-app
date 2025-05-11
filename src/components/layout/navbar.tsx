@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ModeToggle } from "@/components/ui/mode-toggle";
-import { supabase } from "@/lib/supabase/client"; // Import supabase
+import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { LayoutDashboard, LogOut, Menu, User, X } from "lucide-react";
@@ -25,7 +25,7 @@ export function Navbar() {
   const { user, loading, signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const { theme } = useTheme(); // Changed from resolvedTheme to theme
+  const { theme } = useTheme();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -61,24 +61,18 @@ export function Navbar() {
       // Otherwise check directly
       const checkRole = async () => {
         try {
-          // Get user role using a more direct approach
-          const { data: userRoles } = await supabase
-            .from("user_roles")
-            .select("role_id")
-            .eq("user_id", user.id);
+          const { data, error } = await supabase.rpc("get_user_with_role", {
+            user_id: user.id,
+          });
 
-          if (!userRoles || userRoles.length === 0) {
+          console.log("Navbar - Direct role check result:", data);
+
+          if (error) {
+            console.error("Error checking role directly:", error);
             return;
           }
 
-          // Get the role name
-          const { data: roleData } = await supabase
-            .from("roles")
-            .select("name")
-            .eq("id", userRoles[0].role_id)
-            .single();
-
-          if (roleData && roleData.name === "admin") {
+          if (data && data.length > 0 && data[0].role_name === "admin") {
             setIsAdmin(true);
             console.log("Direct role check in navbar: admin");
           }

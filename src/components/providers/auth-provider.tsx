@@ -45,7 +45,51 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const getUserDetails = async (userId: string) => {
     try {
-      // Get profile data
+      // Call our custom function
+      const { data, error } = await supabase.rpc("get_user_with_role", {
+        user_id: userId,
+      });
+
+      console.log("User details from DB function:", data);
+
+      if (error) {
+        console.error("Error calling get_user_with_role:", error);
+
+        // Fallback: just get the profile
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", userId)
+          .single();
+
+        if (profileError) {
+          console.error("Error fetching profile:", profileError);
+          return null;
+        }
+
+        return {
+          id: userId,
+          ...profile,
+          role: "viewer", // Default role
+        };
+      }
+
+      // The function might return an array, so we take the first result
+      if (data && data.length > 0) {
+        const userWithRole = data[0];
+
+        return {
+          id: userId,
+          full_name: userWithRole.full_name,
+          avatar_url: userWithRole.avatar_url,
+          bio: userWithRole.bio,
+          created_at: userWithRole.created_at,
+          updated_at: userWithRole.updated_at,
+          role: userWithRole.role_name,
+        };
+      }
+
+      // If no results, fall back to just getting the profile
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
@@ -53,42 +97,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
         .single();
 
       if (profileError) {
-        console.error("Error fetching profile:", profileError);
+        console.error("Fallback error fetching profile:", profileError);
         return null;
-      }
-
-      // Get user role using a more direct approach
-      const { data: userRoles, error: roleError } = await supabase
-        .from("user_roles")
-        .select("role_id")
-        .eq("user_id", userId);
-
-      if (roleError) {
-        console.error("Error fetching user roles:", roleError);
-      }
-
-      let roleName = "viewer"; // Default role
-
-      if (userRoles && userRoles.length > 0) {
-        // Get the role name
-        const { data: roleData } = await supabase
-          .from("roles")
-          .select("name")
-          .eq("id", userRoles[0].role_id)
-          .single();
-
-        if (roleData) {
-          roleName = roleData.name;
-        }
       }
 
       return {
         id: userId,
         ...profile,
-        role: roleName,
+        role: "viewer", // Default role
       };
     } catch (err) {
-      console.error("Error getting user details:", err);
+      console.error("Error in getUserDetails:", err);
       return null;
     }
   };
@@ -110,6 +129,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser({
             id: sessionData.session.user.id,
             email: sessionData.session.user.email,
+            role: "viewer", // Ensure a default role is set
           });
         }
       } else {
@@ -145,6 +165,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             setUser({
               id: session.user.id,
               email: session.user.email,
+              role: "viewer", // Ensure a default role is set
             });
           }
         } else {
