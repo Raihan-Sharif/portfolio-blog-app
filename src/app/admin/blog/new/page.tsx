@@ -345,7 +345,7 @@ export default function BlogNewPostPage() {
               Content
             </Label>
             <RichTextEditor
-              initialContent={{}}
+              initialContent={formState.content || {}}
               onChange={handleContentChange}
             />
           </div>

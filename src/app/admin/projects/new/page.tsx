@@ -75,14 +75,10 @@ export default function NewProjectPage() {
   };
 
   const saveProject = async () => {
-    alert("Saving project..."); // For debugging purposes
-    console.log("Saving project..."); // For debugging purposes
-    console.log("Form state:", formState); // For debugging purposes
-
     try {
       setSaving(true);
       setError(null);
-
+      alert("Saving project...");
       const {
         title,
         slug,
@@ -142,7 +138,7 @@ export default function NewProjectPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => router.push("/admin/projects/new")}
+              onClick={() => router.push("/admin/projects")}
               className="mr-2"
               type="button"
             >
@@ -254,9 +250,14 @@ export default function NewProjectPage() {
             <Textarea
               id="content"
               name="content"
+              value={
+                typeof formState.content === "object"
+                  ? JSON.stringify(formState.content, null, 2)
+                  : formState.content?.toString() || ""
+              }
+              onChange={handleContentChange}
               rows={10}
               placeholder="Detailed project description and technologies used..."
-              onChange={handleContentChange}
             />
           </div>
         </div>

@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
+import Youtube from "@tiptap/extension-youtube";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import {
@@ -39,18 +40,6 @@ interface RichTextEditorProps {
   onChange: (content: Record<string, unknown>) => void;
 }
 
-// Create a simplified YouTube extension
-const Youtube = {
-  name: "youtube",
-  addOptions() {
-    return {
-      width: 640,
-      height: 480,
-      controls: true,
-    };
-  },
-};
-
 export default function RichTextEditor({
   initialContent,
   onChange,
@@ -70,12 +59,17 @@ export default function RichTextEditor({
       Link.configure({
         openOnClick: false,
       }),
-      Youtube as any, // Using any here for demo purposes
+      Youtube.configure({
+        width: 640,
+        height: 480,
+        controls: true,
+      }),
     ],
     content: initialContent || "",
     onUpdate: ({ editor }) => {
       onChange(editor.getJSON());
     },
+    editable: true,
   });
 
   useEffect(() => {
@@ -136,9 +130,26 @@ export default function RichTextEditor({
 
   const addYoutube = () => {
     if (youtubeUrl) {
-      // In a real implementation, we would use a proper YouTube extension
-      // For now, just insert text representing the embed
-      editor.chain().focus().insertContent(`[YouTube: ${youtubeUrl}]`).run();
+      // Extract YouTube ID
+      const youtubeId = youtubeUrl.match(
+        /(?:youtu\.be\/|youtube\.com(?:\/embed\/|\/v\/|\/watch\?v=|\/user\/\S+|\/ytscreeningroom\?v=))([\w\-]{10,12})\b/
+      )?.[1];
+
+      if (youtubeId) {
+        editor
+          .chain()
+          .focus()
+          .setYoutubeVideo({
+            src: youtubeId,
+            width: 640,
+            height: 480,
+          })
+          .run();
+      } else {
+        // Fallback
+        editor.chain().focus().insertContent(`[YouTube: ${youtubeUrl}]`).run();
+      }
+
       setYoutubeUrl("");
       setIsYoutubeDialogOpen(false);
     }

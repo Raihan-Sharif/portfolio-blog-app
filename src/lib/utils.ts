@@ -51,3 +51,30 @@ export function truncateText(text: string, length: number): string {
   if (text.length <= length) return text;
   return text.substring(0, length) + "...";
 }
+
+// Ensure URL path is valid
+export function ensureValidPath(path: string): string {
+  // Make sure path starts with /
+  if (!path.startsWith("/")) {
+    path = "/" + path;
+  }
+
+  // Remove any double slashes
+  path = path.replace(/\/+/g, "/");
+
+  return path;
+}
+
+// Check if URL is absolute (has protocol)
+export function isAbsoluteUrl(url: string): boolean {
+  return /^(?:[a-z]+:)?\/\//i.test(url);
+}
+
+// Safely navigate to a URL - ensures URLs are properly formatted
+export function safeNavigate(router: any, url: string) {
+  if (isAbsoluteUrl(url)) {
+    window.open(url, "_blank", "noopener,noreferrer");
+  } else {
+    router.push(ensureValidPath(url));
+  }
+}

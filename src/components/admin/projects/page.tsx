@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
+import { safeNavigate } from "@/lib/utils"; // Use our new utility
 import {
   AlertCircle,
   Briefcase,
@@ -158,12 +159,14 @@ export default function AdminProjectsPage() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Projects</h1>
 
-          <Link href="/admin/projects/new">
-            <Button className="gap-2">
-              <Plus size={18} />
-              New Project
-            </Button>
-          </Link>
+          <Button 
+            className="gap-2" 
+            type="button"
+            onClick={() => router.push("/admin/projects/new")}
+          >
+            <Plus size={18} />
+            New Project
+          </Button>
         </div>
 
         {error && (
@@ -235,6 +238,7 @@ export default function AdminProjectsPage() {
                               ? "Remove from featured"
                               : "Add to featured"
                           }
+                          type="button"
                         >
                           <Star
                             size={16}
@@ -249,7 +253,7 @@ export default function AdminProjectsPage() {
                       <TableCell>
                         <div className="flex gap-2">
                           {project.github_url && (
-                            <a
+                            
                               href={project.github_url}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -258,13 +262,14 @@ export default function AdminProjectsPage() {
                                 variant="ghost"
                                 size="icon"
                                 title="GitHub Repository"
+                                type="button"
                               >
                                 <Github size={16} />
                               </Button>
                             </a>
                           )}
                           {project.demo_url && (
-                            <a
+                            
                               href={project.demo_url}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -273,6 +278,7 @@ export default function AdminProjectsPage() {
                                 variant="ghost"
                                 size="icon"
                                 title="Live Demo"
+                                type="button"
                               >
                                 <ExternalLink size={16} />
                               </Button>
@@ -288,10 +294,9 @@ export default function AdminProjectsPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() =>
-                              router.push(`/admin/projects/${project.id}`)
-                            }
+                            onClick={() => router.push(`/admin/projects/${project.id}`)}
                             title="Edit"
+                            type="button"
                           >
                             <Edit size={16} />
                           </Button>
@@ -300,6 +305,7 @@ export default function AdminProjectsPage() {
                             size="icon"
                             onClick={() => handleDeleteClick(project)}
                             title="Delete"
+                            type="button"
                           >
                             <Trash2 size={16} />
                           </Button>
@@ -329,6 +335,7 @@ export default function AdminProjectsPage() {
                 variant="outline"
                 onClick={() => setDeleteDialogOpen(false)}
                 disabled={isDeleting}
+                type="button"
               >
                 Cancel
               </Button>
@@ -336,6 +343,7 @@ export default function AdminProjectsPage() {
                 variant="destructive"
                 onClick={handleDeleteConfirm}
                 disabled={isDeleting}
+                type="button"
               >
                 {isDeleting ? "Deleting..." : "Delete"}
               </Button>
