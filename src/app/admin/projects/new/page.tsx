@@ -75,6 +75,10 @@ export default function NewProjectPage() {
   };
 
   const saveProject = async () => {
+    alert("Saving project..."); // For debugging purposes
+    console.log("Saving project..."); // For debugging purposes
+    console.log("Form state:", formState); // For debugging purposes
+
     try {
       setSaving(true);
       setError(null);
@@ -138,7 +142,7 @@ export default function NewProjectPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => router.push("/admin/projects")}
+              onClick={() => router.push("/admin/projects/new")}
               className="mr-2"
               type="button"
             >
