@@ -98,6 +98,7 @@ export default function NewProjectPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+      console.log("Current user:", user);
 
       if (!user) {
         throw new Error("You must be logged in to save a project");
@@ -118,7 +119,7 @@ export default function NewProjectPage() {
       if (insertError) {
         throw insertError;
       }
-
+      console.log("Project saved successfully");
       // Redirect to the projects list
       router.push("/admin/projects");
       router.refresh();

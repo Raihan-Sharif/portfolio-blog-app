@@ -19,6 +19,7 @@ const nextConfig = {
       "via.placeholder.com",
       "picsum.photos",
       "supabase.co",
+      "lankabd.com",
     ],
   },
   experimental: {

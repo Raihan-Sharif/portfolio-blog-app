@@ -362,3 +362,31 @@ LANGUAGE plpgsql;
 
 --DROP FUNCTION get_user_with_role(uuid)
 $$
+
+```
+-- create post tags manage permission policy create
+create policy "Admin can manage post tags" on "public"."post_tags" to public
+
+using (
+
+  (EXISTS ( SELECT 1
+   FROM (user_roles ur
+     JOIN roles r ON ((ur.role_id = r.id)))
+  WHERE ((ur.user_id = auth.uid()) AND (r.name = 'admin'::text))))
+
+);
+
+```
+
+-- Enable read access for all users
+
+```
+create policy "Enable read access for all users"
+
+on "public"."roles" to public
+
+using (
+  true
+);
+
+```
