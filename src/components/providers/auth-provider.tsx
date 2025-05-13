@@ -114,6 +114,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const refreshUser = useCallback(async () => {
     try {
+      setLoading(true);
       const { data: sessionData } = await supabase.auth.getSession();
 
       if (sessionData?.session?.user) {
@@ -143,14 +144,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
+  // Initial user check on mount
   useEffect(() => {
-    // Initial user fetch
-    refreshUser();
+    const initAuth = async () => {
+      setLoading(true);
+      await refreshUser();
+    };
 
-    // Set up auth state change listener
+    initAuth();
+  }, [refreshUser]);
+
+  // Set up auth state change listener
+  useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("Auth state changed:", event);
+
+        setLoading(true);
 
         if (session?.user) {
           const userDetails = await getUserDetails(session.user.id);
@@ -179,11 +189,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [refreshUser]);
+  }, []);
 
   const signOut = async () => {
+    setLoading(true);
     await supabase.auth.signOut();
     setUser(null);
+    setLoading(false);
   };
 
   return (

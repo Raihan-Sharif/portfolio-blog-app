@@ -14,7 +14,6 @@ import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { LayoutDashboard, LogOut, Menu, User, X } from "lucide-react";
-import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -25,7 +24,8 @@ export function Navbar() {
   const { user, loading, signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const { theme } = useTheme();
+  // Remove unused theme variable
+  // const { theme } = useTheme();
 
   useEffect(() => {
     const handleScroll = () => {

@@ -31,7 +31,6 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -158,12 +157,14 @@ export default function AdminProjectsPage() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Projects</h1>
 
-          <Link href="/admin/projects/new">
-            <Button className="gap-2" type="button">
-              <Plus size={18} />
-              New Project
-            </Button>
-          </Link>
+          <Button
+            className="gap-2"
+            type="button"
+            onClick={() => router.push("/admin/projects/new")}
+          >
+            <Plus size={18} />
+            New Project
+          </Button>
         </div>
 
         {error && (

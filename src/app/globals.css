@@ -57,3 +57,57 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Fix for navbar overlapping content */
+main {
+  padding-top: 4rem; /* 64px to account for navbar height */
+}
+
+/* Ensure buttons and links are clickable */
+button,
+a {
+  position: relative;
+  z-index: 1;
+}
+
+/* Improve spacing in forms */
+form {
+  width: 100%;
+}
+
+/* Improve editor styling */
+.ProseMirror {
+  min-height: 200px;
+  padding: 1rem;
+}
+
+.ProseMirror:focus {
+  outline: none;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: #adb5bd;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Fix for TipTap YouTube styling */
+.ProseMirror .youtube-embed {
+  position: relative;
+  padding-bottom: 56.25%; /* 16:9 aspect ratio */
+  height: 0;
+  overflow: hidden;
+  width: 100%;
+  margin: 1.5rem 0;
+}
+
+.ProseMirror .youtube-embed iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 0.5rem;
+}

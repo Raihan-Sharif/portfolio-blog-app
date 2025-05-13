@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { supabase } from "@/lib/supabase/client";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Youtube from "@tiptap/extension-youtube";
@@ -45,6 +46,9 @@ export default function RichTextEditor({
   onChange,
 }: RichTextEditorProps) {
   const [imageUrl, setImageUrl] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkText, setLinkText] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
@@ -55,19 +59,40 @@ export default function RichTextEditor({
   const editor = useEditor({
     extensions: [
       StarterKit,
-      Image,
+      Image.configure({
+        allowBase64: true,
+        HTMLAttributes: {
+          class: "max-w-full rounded-lg mx-auto my-4",
+        },
+      }),
       Link.configure({
         openOnClick: false,
+        HTMLAttributes: {
+          class: "text-primary underline",
+        },
       }),
       Youtube.configure({
         width: 640,
         height: 480,
         controls: true,
+        nocookie: true,
+        modestBranding: true,
       }),
     ],
     content: initialContent || "",
     onUpdate: ({ editor }) => {
-      onChange(editor.getJSON());
+      // Get both HTML and JSON content
+      const html = editor.getHTML();
+      const json = editor.getJSON();
+
+      // Use a content structure that includes both formats
+      const contentObject = {
+        type: "rich-text",
+        html: html,
+        json: json,
+      };
+
+      onChange(contentObject);
     },
     editable: true,
   });
@@ -82,7 +107,16 @@ export default function RichTextEditor({
           typeof initialContent === "object" &&
           Object.keys(initialContent).length > 0
         ) {
-          editor.commands.setContent(initialContent);
+          // Check if it has HTML content from our enhanced format
+          if (initialContent.html && typeof initialContent.html === "string") {
+            editor.commands.setContent(initialContent.html);
+          } else if (initialContent.json) {
+            // If it has JSON content
+            editor.commands.setContent(initialContent.json);
+          } else {
+            // Legacy content object (likely a tiptap JSON structure)
+            editor.commands.setContent(initialContent);
+          }
         } else {
           // Default empty content
           editor.commands.setContent("");
@@ -98,7 +132,67 @@ export default function RichTextEditor({
     return null;
   }
 
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setImageFile(e.target.files[0]);
+    }
+  };
+
+  const uploadImage = async () => {
+    if (!imageFile) return;
+
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
+
+      // Generate a unique filename
+      const fileExt = imageFile.name.split(".").pop();
+      const fileName = `${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(2, 15)}.${fileExt}`;
+      const filePath = `content-images/${fileName}`;
+
+      // Upload to Supabase storage
+      const { data, error } = await supabase.storage
+        .from("public")
+        .upload(filePath, imageFile, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      // Get public URL for the uploaded image
+      const { data: urlData } = supabase.storage
+        .from("public")
+        .getPublicUrl(filePath);
+
+      if (urlData && urlData.publicUrl) {
+        // Insert the image into the editor
+        editor.chain().focus().setImage({ src: urlData.publicUrl }).run();
+        setIsImageDialogOpen(false);
+        setImageFile(null);
+        setImageUrl("");
+      }
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      alert("Failed to upload image. Please try again.");
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
   const addImage = () => {
+    // If we have a file, upload it first
+    if (imageFile) {
+      uploadImage();
+      return;
+    }
+
+    // Otherwise use the URL
     if (imageUrl) {
       editor.chain().focus().setImage({ src: imageUrl }).run();
       setImageUrl("");
@@ -299,16 +393,53 @@ export default function RichTextEditor({
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="imageUrl">Image URL</Label>
+                <Label htmlFor="imageFile">Upload Image</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="imageFile"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageFileChange}
+                    className="flex-1"
+                  />
+                  {imageFile && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setImageFile(null)}
+                      title="Clear file"
+                      type="button"
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                {isUploading && (
+                  <div className="w-full bg-accent/30 h-2 rounded-full mt-2">
+                    <div
+                      className="bg-primary h-2 rounded-full"
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="imageUrl">Or enter image URL</Label>
                 <Input
                   id="imageUrl"
                   placeholder="https://example.com/image.jpg"
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
+                  disabled={!!imageFile}
                 />
               </div>
-              <Button onClick={addImage} className="w-full" type="button">
-                Insert
+              <Button
+                onClick={addImage}
+                className="w-full"
+                type="button"
+                disabled={(!imageUrl && !imageFile) || isUploading}
+              >
+                {isUploading ? "Uploading..." : "Insert"}
               </Button>
             </div>
           </DialogContent>

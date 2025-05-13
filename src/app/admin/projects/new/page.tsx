@@ -58,7 +58,7 @@ export default function NewProjectPage() {
         ...prev,
         content: contentValue,
       }));
-    } catch (err) {
+    } catch (error) {
       // If parsing fails, just store as a string
       setFormState((prev) => ({
         ...prev,
@@ -78,7 +78,6 @@ export default function NewProjectPage() {
     try {
       setSaving(true);
       setError(null);
-      alert("Saving project...");
       const {
         title,
         slug,
@@ -123,9 +122,9 @@ export default function NewProjectPage() {
       // Redirect to the projects list
       router.push("/admin/projects");
       router.refresh();
-    } catch (err: any) {
-      console.error("Error saving project:", err);
-      setError(err.message || "Failed to save project. Please try again.");
+    } catch (error: any) {
+      console.error("Error saving project:", error);
+      setError(error.message || "Failed to save project. Please try again.");
     } finally {
       setSaving(false);
     }

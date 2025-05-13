@@ -46,10 +46,11 @@ interface Profile {
   created_at: string;
 }
 
-interface AuthUser {
-  id: string;
-  email: string;
-}
+// Removed the unused interface
+// interface AuthUser {
+//   id: string;
+//   email: string;
+// }
 
 interface User {
   id: string;
