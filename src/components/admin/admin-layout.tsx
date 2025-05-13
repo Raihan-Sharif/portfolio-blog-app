@@ -111,7 +111,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   if (loading || checkingAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p>Loading...</p>
+        <div className="flex flex-col items-center">
+          <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mb-4"></div>
+          <p>Loading admin panel...</p>
+        </div>
       </div>
     );
   }
@@ -123,7 +126,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <div className="bg-background min-h-screen flex">
       {/* Sidebar */}
-      <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
+      <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-10">
         <div className="flex flex-col flex-grow border-r bg-card pt-5 overflow-y-auto">
           <div className="flex items-center flex-shrink-0 px-4 mb-5">
             <Link href="/" className="font-bold text-lg">
@@ -133,7 +136,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <div className="flex flex-col flex-grow">
             <nav className="flex-1 px-2 pb-4 space-y-1">
               {navItems.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive =
+                  pathname === item.href ||
+                  pathname.startsWith(item.href + "/");
                 return (
                   <Link
                     key={item.href}
@@ -195,7 +200,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       </div>
 
       {/* Mobile header */}
-      <div className="md:hidden bg-card border-b px-4 py-2 flex items-center justify-between">
+      <div className="md:hidden fixed top-16 left-0 right-0 z-20 bg-card border-b px-4 py-2 flex items-center justify-between">
         <Link href="/" className="font-bold text-lg">
           Admin Panel
         </Link>
@@ -210,7 +215,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       </div>
 
       {/* Main content */}
-      <div className="md:pl-64 flex flex-col flex-1 w-full">
+      <div className="md:pl-64 flex flex-col flex-1 w-full pt-16 md:pt-0">
         <main className="flex-1">{children}</main>
       </div>
     </div>

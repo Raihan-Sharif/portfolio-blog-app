@@ -10,8 +10,9 @@ import { supabase } from "./supabase/client";
  */
 export async function uploadImage(
   file: File,
-  bucket: string = "public",
-  folder: string = "uploads"
+  bucket: string = "raihan-blog-app",
+  //folder: string = "uploads/images"
+  folder: string = "public"
 ): Promise<string> {
   try {
     // Generate a unique filename

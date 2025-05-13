@@ -6,11 +6,14 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase/client";
 import { AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export default function SignInPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectPath = searchParams.get("redirect") || "/";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,12 +25,12 @@ export default function SignInPage() {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         // User is already logged in, redirect
-        router.push("/");
+        router.push(redirectPath);
       }
     };
 
     checkUser();
-  }, [router]);
+  }, [router, redirectPath]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +63,7 @@ export default function SignInPage() {
         if (roleError) {
           console.error("Error fetching user roles:", roleError);
           // Default to home page if error
-          router.push("/");
+          router.push(redirectPath);
           return;
         }
 
@@ -84,10 +87,14 @@ export default function SignInPage() {
           }
         }
 
-        if (isAdmin) {
+        // If user came from admin and is admin, go back to the admin page
+        // If not, go to the provided redirect or home
+        if (redirectPath.startsWith("/admin") && isAdmin) {
+          router.push(redirectPath);
+        } else if (isAdmin) {
           router.push("/admin/dashboard");
         } else {
-          router.push("/");
+          router.push(redirectPath);
         }
       }
     } catch (err: any) {

@@ -14,7 +14,10 @@ export async function middleware(req: NextRequest) {
   // Check for protected routes (admin and editor)
   if (req.nextUrl.pathname.startsWith("/admin")) {
     if (!session) {
-      return NextResponse.redirect(new URL("/sign-in", req.url));
+      const url = new URL("/sign-in", req.url);
+      // Add a redirect parameter to return to this page after login
+      url.searchParams.set("redirect", req.nextUrl.pathname);
+      return NextResponse.redirect(url);
     }
 
     // Use our RPC function to check role
@@ -38,12 +41,14 @@ export async function middleware(req: NextRequest) {
 
   if (req.nextUrl.pathname.startsWith("/editor")) {
     if (!session) {
-      return NextResponse.redirect(new URL("/sign-in", req.url));
+      const url = new URL("/sign-in", req.url);
+      url.searchParams.set("redirect", req.nextUrl.pathname);
+      return NextResponse.redirect(url);
     }
 
     // Use our RPC function to check role
     const { data, error } = await supabase.rpc("get_user_with_role", {
-      user_id: session.user.id,
+      p_user_id: session.user.id,
     });
 
     if (error) {
@@ -62,6 +67,15 @@ export async function middleware(req: NextRequest) {
     }
   }
 
+  // Check for profile page
+  if (req.nextUrl.pathname.startsWith("/profile")) {
+    if (!session) {
+      const url = new URL("/sign-in", req.url);
+      url.searchParams.set("redirect", req.nextUrl.pathname);
+      return NextResponse.redirect(url);
+    }
+  }
+
   return res;
 }
 
@@ -69,6 +83,8 @@ export const config = {
   matcher: [
     "/admin/:path*",
     "/editor/:path*",
+    "/profile/:path*",
+    "/profile",
     "/api/admin/:path*",
     "/api/editor/:path*",
   ],

@@ -1,8 +1,17 @@
 "use client";
 
+import AdminLayout from "@/components/admin/admin-layout";
+import RichTextEditor from "@/components/editor/rich-text-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase/client";
@@ -11,75 +20,107 @@ import { AlertCircle, ArrowLeft, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-interface ProjectEditorProps {
+interface BlogPostEditorProps {
   params: {
-    projectId: string;
+    postId: string;
   };
 }
 
-export default function ProjectEditor({ params }: ProjectEditorProps) {
+export default function BlogPostEditor({ params }: BlogPostEditorProps) {
   const router = useRouter();
-  const isNewProject = params.projectId === "new";
-  const [loading, setLoading] = useState(!isNewProject);
+  const isNewPost = params.postId === "new";
+  const [loading, setLoading] = useState(!isNewPost);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [allTags, setAllTags] = useState<any[]>([]);
+  const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [formState, setFormState] = useState({
     title: "",
     slug: "",
-    description: "",
+    excerpt: "",
     content: {},
-    image_url: "",
-    github_url: "",
-    demo_url: "",
-    featured: false,
+    cover_image_url: "",
+    published: false,
+    category_id: null as number | null,
   });
 
-  const fetchProject = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const { data: project, error: projectError } = await supabase
-        .from("projects")
+
+      // Fetch categories
+      const { data: categoriesData } = await supabase
+        .from("categories")
         .select("*")
-        .eq("id", params.projectId)
-        .single();
+        .order("name");
 
-      if (projectError) {
-        throw projectError;
-      }
+      setCategories(categoriesData || []);
 
-      if (project) {
-        setFormState({
-          title: project.title || "",
-          slug: project.slug || "",
-          description: project.description || "",
-          content: project.content || {},
-          image_url: project.image_url || "",
-          github_url: project.github_url || "",
-          demo_url: project.demo_url || "",
-          featured: project.featured || false,
-        });
+      // Fetch tags
+      const { data: tagsData } = await supabase
+        .from("tags")
+        .select("*")
+        .order("name");
+
+      setAllTags(tagsData || []);
+
+      // If editing an existing post, fetch it
+      if (!isNewPost) {
+        // Fetch post data
+        const { data: post, error: postError } = await supabase
+          .from("posts")
+          .select("*")
+          .eq("id", params.postId)
+          .single();
+
+        if (postError) {
+          throw postError;
+        }
+
+        if (post) {
+          setFormState({
+            title: post.title || "",
+            slug: post.slug || "",
+            excerpt: post.excerpt || "",
+            content: post.content || {},
+            cover_image_url: post.cover_image_url || "",
+            published: post.published || false,
+            category_id: post.category_id || null,
+          });
+
+          // Fetch selected tags
+          const { data: postTags, error: tagsError } = await supabase
+            .from("post_tags")
+            .select("tag_id")
+            .eq("post_id", params.postId);
+
+          if (tagsError) {
+            console.error("Error fetching post tags:", tagsError);
+          } else if (postTags) {
+            setSelectedTags(postTags.map((tag) => tag.tag_id));
+          }
+        }
       }
-    } catch (error) {
-      console.error("Error fetching project:", error);
-      setError("Failed to load project data. Please try again.");
+    } catch (err: any) {
+      console.error("Error fetching data:", err);
+      setError(err.message || "Failed to load data. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [params.projectId]);
+  }, [isNewPost, params.postId]);
 
   useEffect(() => {
-    if (!isNewProject) {
-      fetchProject();
-    }
-  }, [isNewProject, fetchProject]);
+    fetchData();
+  }, [fetchData]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
 
-    // Auto-generate slug from title if it's a new project
-    if (name === "title" && (isNewProject || formState.slug === "")) {
+    // Auto-generate slug from title if it's empty
+    if (name === "title" && (isNewPost || formState.slug === "")) {
       setFormState((prev) => ({
         ...prev,
         [name]: value,
@@ -93,6 +134,13 @@ export default function ProjectEditor({ params }: ProjectEditorProps) {
     }
   };
 
+  const handleSelectChange = (name: string, value: string | number | null) => {
+    setFormState((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
   const handleToggleChange = (name: string, checked: boolean) => {
     setFormState((prev) => ({
       ...prev,
@@ -100,27 +148,22 @@ export default function ProjectEditor({ params }: ProjectEditorProps) {
     }));
   };
 
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    try {
-      // Try to parse as JSON if it's a string representation
-      const contentValue = e.target.value.trim().startsWith("{")
-        ? JSON.parse(e.target.value)
-        : e.target.value;
-
-      setFormState((prev) => ({
-        ...prev,
-        content: contentValue,
-      }));
-    } catch (error) {
-      // If parsing fails, just store as a string
-      setFormState((prev) => ({
-        ...prev,
-        content: e.target.value,
-      }));
-    }
+  const handleContentChange = (content: any) => {
+    setFormState((prev) => ({
+      ...prev,
+      content,
+    }));
   };
 
-  const saveProject = async () => {
+  const handleTagToggle = (tagId: number) => {
+    setSelectedTags((prev) =>
+      prev.includes(tagId)
+        ? prev.filter((id) => id !== tagId)
+        : [...prev, tagId]
+    );
+  };
+
+  const savePost = async () => {
     try {
       setSaving(true);
       setError(null);
@@ -128,71 +171,108 @@ export default function ProjectEditor({ params }: ProjectEditorProps) {
       const {
         title,
         slug,
-        description,
+        excerpt,
         content,
-        image_url,
-        github_url,
-        demo_url,
-        featured,
+        cover_image_url,
+        published,
+        category_id,
       } = formState;
 
       if (!title || !slug) {
         throw new Error("Title and slug are required");
       }
 
-      // Get the current user's ID for audit trail
+      // Get the current user's ID
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (!user) {
-        throw new Error("You must be logged in to save a project");
+        throw new Error("You must be logged in to save a post");
       }
 
-      if (isNewProject) {
-        // Create new project
-        const { error: insertError } = await supabase.from("projects").insert({
-          title,
-          slug,
-          description,
-          content,
-          image_url,
-          github_url,
-          demo_url,
-          featured,
-        });
+      if (isNewPost) {
+        // Create new post
+        const { data: newPost, error: insertError } = await supabase
+          .from("posts")
+          .insert({
+            title,
+            slug,
+            excerpt,
+            content,
+            cover_image_url,
+            published,
+            category_id,
+            author_id: user.id,
+          })
+          .select("id")
+          .single();
 
         if (insertError) {
           throw insertError;
         }
+
+        // Handle tags if any are selected
+        if (selectedTags.length > 0 && newPost) {
+          const tagInserts = selectedTags.map((tagId) => ({
+            post_id: newPost.id,
+            tag_id: tagId,
+          }));
+
+          const { error: tagError } = await supabase
+            .from("post_tags")
+            .insert(tagInserts);
+
+          if (tagError) {
+            throw tagError;
+          }
+        }
       } else {
-        // Update existing project
+        // Update existing post
         const { error: updateError } = await supabase
-          .from("projects")
+          .from("posts")
           .update({
             title,
             slug,
-            description,
+            excerpt,
             content,
-            image_url,
-            github_url,
-            demo_url,
-            featured,
+            cover_image_url,
+            published,
+            category_id,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", params.projectId);
+          .eq("id", params.postId);
 
         if (updateError) {
           throw updateError;
         }
+
+        // First, delete existing tags
+        await supabase.from("post_tags").delete().eq("post_id", params.postId);
+
+        // Then, add new tags
+        if (selectedTags.length > 0) {
+          const tagInserts = selectedTags.map((tagId) => ({
+            post_id: params.postId,
+            tag_id: tagId,
+          }));
+
+          const { error: tagError } = await supabase
+            .from("post_tags")
+            .insert(tagInserts);
+
+          if (tagError) {
+            throw tagError;
+          }
+        }
       }
 
-      // Redirect to the projects list
-      router.push("/admin/projects");
+      // Redirect to the post list
+      router.push("/admin/blog");
       router.refresh();
-    } catch (error: any) {
-      console.error("Error saving project:", error);
-      setError(error.message || "Failed to save project. Please try again.");
+    } catch (err: any) {
+      console.error("Error saving post:", err);
+      setError(err.message || "Failed to save post. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -200,139 +280,164 @@ export default function ProjectEditor({ params }: ProjectEditorProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p>Loading...</p>
-      </div>
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <p>Loading...</p>
+        </div>
+      </AdminLayout>
     );
   }
 
-  const contentValue =
-    typeof formState.content === "object"
-      ? JSON.stringify(formState.content, null, 2)
-      : String(formState.content || "");
-
   return (
-    <div className="container px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
+    <AdminLayout>
+      <div className="container px-4 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push("/admin/blog")}
+              className="mr-2"
+              type="button"
+            >
+              <ArrowLeft size={18} />
+            </Button>
+            <h1 className="text-2xl font-bold">
+              {isNewPost ? "Create New Post" : "Edit Post"}
+            </h1>
+          </div>
           <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push("/admin/projects")}
-            className="mr-2"
+            onClick={savePost}
+            disabled={saving}
+            className="gap-2"
+            type="button"
           >
-            <ArrowLeft size={18} />
+            <Save size={16} />
+            {saving ? "Saving..." : "Save"}
           </Button>
-          <h1 className="text-2xl font-bold">
-            {isNewProject ? "Create New Project" : "Edit Project"}
-          </h1>
         </div>
-        <Button onClick={saveProject} disabled={saving} className="gap-2">
-          <Save size={16} />
-          {saving ? "Saving..." : "Save"}
-        </Button>
-      </div>
 
-      {error && (
-        <div className="bg-destructive/10 text-destructive rounded-md p-4 mb-6 flex items-start">
-          <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
-          <div>{error}</div>
-        </div>
-      )}
+        {error && (
+          <div className="bg-destructive/10 text-destructive rounded-md p-4 mb-6 flex items-start">
+            <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+            <div>{error}</div>
+          </div>
+        )}
 
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                name="title"
-                value={formState.title}
-                onChange={handleChange}
-                placeholder="Project title"
-              />
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="title">Title</Label>
+                <Input
+                  id="title"
+                  name="title"
+                  value={formState.title}
+                  onChange={handleChange}
+                  placeholder="Post title"
+                />
+              </div>
+              <div>
+                <Label htmlFor="slug">Slug</Label>
+                <Input
+                  id="slug"
+                  name="slug"
+                  value={formState.slug}
+                  onChange={handleChange}
+                  placeholder="post-url-slug"
+                />
+              </div>
+              <div>
+                <Label htmlFor="excerpt">Excerpt</Label>
+                <Textarea
+                  id="excerpt"
+                  name="excerpt"
+                  value={formState.excerpt || ""}
+                  onChange={handleChange}
+                  placeholder="Brief summary of the post"
+                  rows={3}
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="slug">Slug</Label>
-              <Input
-                id="slug"
-                name="slug"
-                value={formState.slug}
-                onChange={handleChange}
-                placeholder="project-url-slug"
-              />
-            </div>
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formState.description || ""}
-                onChange={handleChange}
-                placeholder="Brief description of the project"
-                rows={3}
-              />
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="cover_image_url">Cover Image URL</Label>
+                <Input
+                  id="cover_image_url"
+                  name="cover_image_url"
+                  value={formState.cover_image_url || ""}
+                  onChange={handleChange}
+                  placeholder="https://example.com/image.jpg"
+                />
+              </div>
+              <div>
+                <Label htmlFor="category">Category</Label>
+                <Select
+                  value={formState.category_id?.toString() || ""}
+                  onValueChange={(value) =>
+                    handleSelectChange(
+                      "category_id",
+                      value ? parseInt(value) : null
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem
+                        key={category.id}
+                        value={category.id.toString()}
+                      >
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="mb-2 block">Tags</Label>
+                <div className="flex flex-wrap gap-2">
+                  {allTags.map((tag) => (
+                    <div
+                      key={tag.id}
+                      className={`px-3 py-1 rounded-full text-xs cursor-pointer transition-colors ${
+                        selectedTags.includes(tag.id)
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-accent hover:bg-primary/20"
+                      }`}
+                      onClick={() => handleTagToggle(tag.id)}
+                    >
+                      {tag.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="published"
+                  checked={formState.published}
+                  onCheckedChange={(checked) =>
+                    handleToggleChange("published", checked)
+                  }
+                />
+                <Label htmlFor="published">Published</Label>
+              </div>
             </div>
           </div>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="image_url">Image URL</Label>
-              <Input
-                id="image_url"
-                name="image_url"
-                value={formState.image_url || ""}
-                onChange={handleChange}
-                placeholder="https://example.com/image.jpg"
-              />
-            </div>
-            <div>
-              <Label htmlFor="github_url">GitHub URL</Label>
-              <Input
-                id="github_url"
-                name="github_url"
-                value={formState.github_url || ""}
-                onChange={handleChange}
-                placeholder="https://github.com/username/project"
-              />
-            </div>
-            <div>
-              <Label htmlFor="demo_url">Demo URL</Label>
-              <Input
-                id="demo_url"
-                name="demo_url"
-                value={formState.demo_url || ""}
-                onChange={handleChange}
-                placeholder="https://demo-site.com"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="featured"
-                checked={formState.featured}
-                onCheckedChange={(checked) =>
-                  handleToggleChange("featured", checked)
-                }
-              />
-              <Label htmlFor="featured">Featured Project</Label>
-            </div>
+
+          <div>
+            <Label htmlFor="content" className="mb-2 block">
+              Content
+            </Label>
+            <RichTextEditor
+              initialContent={formState.content}
+              onChange={handleContentChange}
+            />
           </div>
         </div>
-
-        <div>
-          <Label htmlFor="content" className="mb-2 block">
-            Content
-          </Label>
-          <Textarea
-            id="content"
-            name="content"
-            value={contentValue}
-            onChange={handleContentChange}
-            rows={10}
-            placeholder="Detailed project description and technologies used..."
-          />
-        </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 }
