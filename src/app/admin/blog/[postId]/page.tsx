@@ -3,6 +3,7 @@
 import AdminLayout from "@/components/admin/admin-layout";
 import RichTextEditor from "@/components/editor/rich-text-editor";
 import { Button } from "@/components/ui/button";
+import { ImageUploader } from "@/components/ui/image-uploader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -361,14 +362,20 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
             </div>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="cover_image_url">Cover Image URL</Label>
-                <Input
-                  id="cover_image_url"
-                  name="cover_image_url"
-                  value={formState.cover_image_url || ""}
-                  onChange={handleChange}
-                  placeholder="https://example.com/image.jpg"
-                />
+                <Label htmlFor="cover_image_url">Cover Image</Label>
+                <div className="mt-2">
+                  <ImageUploader
+                    initialImageUrl={formState.cover_image_url || ""}
+                    onImageUploaded={(url) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        cover_image_url: url,
+                      }))
+                    }
+                    bucketName="raihan-blog-app"
+                    folderPath="public"
+                  />
+                </div>
               </div>
               <div>
                 <Label htmlFor="category">Category</Label>

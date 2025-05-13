@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { ImageUploader } from "@/components/ui/image-uploader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -277,14 +278,20 @@ export default function ProjectEditor({ params }: ProjectEditorProps) {
           </div>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="image_url">Image URL</Label>
-              <Input
-                id="image_url"
-                name="image_url"
-                value={formState.image_url || ""}
-                onChange={handleChange}
-                placeholder="https://example.com/image.jpg"
-              />
+              <Label htmlFor="image_url">Project Image</Label>
+              <div className="mt-2">
+                <ImageUploader
+                  initialImageUrl={formState.image_url || ""}
+                  onImageUploaded={(url) =>
+                    setFormState((prev) => ({
+                      ...prev,
+                      image_url: url,
+                    }))
+                  }
+                  bucketName="raihan-blog-app"
+                  folderPath="public"
+                />
+              </div>
             </div>
             <div>
               <Label htmlFor="github_url">GitHub URL</Label>

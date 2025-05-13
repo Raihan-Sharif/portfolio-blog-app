@@ -390,3 +390,94 @@ using (
 );
 
 ```
+
+-- SQL to create new tables for view tracking in Supabase
+
+-- Create a table to track post views with timestamped entries
+CREATE TABLE IF NOT EXISTS post_views (
+id SERIAL PRIMARY KEY,
+post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+view_date DATE NOT NULL DEFAULT CURRENT_DATE,
+view_count INTEGER NOT NULL DEFAULT 1,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+UNIQUE (post_id, view_date)
+);
+
+-- Create a function to increment view count properly
+CREATE OR REPLACE FUNCTION increment_post_view(post_id_param INTEGER)
+RETURNS VOID AS $$
+BEGIN
+-- First update the main posts table total view count
+UPDATE posts
+SET view_count = view_count + 1
+WHERE id = post_id_param;
+
+-- Then, update or insert the daily view count
+INSERT INTO post_views (post_id, view_date, view_count)
+VALUES (post_id_param, CURRENT_DATE, 1)
+ON CONFLICT (post_id, view_date)
+DO UPDATE SET view_count = post_views.view_count + 1;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Create a function to get post views per day for the last N days
+CREATE OR REPLACE FUNCTION get_post_views_by_day(post_id_param INTEGER, days_count INTEGER)
+RETURNS TABLE (
+  view_date DATE,
+  count INTEGER
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+WITH days AS (
+SELECT generate_series(
+CURRENT_DATE - (days_count - 1)::interval,
+CURRENT_DATE,
+'1 day'::interval
+)::date AS day
+)
+SELECT
+days.day AS view_date,
+COALESCE(pv.view_count, 0) AS count
+FROM days
+LEFT JOIN post_views pv ON pv.view_date = days.day AND pv.post_id = post_id_param
+ORDER BY days.day;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Create a function to get total views per day across all posts
+CREATE OR REPLACE FUNCTION get_total_views_by_day(days_count INTEGER)
+RETURNS TABLE (
+  view_date DATE,
+  count INTEGER
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+WITH days AS (
+SELECT generate_series(
+CURRENT_DATE - (days_count - 1)::interval,
+CURRENT_DATE,
+'1 day'::interval
+)::date AS day
+)
+SELECT
+days.day AS view_date,
+COALESCE(SUM(pv.view_count), 0) AS count
+FROM days
+LEFT JOIN post_views pv ON pv.view_date = days.day
+GROUP BY days.day
+ORDER BY days.day;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+
+$$

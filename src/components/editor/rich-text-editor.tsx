@@ -1,3 +1,4 @@
+// src/components/editor/rich-text-editor.tsx (updated)
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,7 @@ export default function RichTextEditor({
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [isYoutubeDialogOpen, setIsYoutubeDialogOpen] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -135,6 +137,7 @@ export default function RichTextEditor({
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setImageFile(e.target.files[0]);
+      setUploadError(null);
     }
   };
 
@@ -144,29 +147,31 @@ export default function RichTextEditor({
     try {
       setIsUploading(true);
       setUploadProgress(0);
+      setUploadError(null);
 
       // Generate a unique filename
       const fileExt = imageFile.name.split(".").pop();
       const fileName = `${Date.now()}-${Math.random()
         .toString(36)
         .substring(2, 15)}.${fileExt}`;
-      const filePath = `content-images/${fileName}`;
+      const filePath = `uploads/images/${fileName}`;
 
       // Upload to Supabase storage
       const { data, error } = await supabase.storage
-        .from("public")
+        .from("raihan-blog-app") // Using your bucket name
         .upload(filePath, imageFile, {
           cacheControl: "3600",
           upsert: false,
         });
 
       if (error) {
+        console.error("Storage upload error:", error);
         throw error;
       }
 
       // Get public URL for the uploaded image
       const { data: urlData } = supabase.storage
-        .from("public")
+        .from("raihan-blog-app") // Using your bucket name
         .getPublicUrl(filePath);
 
       if (urlData && urlData.publicUrl) {
@@ -176,9 +181,11 @@ export default function RichTextEditor({
         setImageFile(null);
         setImageUrl("");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error uploading image:", error);
-      alert("Failed to upload image. Please try again.");
+      setUploadError(
+        error.message || "Failed to upload image. Please try again."
+      );
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -420,6 +427,11 @@ export default function RichTextEditor({
                       className="bg-primary h-2 rounded-full"
                       style={{ width: `${uploadProgress}%` }}
                     ></div>
+                  </div>
+                )}
+                {uploadError && (
+                  <div className="text-sm text-destructive mt-2">
+                    {uploadError}
                   </div>
                 )}
               </div>
