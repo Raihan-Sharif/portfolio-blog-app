@@ -9,7 +9,6 @@ const nextConfig = {
   images: {
     domains: [
       "brandfetch.com",
-      "example.com",
       "images.unsplash.com",
       "firebasestorage.googleapis.com",
       "storage.googleapis.com",
@@ -20,6 +19,7 @@ const nextConfig = {
       "picsum.photos",
       "supabase.co",
       "lankabd.com",
+      "cozdthelsubfwivejiyw.supabase.co",
     ],
   },
   experimental: {

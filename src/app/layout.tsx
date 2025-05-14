@@ -22,20 +22,20 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <AuthProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
             <div className="flex min-h-screen flex-col">
               <Navbar />
               <main className="flex-1 pt-16">{children}</main>
               <Footer />
             </div>
-          </ThemeProvider>
-        </AuthProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

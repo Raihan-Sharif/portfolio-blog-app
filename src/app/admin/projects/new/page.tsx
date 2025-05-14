@@ -59,8 +59,8 @@ export default function NewProjectPage() {
         ...prev,
         content: contentValue,
       }));
-    } catch (error) {
-      // If parsing fails, just store as a string
+    } catch (_) {
+      // If parsing fails, just store as a string without using the error variable
       setFormState((prev) => ({
         ...prev,
         content: e.target.value,
@@ -98,7 +98,6 @@ export default function NewProjectPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      console.log("Current user:", user);
 
       if (!user) {
         throw new Error("You must be logged in to save a project");
@@ -119,13 +118,13 @@ export default function NewProjectPage() {
       if (insertError) {
         throw insertError;
       }
-      console.log("Project saved successfully");
+
       // Redirect to the projects list
       router.push("/admin/projects");
       router.refresh();
-    } catch (error: any) {
-      console.error("Error saving project:", error);
-      setError(error.message || "Failed to save project. Please try again.");
+    } catch (err: any) {
+      console.error("Error saving project:", err.message || err);
+      setError(err.message || "Failed to save project. Please try again.");
     } finally {
       setSaving(false);
     }

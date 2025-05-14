@@ -112,8 +112,8 @@ export default function ProjectEditor({ params }: ProjectEditorProps) {
         ...prev,
         content: contentValue,
       }));
-    } catch (error) {
-      // If parsing fails, just store as a string
+    } catch (_) {
+      // If parsing fails, just store as a string (not using error variable)
       setFormState((prev) => ({
         ...prev,
         content: e.target.value,
@@ -191,9 +191,9 @@ export default function ProjectEditor({ params }: ProjectEditorProps) {
       // Redirect to the projects list
       router.push("/admin/projects");
       router.refresh();
-    } catch (error: any) {
-      console.error("Error saving project:", error);
-      setError(error.message || "Failed to save project. Please try again.");
+    } catch (err: any) {
+      console.error("Error saving project:", err.message || err);
+      setError(err.message || "Failed to save project. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -221,6 +221,7 @@ export default function ProjectEditor({ params }: ProjectEditorProps) {
             size="icon"
             onClick={() => router.push("/admin/projects")}
             className="mr-2"
+            type="button"
           >
             <ArrowLeft size={18} />
           </Button>
@@ -228,7 +229,12 @@ export default function ProjectEditor({ params }: ProjectEditorProps) {
             {isNewProject ? "Create New Project" : "Edit Project"}
           </h1>
         </div>
-        <Button onClick={saveProject} disabled={saving} className="gap-2">
+        <Button
+          onClick={saveProject}
+          disabled={saving}
+          className="gap-2"
+          type="button"
+        >
           <Save size={16} />
           {saving ? "Saving..." : "Save"}
         </Button>

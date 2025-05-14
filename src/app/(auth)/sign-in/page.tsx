@@ -7,12 +7,13 @@ import { supabase } from "@/lib/supabase/client";
 import { AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
-export default function SignInPage() {
+// Component to safely use hooks that require client-side features
+function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectPath = searchParams.get("redirect") || "/";
+  const redirectPath = searchParams?.get("redirect") || "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -58,8 +59,6 @@ export default function SignInPage() {
           .select("role_id")
           .eq("user_id", userId);
 
-        console.log("User roles data:", userRolesData);
-
         if (roleError) {
           console.error("Error fetching user roles:", roleError);
           // Default to home page if error
@@ -79,8 +78,6 @@ export default function SignInPage() {
             .select("name")
             .eq("id", roleId)
             .single();
-
-          console.log("Role data:", roleData);
 
           if (roleData && roleData.name === "admin") {
             isAdmin = true;
@@ -170,5 +167,22 @@ export default function SignInPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Main page component with Suspense boundary
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-accent/20">
+          <div className="text-center">
+            <p>Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <SignInForm />
+    </Suspense>
   );
 }

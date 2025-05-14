@@ -13,34 +13,97 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, refreshUser } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
+  const [contentVisible, setContentVisible] = useState(false);
+  const mountedRef = useRef(false);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Function to handle visibility changes (when tab becomes active)
+  const handleVisibilityChange = useCallback(() => {
+    if (document.visibilityState === "visible") {
+      refreshUser();
+    }
+  }, [refreshUser]);
+
+  // Set up visibility change listener
   useEffect(() => {
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [handleVisibilityChange]);
+
+  // Set up manual polling for auth state when tab is active
+  useEffect(() => {
+    mountedRef.current = true;
+
+    // Implement a gentle polling mechanism to periodically check auth state
+    // when the tab is visible and in the admin section
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === "visible" && mountedRef.current) {
+        refreshUser();
+      }
+    }, 30000); // Poll every 30 seconds when tab is visible
+
+    return () => {
+      mountedRef.current = false;
+      clearInterval(pollInterval);
+    };
+  }, [refreshUser]);
+
+  // This is to prevent the flashing of content during authentication checks
+  useEffect(() => {
+    if (!checkingAdmin && !contentVisible) {
+      // Clear any existing timeout
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+
+      // Set a new timeout
+      loadingTimeoutRef.current = setTimeout(() => {
+        if (mountedRef.current) {
+          setContentVisible(true);
+        }
+      }, 100);
+    }
+
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, [checkingAdmin, contentVisible]);
+
+  // Check admin status
+  useEffect(() => {
+    let isMounted = true;
+
     const checkAdminStatus = async () => {
       if (loading) return;
 
+      // If user is null (not authenticated), redirect to sign-in
       if (!user) {
-        router.push("/sign-in");
+        router.push("/sign-in?redirect=" + encodeURIComponent(pathname));
         return;
       }
 
-      console.log("AdminLayout - User role check:", user.role);
-
       // First check the user.role from auth provider
       if (user.role === "admin") {
-        setIsAdmin(true);
-        setCheckingAdmin(false);
+        if (isMounted) {
+          setIsAdmin(true);
+          setCheckingAdmin(false);
+        }
         return;
       }
 
@@ -50,30 +113,63 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           p_user_id: user.id,
         });
 
-        console.log("AdminLayout - Direct role check result:", data);
-
         if (error) {
           console.error("Error checking admin role:", error);
-          router.push("/");
+          if (isMounted) {
+            router.push("/");
+          }
           return;
         }
 
         if (data && data.length > 0 && data[0].role_name === "admin") {
-          setIsAdmin(true);
+          if (isMounted) {
+            setIsAdmin(true);
+          }
         } else {
           console.log("User does not have admin role, redirecting");
-          router.push("/");
+          if (isMounted) {
+            router.push("/");
+          }
         }
       } catch (err) {
         console.error("Error in admin check:", err);
-        router.push("/");
+        if (isMounted) {
+          router.push("/");
+        }
       } finally {
-        setCheckingAdmin(false);
+        if (isMounted) {
+          setCheckingAdmin(false);
+        }
       }
     };
 
     checkAdminStatus();
-  }, [user, loading, router]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, loading, router, pathname]);
+
+  // Handle manual page refresh to reset the content visibility state
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // This will run before page refresh/navigation
+      localStorage.setItem("admin_last_path", pathname);
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    // Check if we're returning to the same path after a refresh
+    const lastPath = localStorage.getItem("admin_last_path");
+    if (lastPath === pathname) {
+      // If returning to the same path, make content visible immediately
+      setContentVisible(true);
+    }
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [pathname]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -122,6 +218,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   if (!isAdmin) {
     return null; // Will redirect in the effect
   }
+
+  // Force immediate display of content if we're on an admin page
+  // This helps when navigating between admin pages
+  const forceDisplay = contentVisible || pathname.startsWith("/admin/");
 
   return (
     <div className="bg-background min-h-screen flex">
@@ -214,9 +314,18 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </Button>
       </div>
 
-      {/* Main content */}
+      {/* Main content - only render when authentication is complete */}
       <div className="md:pl-64 flex flex-col flex-1 w-full pt-16 md:pt-0">
-        <main className="flex-1">{children}</main>
+        {forceDisplay ? (
+          <main className="flex-1">{children}</main>
+        ) : (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="flex flex-col items-center">
+              <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mb-4"></div>
+              <p>Loading content...</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

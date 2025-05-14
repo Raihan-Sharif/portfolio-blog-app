@@ -157,7 +157,7 @@ export default function RichTextEditor({
       const filePath = `uploads/images/${fileName}`;
 
       // Upload to Supabase storage
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from("raihan-blog-app") // Using your bucket name
         .upload(filePath, imageFile, {
           cacheControl: "3600",

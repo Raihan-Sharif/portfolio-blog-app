@@ -7,6 +7,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -42,15 +43,15 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
+  // Function to get user details with role information
   const getUserDetails = async (userId: string) => {
     try {
       // Call our custom function
       const { data, error } = await supabase.rpc("get_user_with_role", {
         p_user_id: userId,
       });
-
-      console.log("User details from DB function:", data);
 
       if (error) {
         console.error("Error calling get_user_with_role:", error);
@@ -112,6 +113,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  // Function to refresh user data
   const refreshUser = useCallback(async () => {
     try {
       setLoading(true);
@@ -144,18 +146,63 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
-  // Initial user check on mount
+  // Initial setup of auth state
   useEffect(() => {
     const initAuth = async () => {
-      setLoading(true);
-      await refreshUser();
+      try {
+        setLoading(true);
+
+        // Get current session
+        const { data } = await supabase.auth.getSession();
+
+        if (data.session?.user) {
+          const userDetails = await getUserDetails(data.session.user.id);
+
+          if (userDetails) {
+            setUser({
+              id: data.session.user.id,
+              email: data.session.user.email,
+              ...userDetails,
+            });
+          } else {
+            setUser({
+              id: data.session.user.id,
+              email: data.session.user.email,
+              role: "viewer",
+            });
+          }
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error("Error initializing auth:", err);
+        setUser(null);
+      } finally {
+        setLoading(false);
+        setAuthInitialized(true);
+      }
     };
 
     initAuth();
-  }, [refreshUser]);
+
+    // Handle tab/window focus events to refresh authentication
+    const handleFocus = () => {
+      if (authInitialized) {
+        refreshUser();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [refreshUser, authInitialized]);
 
   // Set up auth state change listener
   useEffect(() => {
+    if (!authInitialized) return;
+
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("Auth state changed:", event);
@@ -189,18 +236,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [authInitialized]);
 
-  const signOut = async () => {
+  // Sign out function
+  const signOut = useCallback(async () => {
     setLoading(true);
     await supabase.auth.signOut();
     setUser(null);
     setLoading(false);
-  };
+  }, []);
+
+  // Create a stable context value
+  const contextValue = useMemo(
+    () => ({
+      user,
+      loading,
+      signOut,
+      refreshUser,
+    }),
+    [user, loading, signOut, refreshUser]
+  );
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut, refreshUser }}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 }

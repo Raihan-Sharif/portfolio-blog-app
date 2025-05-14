@@ -1,12 +1,12 @@
-// src/components/ui/image-uploader.tsx
 "use client";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase/client";
-import { Image, Loader2, X } from "lucide-react";
-import { useState } from "react";
+import { Image as ImageIcon, Loader2, X } from "lucide-react";
+import Image from "next/image";
+import { useEffect, useState } from "react";
 
 interface ImageUploaderProps {
   initialImageUrl?: string;
@@ -27,11 +27,26 @@ export function ImageUploader({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
+  // Update image URL when initialImageUrl changes
+  useEffect(() => {
+    if (initialImageUrl) {
+      setImageUrl(initialImageUrl);
+    }
+  }, [initialImageUrl]);
+
+  // Function to properly handle file upload with progress tracking
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setImageFile(e.target.files[0]);
+      const file = e.target.files[0];
+      setImageFile(file);
       setError(null);
+
+      // Create a preview URL for the selected file
+      const objectUrl = URL.createObjectURL(file);
+      setPreviewUrl(objectUrl);
     }
   };
 
@@ -42,12 +57,17 @@ export function ImageUploader({
 
   const handleClearFile = () => {
     setImageFile(null);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
   };
 
   const handleUpload = async () => {
     try {
       setUploading(true);
       setError(null);
+      setUploadProgress(0);
 
       if (!imageFile) {
         // If no file selected but we have a URL, use that
@@ -66,23 +86,42 @@ export function ImageUploader({
         .substring(2, 15)}.${fileExt}`;
       const filePath = `${folderPath}/${fileName}`;
 
+      // Add console logs for debugging
+      console.log("Starting upload to:", bucketName, filePath);
+      console.log("File size:", imageFile.size, "bytes");
+
+      // Begin simulating progress
+      let progress = 0;
+      const progressInterval = setInterval(() => {
+        progress += 5;
+        if (progress > 90) progress = 90; // Avoid reaching 100% before actually complete
+        setUploadProgress(progress);
+      }, 100);
+
       // Upload to Supabase storage
-      const { error: uploadError } = await supabase.storage
+      const { data, error: uploadError } = await supabase.storage
         .from(bucketName)
         .upload(filePath, imageFile, {
           cacheControl: "3600",
-          upsert: false,
+          upsert: true,
         });
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
 
       if (uploadError) {
         console.error("Upload error:", uploadError);
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
+      console.log("Upload successful:", data);
+
       // Get public URL
       const { data: urlData } = supabase.storage
         .from(bucketName)
         .getPublicUrl(filePath);
+
+      console.log("Public URL data:", urlData);
 
       if (!urlData || !urlData.publicUrl) {
         throw new Error("Failed to get public URL");
@@ -92,6 +131,14 @@ export function ImageUploader({
       setImageUrl(urlData.publicUrl);
       onImageUploaded(urlData.publicUrl);
       setImageFile(null);
+
+      // Clean up preview URL
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+
+      console.log("Image upload complete, URL:", urlData.publicUrl);
     } catch (err: any) {
       console.error("Error uploading image:", err);
       setError(err.message || "Failed to upload image. Please try again.");
@@ -106,10 +153,11 @@ export function ImageUploader({
         {/* Current image preview */}
         {imageUrl && !imageFile && (
           <div className="relative w-full h-40 border rounded-md overflow-hidden mb-2">
-            <img
+            <Image
               src={imageUrl}
-              alt="Preview"
-              className="w-full h-full object-cover"
+              alt="Uploaded image preview"
+              fill
+              className="object-cover"
             />
             <Button
               variant="destructive"
@@ -150,16 +198,17 @@ export function ImageUploader({
             )}
           </div>
 
-          {imageFile && (
+          {imageFile && previewUrl && (
             <div className="mt-2">
               <p className="text-sm text-muted-foreground">
                 Selected: {imageFile.name}
               </p>
               <div className="relative w-full h-40 border rounded-md overflow-hidden mt-2">
-                <img
-                  src={URL.createObjectURL(imageFile)}
-                  alt="Preview"
-                  className="w-full h-full object-cover"
+                <Image
+                  src={previewUrl}
+                  alt="Image preview"
+                  fill
+                  className="object-cover"
                 />
               </div>
             </div>
@@ -178,6 +227,16 @@ export function ImageUploader({
           />
         </div>
 
+        {/* Progress bar */}
+        {uploading && (
+          <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-2">
+            <div
+              className="bg-primary h-2.5 rounded-full transition-all duration-300"
+              style={{ width: `${uploadProgress}%` }}
+            ></div>
+          </div>
+        )}
+
         {/* Error message */}
         {error && <div className="text-sm text-destructive">{error}</div>}
 
@@ -195,11 +254,21 @@ export function ImageUploader({
             </>
           ) : (
             <>
-              <Image className="mr-2 h-4 w-4" />
+              <ImageIcon className="mr-2 h-4 w-4" />
               {imageUrl ? "Update Image" : "Upload Image"}
             </>
           )}
         </Button>
+
+        {/* Debug information in development (hidden in production) */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="mt-4 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs">
+            <p>Bucket: {bucketName}</p>
+            <p>Folder: {folderPath}</p>
+            <p>File: {imageFile?.name}</p>
+            <p>URL: {imageUrl}</p>
+          </div>
+        )}
       </div>
     </div>
   );

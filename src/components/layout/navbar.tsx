@@ -24,8 +24,6 @@ export function Navbar() {
   const { user, loading, signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  // Remove unused theme variable
-  // const { theme } = useTheme();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -49,9 +47,6 @@ export function Navbar() {
 
   useEffect(() => {
     if (user) {
-      console.log("Current user in navbar:", user);
-      console.log("User role in navbar:", user.role);
-
       // If we already know they're an admin from the context, use that
       if (user.role === "admin") {
         setIsAdmin(true);
@@ -65,8 +60,6 @@ export function Navbar() {
             p_user_id: user.id,
           });
 
-          console.log("Navbar - Direct role check result:", data);
-
           if (error) {
             console.error("Error checking role directly:", error);
             return;
@@ -74,7 +67,6 @@ export function Navbar() {
 
           if (data && data.length > 0 && data[0].role_name === "admin") {
             setIsAdmin(true);
-            console.log("Direct role check in navbar: admin");
           }
         } catch (err) {
           console.error("Error checking role directly:", err);

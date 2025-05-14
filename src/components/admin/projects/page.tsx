@@ -20,7 +20,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
-import { safeNavigate } from "@/lib/utils"; // Use our new utility
 import {
   AlertCircle,
   Briefcase,
@@ -32,7 +31,6 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -159,8 +157,8 @@ export default function AdminProjectsPage() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Projects</h1>
 
-          <Button 
-            className="gap-2" 
+          <Button
+            className="gap-2"
             type="button"
             onClick={() => router.push("/admin/projects/new")}
           >
@@ -253,7 +251,7 @@ export default function AdminProjectsPage() {
                       <TableCell>
                         <div className="flex gap-2">
                           {project.github_url && (
-                            
+                            <a
                               href={project.github_url}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -269,7 +267,7 @@ export default function AdminProjectsPage() {
                             </a>
                           )}
                           {project.demo_url && (
-                            
+                            <a
                               href={project.demo_url}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -294,7 +292,9 @@ export default function AdminProjectsPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => router.push(`/admin/projects/${project.id}`)}
+                            onClick={() =>
+                              router.push(`/admin/projects/${project.id}`)
+                            }
                             title="Edit"
                             type="button"
                           >

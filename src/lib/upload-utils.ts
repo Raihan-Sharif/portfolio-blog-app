@@ -11,7 +11,6 @@ import { supabase } from "./supabase/client";
 export async function uploadImage(
   file: File,
   bucket: string = "raihan-blog-app",
-  //folder: string = "uploads/images"
   folder: string = "public"
 ): Promise<string> {
   try {
@@ -23,15 +22,15 @@ export async function uploadImage(
     const filePath = `${folder}/${fileName}`;
 
     // Upload to Supabase storage
-    const { data, error } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from(bucket)
       .upload(filePath, file, {
         cacheControl: "3600",
         upsert: false,
       });
 
-    if (error) {
-      throw error;
+    if (uploadError) {
+      throw uploadError;
     }
 
     // Get the public URL
