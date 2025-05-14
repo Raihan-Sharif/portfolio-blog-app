@@ -278,6 +278,7 @@ export default function BlogNewPostPage() {
                 <Label htmlFor="cover_image_url">Cover Image</Label>
                 <div className="mt-2">
                   <ImageUploader
+                    key={formState.cover_image_url || "new"}
                     initialImageUrl={formState.cover_image_url || ""}
                     onImageUploaded={(url) =>
                       setFormState((prev) => ({

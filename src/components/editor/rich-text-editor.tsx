@@ -1,4 +1,4 @@
-// src/components/editor/rich-text-editor.tsx (updated)
+// src/components/editor/rich-text-editor.tsx
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,7 @@ import {
   Undo,
   Youtube as YoutubeIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // Define types for the RichTextEditor
 interface RichTextEditorProps {
@@ -57,10 +57,17 @@ export default function RichTextEditor({
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [isYoutubeDialogOpen, setIsYoutubeDialogOpen] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [editorInitialized, setEditorInitialized] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        // Fix for spaces not working properly in editing mode
+        history: {
+          newGroupDelay: 300, // Adjust the delay for history grouping
+        },
+      }),
       Image.configure({
         allowBase64: true,
         HTMLAttributes: {
@@ -71,6 +78,8 @@ export default function RichTextEditor({
         openOnClick: false,
         HTMLAttributes: {
           class: "text-primary underline",
+          rel: "noopener noreferrer",
+          target: "_blank",
         },
       }),
       Youtube.configure({
@@ -81,7 +90,7 @@ export default function RichTextEditor({
         modestBranding: true,
       }),
     ],
-    content: initialContent || "",
+    content: "",
     onUpdate: ({ editor }) => {
       // Get both HTML and JSON content
       const html = editor.getHTML();
@@ -97,10 +106,39 @@ export default function RichTextEditor({
       onChange(contentObject);
     },
     editable: true,
+    // Improve cursor behavior
+    editorProps: {
+      attributes: {
+        class:
+          "prose prose-sm sm:prose lg:prose-lg xl:prose-xl focus:outline-none min-h-[200px] w-full p-4",
+        spellcheck: "true",
+      },
+      handleDOMEvents: {
+        // Ensure click events maintain focus
+        click: (view, event) => {
+          if (!view.hasFocus()) {
+            view.focus();
+          }
+          return false;
+        },
+      },
+      handleKeyDown: (view, event) => {
+        // Handle Enter key to prevent unwanted form submission
+        if (event.key === "Enter" && !event.shiftKey) {
+          if (
+            event.target instanceof HTMLElement &&
+            event.target.closest(".ProseMirror")
+          ) {
+            event.stopPropagation();
+          }
+        }
+        return false;
+      },
+    },
   });
 
   useEffect(() => {
-    if (editor && initialContent) {
+    if (editor && initialContent && !editorInitialized) {
       try {
         // Handle different types of initialContent
         if (typeof initialContent === "string") {
@@ -123,25 +161,49 @@ export default function RichTextEditor({
           // Default empty content
           editor.commands.setContent("");
         }
+        setEditorInitialized(true);
+        // Focus the editor at the end
+        setTimeout(() => {
+          editor.commands.focus("end");
+        }, 100);
       } catch (error) {
         console.error("Error setting editor content:", error);
         editor.commands.setContent("");
       }
     }
-  }, [editor, initialContent]);
+  }, [editor, initialContent, editorInitialized]);
+
+  // Form protection
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isUploading) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isUploading]);
 
   if (!editor) {
     return null;
   }
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault(); // Prevent form submission
+    e.stopPropagation();
+
     if (e.target.files && e.target.files.length > 0) {
       setImageFile(e.target.files[0]);
       setUploadError(null);
     }
   };
 
-  const uploadImage = async () => {
+  const uploadImage = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent form submission
+    e.stopPropagation();
+
     if (!imageFile) return;
 
     try {
@@ -156,6 +218,14 @@ export default function RichTextEditor({
         .substring(2, 15)}.${fileExt}`;
       const filePath = `uploads/images/${fileName}`;
 
+      // Begin simulating progress
+      let progress = 0;
+      const progressInterval = setInterval(() => {
+        progress += 5;
+        if (progress > 90) progress = 90; // Avoid reaching 100% before actually complete
+        setUploadProgress(progress);
+      }, 100);
+
       // Upload to Supabase storage
       const { error } = await supabase.storage
         .from("raihan-blog-app") // Using your bucket name
@@ -163,6 +233,9 @@ export default function RichTextEditor({
           cacheControl: "3600",
           upsert: false,
         });
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
 
       if (error) {
         console.error("Storage upload error:", error);
@@ -180,6 +253,10 @@ export default function RichTextEditor({
         setIsImageDialogOpen(false);
         setImageFile(null);
         setImageUrl("");
+
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
       }
     } catch (error: any) {
       console.error("Error uploading image:", error);
@@ -192,10 +269,13 @@ export default function RichTextEditor({
     }
   };
 
-  const addImage = () => {
+  const addImage = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent form submission
+    e.stopPropagation();
+
     // If we have a file, upload it first
     if (imageFile) {
-      uploadImage();
+      uploadImage(e);
       return;
     }
 
@@ -207,9 +287,13 @@ export default function RichTextEditor({
     }
   };
 
-  const addLink = () => {
+  const addLink = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent form submission
+    e.stopPropagation();
+
     if (linkUrl) {
       if (linkText) {
+        // If we have link text, insert it and select it
         editor.chain().focus().insertContent(linkText).run();
         editor
           .chain()
@@ -229,7 +313,10 @@ export default function RichTextEditor({
     }
   };
 
-  const addYoutube = () => {
+  const addYoutube = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent form submission
+    e.stopPropagation();
+
     if (youtubeUrl) {
       // Extract YouTube ID
       const youtubeId = youtubeUrl.match(
@@ -263,7 +350,11 @@ export default function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => editor.chain().focus().toggleBold().run()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editor.chain().focus().toggleBold().run();
+          }}
           className={editor.isActive("bold") ? "bg-accent" : ""}
           title="Bold"
           type="button"
@@ -273,7 +364,11 @@ export default function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => editor.chain().focus().toggleItalic().run()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editor.chain().focus().toggleItalic().run();
+          }}
           className={editor.isActive("italic") ? "bg-accent" : ""}
           title="Italic"
           type="button"
@@ -286,9 +381,11 @@ export default function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 1 }).run()
-          }
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editor.chain().focus().toggleHeading({ level: 1 }).run();
+          }}
           className={
             editor.isActive("heading", { level: 1 }) ? "bg-accent" : ""
           }
@@ -300,9 +397,11 @@ export default function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 2 }).run()
-          }
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editor.chain().focus().toggleHeading({ level: 2 }).run();
+          }}
           className={
             editor.isActive("heading", { level: 2 }) ? "bg-accent" : ""
           }
@@ -314,9 +413,11 @@ export default function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 3 }).run()
-          }
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editor.chain().focus().toggleHeading({ level: 3 }).run();
+          }}
           className={
             editor.isActive("heading", { level: 3 }) ? "bg-accent" : ""
           }
@@ -331,7 +432,11 @@ export default function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editor.chain().focus().toggleBulletList().run();
+          }}
           className={editor.isActive("bulletList") ? "bg-accent" : ""}
           title="Bullet List"
           type="button"
@@ -341,7 +446,11 @@ export default function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editor.chain().focus().toggleOrderedList().run();
+          }}
           className={editor.isActive("orderedList") ? "bg-accent" : ""}
           title="Ordered List"
           type="button"
@@ -354,7 +463,11 @@ export default function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editor.chain().focus().toggleBlockquote().run();
+          }}
           className={editor.isActive("blockquote") ? "bg-accent" : ""}
           title="Quote"
           type="button"
@@ -364,7 +477,11 @@ export default function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editor.chain().focus().toggleCodeBlock().run();
+          }}
           className={editor.isActive("codeBlock") ? "bg-accent" : ""}
           title="Code Block"
           type="button"
@@ -374,7 +491,11 @@ export default function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => editor.chain().focus().setHorizontalRule().run()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editor.chain().focus().setHorizontalRule().run();
+          }}
           title="Horizontal Rule"
           type="button"
         >
@@ -390,6 +511,10 @@ export default function RichTextEditor({
               size="icon"
               title="Insert Image"
               type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
             >
               <ImageIcon size={18} />
             </Button>
@@ -408,12 +533,20 @@ export default function RichTextEditor({
                     accept="image/*"
                     onChange={handleImageFileChange}
                     className="flex-1"
+                    ref={fileInputRef}
                   />
                   {imageFile && (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setImageFile(null)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setImageFile(null);
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = "";
+                        }
+                      }}
                       title="Clear file"
                       type="button"
                     >
@@ -464,6 +597,16 @@ export default function RichTextEditor({
               size="icon"
               title="Insert Link"
               type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // Pre-fill the link text with the current selection
+                if (editor.state.selection.content().size > 0) {
+                  setLinkText(
+                    editor.state.selection.content().content?.textContent || ""
+                  );
+                }
+              }}
             >
               <LinkIcon size={18} />
             </Button>
@@ -491,7 +634,12 @@ export default function RichTextEditor({
                   onChange={(e) => setLinkUrl(e.target.value)}
                 />
               </div>
-              <Button onClick={addLink} className="w-full" type="button">
+              <Button
+                onClick={addLink}
+                className="w-full"
+                type="button"
+                disabled={!linkUrl}
+              >
                 Insert
               </Button>
             </div>
@@ -508,6 +656,10 @@ export default function RichTextEditor({
               size="icon"
               title="Insert YouTube Video"
               type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
             >
               <YoutubeIcon size={18} />
             </Button>
@@ -526,7 +678,12 @@ export default function RichTextEditor({
                   onChange={(e) => setYoutubeUrl(e.target.value)}
                 />
               </div>
-              <Button onClick={addYoutube} className="w-full" type="button">
+              <Button
+                onClick={addYoutube}
+                className="w-full"
+                type="button"
+                disabled={!youtubeUrl}
+              >
                 Insert
               </Button>
             </div>
@@ -538,7 +695,11 @@ export default function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => editor.chain().focus().undo().run()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editor.chain().focus().undo().run();
+          }}
           disabled={!editor.can().undo()}
           title="Undo"
           type="button"
@@ -548,7 +709,11 @@ export default function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => editor.chain().focus().redo().run()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editor.chain().focus().redo().run();
+          }}
           disabled={!editor.can().redo()}
           title="Redo"
           type="button"
@@ -556,8 +721,14 @@ export default function RichTextEditor({
           <Redo size={18} />
         </Button>
       </div>
-      <div className="p-4 min-h-[300px] prose prose-sm dark:prose-invert max-w-none">
-        <EditorContent editor={editor} />
+      <div
+        className="prose prose-sm sm:prose lg:prose-lg dark:prose-invert max-w-none"
+        onClick={() => editor.commands.focus()}
+      >
+        <EditorContent
+          editor={editor}
+          onClick={() => editor.commands.focus()}
+        />
       </div>
     </div>
   );

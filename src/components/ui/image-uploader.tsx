@@ -1,3 +1,4 @@
+// src/components/ui/image-uploader.tsx
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase/client";
 import { Image as ImageIcon, Loader2, X } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface ImageUploaderProps {
   initialImageUrl?: string;
@@ -29,6 +30,20 @@ export function ImageUploader({
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fix for form reloads
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (uploading || imageFile) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [uploading, imageFile]);
 
   // Update image URL when initialImageUrl changes
   useEffect(() => {
@@ -39,6 +54,8 @@ export function ImageUploader({
 
   // Function to properly handle file upload with progress tracking
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault(); // Prevent form submission
+
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       setImageFile(file);
@@ -55,15 +72,23 @@ export function ImageUploader({
     setError(null);
   };
 
-  const handleClearFile = () => {
+  const handleClearFile = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent form submission
     setImageFile(null);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""; // Clear the file input
+    }
+
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
     }
   };
 
-  const handleUpload = async () => {
+  const handleUpload = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent form submission
+
     try {
       setUploading(true);
       setError(null);
@@ -130,7 +155,12 @@ export function ImageUploader({
       // Set the URL and notify parent
       setImageUrl(urlData.publicUrl);
       onImageUploaded(urlData.publicUrl);
+
+      // Reset file input state
       setImageFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
 
       // Clean up preview URL
       if (previewUrl) {
@@ -163,7 +193,8 @@ export function ImageUploader({
               variant="destructive"
               size="icon"
               className="absolute top-2 right-2"
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault(); // Prevent form submission
                 setImageUrl("");
                 onImageUploaded("");
               }}
@@ -184,6 +215,8 @@ export function ImageUploader({
               accept="image/*"
               onChange={handleFileChange}
               disabled={uploading}
+              ref={fileInputRef}
+              onClick={(e) => e.stopPropagation()} // Prevent form clicks from triggering file input
             />
             {imageFile && (
               <Button
@@ -259,16 +292,6 @@ export function ImageUploader({
             </>
           )}
         </Button>
-
-        {/* Debug information in development (hidden in production) */}
-        {process.env.NODE_ENV === "development" && (
-          <div className="mt-4 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs">
-            <p>Bucket: {bucketName}</p>
-            <p>Folder: {folderPath}</p>
-            <p>File: {imageFile?.name}</p>
-            <p>URL: {imageUrl}</p>
-          </div>
-        )}
       </div>
     </div>
   );
