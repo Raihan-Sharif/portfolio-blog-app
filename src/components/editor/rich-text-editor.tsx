@@ -600,10 +600,14 @@ export default function RichTextEditor({
                 e.preventDefault();
                 e.stopPropagation();
                 // Pre-fill the link text with the current selection
-                if (editor.state.selection.content().size > 0) {
-                  setLinkText(
-                    editor.state.selection.content().content?.textContent || ""
-                  );
+                // Fixed: Safely accessing textContent with optional chaining
+                const selectionContent = editor.state.selection.content();
+                if (selectionContent.size > 0) {
+                  // Get the selected text more safely
+                  const selectedText = selectionContent.content
+                    ? String(selectionContent.content.content?.[0]?.text || "")
+                    : "";
+                  setLinkText(selectedText);
                 }
               }}
             >
