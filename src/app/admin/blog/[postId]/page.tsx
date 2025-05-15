@@ -3,6 +3,7 @@
 import AdminLayout from "@/components/admin/admin-layout";
 import RichTextEditor from "@/components/editor/rich-text-editor";
 import { Button } from "@/components/ui/button";
+import { FormWrapper } from "@/components/ui/form-wrapper";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,8 +19,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase/client";
 import { slugify } from "@/lib/utils";
 import { AlertCircle, ArrowLeft, Save } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface BlogPostEditorProps {
   params: {
@@ -36,6 +38,7 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
   const [categories, setCategories] = useState<any[]>([]);
   const [allTags, setAllTags] = useState<any[]>([]);
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
+  const hasLoadedRef = useRef(false);
   const [formState, setFormState] = useState({
     title: "",
     slug: "",
@@ -47,6 +50,8 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
   });
 
   const fetchData = useCallback(async () => {
+    if (hasLoadedRef.current) return;
+
     try {
       setLoading(true);
 
@@ -103,6 +108,8 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
           }
         }
       }
+
+      hasLoadedRef.current = true;
     } catch (err: any) {
       console.error("Error fetching data:", err);
       setError(err.message || "Failed to load data. Please try again.");
@@ -111,13 +118,26 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
     }
   }, [isNewPost, params.postId]);
 
+  // Make sure we only fetch once
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+
+    // Add page refresh protection
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (saving) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [fetchData, saving]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
+    e.preventDefault();
     const { name, value } = e.target;
 
     // Auto-generate slug from title if it's empty
@@ -156,7 +176,9 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
     }));
   };
 
-  const handleTagToggle = (tagId: number) => {
+  const handleTagToggle = (e: React.MouseEvent, tagId: number) => {
+    e.preventDefault(); // Prevent form submission
+
     setSelectedTags((prev) =>
       prev.includes(tagId)
         ? prev.filter((id) => id !== tagId)
@@ -164,7 +186,9 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
     );
   };
 
-  const savePost = async () => {
+  const savePost = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault(); // Prevent form submission
+
     try {
       setSaving(true);
       setError(null);
@@ -294,15 +318,16 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
       <div className="container px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.push("/admin/blog")}
-              className="mr-2"
-              type="button"
-            >
-              <ArrowLeft size={18} />
-            </Button>
+            <Link href="/admin/blog">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="mr-2"
+                type="button"
+              >
+                <ArrowLeft size={18} />
+              </Button>
+            </Link>
             <h1 className="text-2xl font-bold">
               {isNewPost ? "Create New Post" : "Edit Post"}
             </h1>
@@ -325,125 +350,127 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
           </div>
         )}
 
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="title">Title</Label>
-                <Input
-                  id="title"
-                  name="title"
-                  value={formState.title}
-                  onChange={handleChange}
-                  placeholder="Post title"
-                />
-              </div>
-              <div>
-                <Label htmlFor="slug">Slug</Label>
-                <Input
-                  id="slug"
-                  name="slug"
-                  value={formState.slug}
-                  onChange={handleChange}
-                  placeholder="post-url-slug"
-                />
-              </div>
-              <div>
-                <Label htmlFor="excerpt">Excerpt</Label>
-                <Textarea
-                  id="excerpt"
-                  name="excerpt"
-                  value={formState.excerpt || ""}
-                  onChange={handleChange}
-                  placeholder="Brief summary of the post"
-                  rows={3}
-                />
-              </div>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="cover_image_url">Cover Image</Label>
-                <div className="mt-2">
-                  <ImageUploader
-                    initialImageUrl={formState.cover_image_url || ""}
-                    onImageUploaded={(url) =>
-                      setFormState((prev) => ({
-                        ...prev,
-                        cover_image_url: url,
-                      }))
-                    }
-                    bucketName="raihan-blog-app"
-                    folderPath="public"
+        <FormWrapper>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="title">Title</Label>
+                  <Input
+                    id="title"
+                    name="title"
+                    value={formState.title}
+                    onChange={handleChange}
+                    placeholder="Post title"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="slug">Slug</Label>
+                  <Input
+                    id="slug"
+                    name="slug"
+                    value={formState.slug}
+                    onChange={handleChange}
+                    placeholder="post-url-slug"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="excerpt">Excerpt</Label>
+                  <Textarea
+                    id="excerpt"
+                    name="excerpt"
+                    value={formState.excerpt || ""}
+                    onChange={handleChange}
+                    placeholder="Brief summary of the post"
+                    rows={3}
                   />
                 </div>
               </div>
-              <div>
-                <Label htmlFor="category">Category</Label>
-                <Select
-                  value={formState.category_id?.toString() || ""}
-                  onValueChange={(value) =>
-                    handleSelectChange(
-                      "category_id",
-                      value ? parseInt(value) : null
-                    )
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem
-                        key={category.id}
-                        value={category.id.toString()}
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="cover_image_url">Cover Image</Label>
+                  <div className="mt-2">
+                    <ImageUploader
+                      initialImageUrl={formState.cover_image_url || ""}
+                      onImageUploaded={(url) =>
+                        setFormState((prev) => ({
+                          ...prev,
+                          cover_image_url: url,
+                        }))
+                      }
+                      bucketName="raihan-blog-app"
+                      folderPath="public"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    value={formState.category_id?.toString() || ""}
+                    onValueChange={(value) =>
+                      handleSelectChange(
+                        "category_id",
+                        value ? parseInt(value) : null
+                      )
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem
+                          key={category.id}
+                          value={category.id.toString()}
+                        >
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="mb-2 block">Tags</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {allTags.map((tag) => (
+                      <div
+                        key={tag.id}
+                        className={`px-3 py-1 rounded-full text-xs cursor-pointer transition-colors ${
+                          selectedTags.includes(tag.id)
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-accent hover:bg-primary/20"
+                        }`}
+                        onClick={(e) => handleTagToggle(e, tag.id)}
                       >
-                        {category.name}
-                      </SelectItem>
+                        {tag.name}
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-2 block">Tags</Label>
-                <div className="flex flex-wrap gap-2">
-                  {allTags.map((tag) => (
-                    <div
-                      key={tag.id}
-                      className={`px-3 py-1 rounded-full text-xs cursor-pointer transition-colors ${
-                        selectedTags.includes(tag.id)
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-accent hover:bg-primary/20"
-                      }`}
-                      onClick={() => handleTagToggle(tag.id)}
-                    >
-                      {tag.name}
-                    </div>
-                  ))}
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="published"
+                    checked={formState.published}
+                    onCheckedChange={(checked) =>
+                      handleToggleChange("published", checked)
+                    }
+                  />
+                  <Label htmlFor="published">Published</Label>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="published"
-                  checked={formState.published}
-                  onCheckedChange={(checked) =>
-                    handleToggleChange("published", checked)
-                  }
-                />
-                <Label htmlFor="published">Published</Label>
-              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="content" className="mb-2 block">
+                Content
+              </Label>
+              <RichTextEditor
+                initialContent={formState.content}
+                onChange={handleContentChange}
+              />
             </div>
           </div>
-
-          <div>
-            <Label htmlFor="content" className="mb-2 block">
-              Content
-            </Label>
-            <RichTextEditor
-              initialContent={formState.content}
-              onChange={handleContentChange}
-            />
-          </div>
-        </div>
+        </FormWrapper>
       </div>
     </AdminLayout>
   );

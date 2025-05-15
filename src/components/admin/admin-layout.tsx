@@ -2,14 +2,24 @@
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 import {
   Briefcase,
   FileText,
   Home,
   LogOut,
+  Menu,
   Settings,
   Users,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -26,13 +36,124 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
   const [contentVisible, setContentVisible] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const mountedRef = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const adminCheckAttempts = useRef(0);
+  const lastRefreshTime = useRef<number | null>(null);
+
+  // Check admin status function that can be called independently
+  const checkAdminStatus = useCallback(
+    async (forceCheck = false) => {
+      if (loading) return;
+
+      // If user is null (not authenticated), redirect to sign-in
+      if (!user) {
+        router.push("/sign-in?redirect=" + encodeURIComponent(pathname));
+        return;
+      }
+
+      // Use cached admin status if available and not forcing a check
+      if (!forceCheck) {
+        const cachedAdminStatus = localStorage.getItem("adminStatus");
+        if (cachedAdminStatus) {
+          try {
+            const parsed = JSON.parse(cachedAdminStatus);
+            if (
+              parsed.userId === user.id &&
+              parsed.isAdmin &&
+              parsed.timestamp &&
+              Date.now() - parsed.timestamp < 5 * 60 * 1000
+            ) {
+              setIsAdmin(true);
+              setCheckingAdmin(false);
+              setContentVisible(true);
+              return;
+            }
+          } catch (e) {
+            console.error("Error parsing cached admin status:", e);
+          }
+        }
+      }
+
+      // First check the user.role from auth provider
+      if (user.role === "admin") {
+        setIsAdmin(true);
+        setCheckingAdmin(false);
+        // Cache the admin status
+        localStorage.setItem(
+          "adminStatus",
+          JSON.stringify({
+            userId: user.id,
+            isAdmin: true,
+            timestamp: Date.now(),
+          })
+        );
+        return;
+      }
+
+      // If that doesn't work, check directly with our RPC function
+      try {
+        adminCheckAttempts.current += 1;
+        const { data, error } = await supabase.rpc("get_user_with_role", {
+          p_user_id: user.id,
+        });
+
+        if (error) {
+          console.error("Error checking admin role:", error);
+
+          // If we've tried a few times and still getting errors, redirect
+          if (adminCheckAttempts.current > 3) {
+            router.push("/");
+          }
+          return;
+        }
+
+        if (data && data.length > 0 && data[0].role_name === "admin") {
+          setIsAdmin(true);
+          // Cache the admin status
+          localStorage.setItem(
+            "adminStatus",
+            JSON.stringify({
+              userId: user.id,
+              isAdmin: true,
+              timestamp: Date.now(),
+            })
+          );
+        } else {
+          console.log("User does not have admin role");
+          // Cache the non-admin status
+          localStorage.setItem(
+            "adminStatus",
+            JSON.stringify({
+              userId: user.id,
+              isAdmin: false,
+              timestamp: Date.now(),
+            })
+          );
+          router.push("/");
+        }
+      } catch (err) {
+        console.error("Error in admin check:", err);
+        if (adminCheckAttempts.current > 3) {
+          router.push("/");
+        }
+      } finally {
+        setCheckingAdmin(false);
+      }
+    },
+    [user, loading, router, pathname]
+  );
 
   // Function to handle visibility changes (when tab becomes active)
   const handleVisibilityChange = useCallback(() => {
     if (document.visibilityState === "visible") {
-      refreshUser();
+      // Only refresh if it's been at least 30 seconds since the last refresh
+      const now = Date.now();
+      if (!lastRefreshTime.current || now - lastRefreshTime.current > 30000) {
+        refreshUser();
+        lastRefreshTime.current = now;
+      }
     }
   }, [refreshUser]);
 
@@ -44,23 +165,26 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     };
   }, [handleVisibilityChange]);
 
-  // Set up manual polling for auth state when tab is active
+  // Setup cross-tab storage sync
   useEffect(() => {
-    mountedRef.current = true;
-
-    // Implement a gentle polling mechanism to periodically check auth state
-    // when the tab is visible and in the admin section
-    const pollInterval = setInterval(() => {
-      if (document.visibilityState === "visible" && mountedRef.current) {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (
+        event.key === "authSession" ||
+        event.key === "authUserDetails" ||
+        event.key === "adminStatus"
+      ) {
+        // Force a refresh of auth state
         refreshUser();
+        checkAdminStatus(false);
       }
-    }, 30000); // Poll every 30 seconds when tab is visible
+    };
+
+    window.addEventListener("storage", handleStorageChange);
 
     return () => {
-      mountedRef.current = false;
-      clearInterval(pollInterval);
+      window.removeEventListener("storage", handleStorageChange);
     };
-  }, [refreshUser]);
+  }, [refreshUser, checkAdminStatus]);
 
   // This is to prevent the flashing of content during authentication checks
   useEffect(() => {
@@ -85,70 +209,23 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     };
   }, [checkingAdmin, contentVisible]);
 
-  // Check admin status
+  // Improved admin check with caching
   useEffect(() => {
-    let isMounted = true;
-
-    const checkAdminStatus = async () => {
-      if (loading) return;
-
-      // If user is null (not authenticated), redirect to sign-in
-      if (!user) {
-        router.push("/sign-in?redirect=" + encodeURIComponent(pathname));
-        return;
-      }
-
-      // First check the user.role from auth provider
-      if (user.role === "admin") {
-        if (isMounted) {
-          setIsAdmin(true);
-          setCheckingAdmin(false);
-        }
-        return;
-      }
-
-      // If that doesn't work, check directly with our RPC function
-      try {
-        const { data, error } = await supabase.rpc("get_user_with_role", {
-          p_user_id: user.id,
-        });
-
-        if (error) {
-          console.error("Error checking admin role:", error);
-          if (isMounted) {
-            router.push("/");
-          }
-          return;
-        }
-
-        if (data && data.length > 0 && data[0].role_name === "admin") {
-          if (isMounted) {
-            setIsAdmin(true);
-          }
-        } else {
-          console.log("User does not have admin role, redirecting");
-          if (isMounted) {
-            router.push("/");
-          }
-        }
-      } catch (err) {
-        console.error("Error in admin check:", err);
-        if (isMounted) {
-          router.push("/");
-        }
-      } finally {
-        if (isMounted) {
-          setCheckingAdmin(false);
-        }
-      }
-    };
-
+    mountedRef.current = true;
     checkAdminStatus();
 
+    // Set up periodic checking for long-lived pages
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        checkAdminStatus(true); // Force a fresh check every 5 minutes
+      }
+    }, 5 * 60 * 1000);
+
     return () => {
-      isMounted = false;
+      mountedRef.current = false;
+      clearInterval(intervalId);
     };
-  }, [user, loading, router, pathname]);
+  }, [checkAdminStatus]);
 
   // Handle manual page refresh to reset the content visibility state
   useEffect(() => {
@@ -172,8 +249,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }, [pathname]);
 
   const handleSignOut = async () => {
+    // Clear cached data first
+    localStorage.removeItem("adminStatus");
+    localStorage.removeItem("authSession");
+    localStorage.removeItem("authUserDetails");
+
     await signOut();
     router.push("/");
+  };
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
   };
 
   const navItems = [
@@ -225,8 +311,26 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="bg-background min-h-screen flex">
+      {/* Sidebar Toggle for Mobile */}
+      <div className="md:hidden fixed top-4 left-4 z-50">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={toggleSidebar}
+          className="bg-background"
+        >
+          {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        </Button>
+      </div>
+
       {/* Sidebar */}
-      <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-10">
+      <div
+        className={cn(
+          "md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-10 transform transition-transform duration-200 ease-in-out",
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full",
+          "md:translate-x-0" // Always visible on desktop
+        )}
+      >
         <div className="flex flex-col flex-grow border-r bg-card pt-5 overflow-y-auto">
           <div className="flex items-center flex-shrink-0 px-4 mb-5">
             <Link href="/" className="font-bold text-lg">
@@ -299,25 +403,51 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </div>
       </div>
 
-      {/* Mobile header */}
-      <div className="md:hidden fixed top-16 left-0 right-0 z-20 bg-card border-b px-4 py-2 flex items-center justify-between">
-        <Link href="/" className="font-bold text-lg">
-          Admin Panel
-        </Link>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSignOut}
-          type="button"
-        >
-          <LogOut size={16} />
-        </Button>
-      </div>
+      {/* Overlay for mobile sidebar */}
+      {isSidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-0"
+          onClick={toggleSidebar}
+        ></div>
+      )}
 
       {/* Main content - only render when authentication is complete */}
-      <div className="md:pl-64 flex flex-col flex-1 w-full pt-16 md:pt-0">
+      <div
+        className={cn(
+          "flex flex-col flex-1 w-full transition-all duration-200 ease-in-out",
+          isSidebarOpen ? "md:pl-64" : "pl-0"
+        )}
+      >
+        <div className="sticky top-0 z-10 flex-shrink-0 h-16 bg-background border-b flex items-center justify-end px-4 md:px-8">
+          <div className="ml-auto flex items-center space-x-2">
+            <span className="text-sm text-muted-foreground hidden sm:inline-block">
+              {user?.email}
+            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="ml-4">
+                  Account
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href="/profile">Profile</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/">View Site</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Sign Out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
         {forceDisplay ? (
-          <main className="flex-1">{children}</main>
+          <main className="flex-1 pt-4">{children}</main>
         ) : (
           <div className="min-h-screen flex items-center justify-center">
             <div className="flex flex-col items-center">

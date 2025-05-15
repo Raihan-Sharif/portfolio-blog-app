@@ -2,6 +2,7 @@
 
 import AdminLayout from "@/components/admin/admin-layout";
 import { Button } from "@/components/ui/button";
+import { FormWrapper } from "@/components/ui/form-wrapper";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,8 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase/client";
 import { slugify } from "@/lib/utils";
 import { AlertCircle, ArrowLeft, Save } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -28,12 +30,27 @@ export default function NewProjectPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Add page refresh protection
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (saving) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [saving]);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
+    e.preventDefault(); // Prevent form submission
+
     const { name, value } = e.target;
 
-    // Auto-generate slug from title if it's a new project
+    // Auto-generate slug from title for new posts
     if (name === "title" && formState.slug === "") {
       setFormState((prev) => ({
         ...prev,
@@ -49,6 +66,8 @@ export default function NewProjectPage() {
   };
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    e.preventDefault(); // Prevent form submission
+
     try {
       // Try to parse as JSON if it's a string representation
       const contentValue = e.target.value.trim().startsWith("{")
@@ -59,8 +78,8 @@ export default function NewProjectPage() {
         ...prev,
         content: contentValue,
       }));
-    } catch (_) {
-      // If parsing fails, just store as a string without using the error variable
+    } catch (error) {
+      // If parsing fails, just store as a string without using an error variable
       setFormState((prev) => ({
         ...prev,
         content: e.target.value,
@@ -75,7 +94,9 @@ export default function NewProjectPage() {
     }));
   };
 
-  const saveProject = async () => {
+  const saveProject = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault(); // Prevent form submission
+
     try {
       setSaving(true);
       setError(null);
@@ -135,15 +156,16 @@ export default function NewProjectPage() {
       <div className="container px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.push("/admin/projects")}
-              className="mr-2"
-              type="button"
-            >
-              <ArrowLeft size={18} />
-            </Button>
+            <Link href="/admin/projects">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="mr-2"
+                type="button"
+              >
+                <ArrowLeft size={18} />
+              </Button>
+            </Link>
             <h1 className="text-2xl font-bold">Create New Project</h1>
           </div>
           <Button
@@ -164,109 +186,111 @@ export default function NewProjectPage() {
           </div>
         )}
 
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="title">Title</Label>
-                <Input
-                  id="title"
-                  name="title"
-                  value={formState.title}
-                  onChange={handleChange}
-                  placeholder="Project title"
-                />
-              </div>
-              <div>
-                <Label htmlFor="slug">Slug</Label>
-                <Input
-                  id="slug"
-                  name="slug"
-                  value={formState.slug}
-                  onChange={handleChange}
-                  placeholder="project-url-slug"
-                />
-              </div>
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  name="description"
-                  value={formState.description || ""}
-                  onChange={handleChange}
-                  placeholder="Brief description of the project"
-                  rows={3}
-                />
-              </div>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="image_url">Project Image</Label>
-                <div className="mt-2">
-                  <ImageUploader
-                    initialImageUrl={formState.image_url || ""}
-                    onImageUploaded={(url) =>
-                      setFormState((prev) => ({
-                        ...prev,
-                        image_url: url,
-                      }))
-                    }
-                    bucketName="raihan-blog-app"
-                    folderPath="public"
+        <FormWrapper>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="title">Title</Label>
+                  <Input
+                    id="title"
+                    name="title"
+                    value={formState.title}
+                    onChange={handleChange}
+                    placeholder="Project title"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="slug">Slug</Label>
+                  <Input
+                    id="slug"
+                    name="slug"
+                    value={formState.slug}
+                    onChange={handleChange}
+                    placeholder="project-url-slug"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    name="description"
+                    value={formState.description || ""}
+                    onChange={handleChange}
+                    placeholder="Brief description of the project"
+                    rows={3}
                   />
                 </div>
               </div>
-              <div>
-                <Label htmlFor="github_url">GitHub URL</Label>
-                <Input
-                  id="github_url"
-                  name="github_url"
-                  value={formState.github_url || ""}
-                  onChange={handleChange}
-                  placeholder="https://github.com/username/project"
-                />
-              </div>
-              <div>
-                <Label htmlFor="demo_url">Demo URL</Label>
-                <Input
-                  id="demo_url"
-                  name="demo_url"
-                  value={formState.demo_url || ""}
-                  onChange={handleChange}
-                  placeholder="https://demo-site.com"
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="featured"
-                  checked={formState.featured}
-                  onCheckedChange={(checked) =>
-                    handleToggleChange("featured", checked)
-                  }
-                />
-                <Label htmlFor="featured">Featured Project</Label>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="image_url">Project Image</Label>
+                  <div className="mt-2">
+                    <ImageUploader
+                      initialImageUrl={formState.image_url || ""}
+                      onImageUploaded={(url) =>
+                        setFormState((prev) => ({
+                          ...prev,
+                          image_url: url,
+                        }))
+                      }
+                      bucketName="raihan-blog-app"
+                      folderPath="public"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="github_url">GitHub URL</Label>
+                  <Input
+                    id="github_url"
+                    name="github_url"
+                    value={formState.github_url || ""}
+                    onChange={handleChange}
+                    placeholder="https://github.com/username/project"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="demo_url">Demo URL</Label>
+                  <Input
+                    id="demo_url"
+                    name="demo_url"
+                    value={formState.demo_url || ""}
+                    onChange={handleChange}
+                    placeholder="https://demo-site.com"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="featured"
+                    checked={formState.featured}
+                    onCheckedChange={(checked) =>
+                      handleToggleChange("featured", checked)
+                    }
+                  />
+                  <Label htmlFor="featured">Featured Project</Label>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div>
-            <Label htmlFor="content" className="mb-2 block">
-              Content
-            </Label>
-            <Textarea
-              id="content"
-              name="content"
-              value={
-                typeof formState.content === "object"
-                  ? JSON.stringify(formState.content, null, 2)
-                  : formState.content?.toString() || ""
-              }
-              onChange={handleContentChange}
-              rows={10}
-              placeholder="Detailed project description and technologies used..."
-            />
+            <div>
+              <Label htmlFor="content" className="mb-2 block">
+                Content
+              </Label>
+              <Textarea
+                id="content"
+                name="content"
+                value={
+                  typeof formState.content === "object"
+                    ? JSON.stringify(formState.content, null, 2)
+                    : formState.content?.toString() || ""
+                }
+                onChange={handleContentChange}
+                rows={10}
+                placeholder="Detailed project description and technologies used..."
+              />
+            </div>
           </div>
-        </div>
+        </FormWrapper>
       </div>
     </AdminLayout>
   );

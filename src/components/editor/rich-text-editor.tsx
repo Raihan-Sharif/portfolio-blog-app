@@ -1,4 +1,3 @@
-// src/components/editor/rich-text-editor.tsx
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -115,21 +114,21 @@ export default function RichTextEditor({
       },
       handleDOMEvents: {
         // Ensure click events maintain focus
-        click: (view, event) => {
+        click: (view) => {
           if (!view.hasFocus()) {
             view.focus();
           }
           return false;
         },
       },
-      handleKeyDown: (view, event) => {
+      handleKeyDown: (view, evt) => {
         // Handle Enter key to prevent unwanted form submission
-        if (event.key === "Enter" && !event.shiftKey) {
+        if (evt.key === "Enter" && !evt.shiftKey) {
           if (
-            event.target instanceof HTMLElement &&
-            event.target.closest(".ProseMirror")
+            evt.target instanceof HTMLElement &&
+            evt.target.closest(".ProseMirror")
           ) {
-            event.stopPropagation();
+            evt.stopPropagation();
           }
         }
         return false;
