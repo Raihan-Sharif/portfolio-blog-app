@@ -336,7 +336,7 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
             onClick={savePost}
             disabled={saving}
             className="gap-2"
-            type="button"
+            type="button" // CRITICAL FIX: Explicit button type
           >
             <Save size={16} />
             {saving ? "Saving..." : "Save"}

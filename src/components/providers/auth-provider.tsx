@@ -115,9 +115,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   // Function to refresh user data with optimized caching
+  // Modified refreshUser function (around line 32-70)
   const refreshUser = useCallback(async () => {
+    // CRITICAL FIX: Rate limit refreshUser calls to prevent excessive API hits
+    const lastRefreshTime = localStorage.getItem("lastAuthRefresh");
+    if (lastRefreshTime) {
+      const lastRefresh = parseInt(lastRefreshTime);
+      // Only allow refresh once every 5 seconds to prevent loops
+      if (Date.now() - lastRefresh < 5000) {
+        return;
+      }
+    }
+
     try {
       setLoading(true);
+
+      // Set the timestamp for this refresh
+      localStorage.setItem("lastAuthRefresh", Date.now().toString());
 
       // Add timestamp to avoid browser caching the request
       const { data: sessionData } = await supabase.auth.getSession();
@@ -132,6 +146,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
             email: sessionData.session.user.email,
           })
         );
+
+        // Check if we have recent user details in cache before fetching new ones
+        const cachedUserDetails = localStorage.getItem("authUserDetails");
+        if (cachedUserDetails) {
+          try {
+            const parsed = JSON.parse(cachedUserDetails);
+            if (
+              parsed.timestamp &&
+              parsed.user.id === sessionData.session.user.id &&
+              Date.now() - parsed.timestamp < 60000 // 1 minute cache
+            ) {
+              setUser(parsed.user);
+              setLoading(false);
+              return;
+            }
+          } catch (e) {
+            console.error("Error parsing cached user details:", e);
+          }
+        }
 
         const userDetails = await getUserDetails(sessionData.session.user.id);
 

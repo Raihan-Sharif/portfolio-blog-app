@@ -730,7 +730,13 @@ export default function RichTextEditor({
       >
         <EditorContent
           editor={editor}
-          onClick={() => editor.commands.focus()}
+          onClick={(e) => {
+            // CRITICAL FIX: Stop propagation to prevent form submission
+            e.stopPropagation();
+            editor.commands.focus();
+          }}
+          className="prose-content"
+          data-allow-enter="true"
         />
       </div>
     </div>

@@ -76,11 +76,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         }
       }
 
-      // First check the user.role from auth provider
+      // First check the user.role from auth provider - this prevents excessive API calls
       if (user.role === "admin") {
         setIsAdmin(true);
         setCheckingAdmin(false);
-        // Cache the admin status
+        setContentVisible(true);
+
+        // Cache the admin status to prevent future checks
         localStorage.setItem(
           "adminStatus",
           JSON.stringify({
@@ -91,6 +93,26 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         );
         return;
       }
+
+      // CRITICAL FIX: Limit API calls for role checking
+      // If we've already checked recently (in the last 30 seconds), don't check again
+      const lastCheckTime = localStorage.getItem("lastAdminRoleCheck");
+      if (lastCheckTime && !forceCheck) {
+        const lastCheck = parseInt(lastCheckTime);
+        if (Date.now() - lastCheck < 30000) {
+          // 30 seconds
+          // If we already determined they're not admin in recent memory, redirect
+          if (adminCheckAttempts.current > 2) {
+            router.push("/");
+            return;
+          }
+          setCheckingAdmin(false);
+          return;
+        }
+      }
+
+      // Save the time of this check
+      localStorage.setItem("lastAdminRoleCheck", Date.now().toString());
 
       // If that doesn't work, check directly with our RPC function
       try {

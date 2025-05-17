@@ -53,8 +53,11 @@ export function ImageUploader({
   }, [initialImageUrl]);
 
   // Function to properly handle file upload with progress tracking
+  // Fix handleFileChange function (around line 53)
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault(); // Prevent form submission
+    // CRITICAL FIX: Stop event propagation to prevent form submissions
+    e.preventDefault();
+    e.stopPropagation();
 
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
@@ -72,8 +75,11 @@ export function ImageUploader({
     setError(null);
   };
 
+  // Fix other event handlers to properly stop propagation
   const handleClearFile = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent form submission
+    e.preventDefault();
+    e.stopPropagation();
+
     setImageFile(null);
 
     if (fileInputRef.current) {
@@ -87,7 +93,8 @@ export function ImageUploader({
   };
 
   const handleUpload = async (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent form submission
+    e.preventDefault();
+    e.stopPropagation();
 
     try {
       setUploading(true);
@@ -216,7 +223,12 @@ export function ImageUploader({
               onChange={handleFileChange}
               disabled={uploading}
               ref={fileInputRef}
-              onClick={(e) => e.stopPropagation()} // Prevent form clicks from triggering file input
+              onClick={(e) => {
+                // CRITICAL FIX: Prevent event bubbling to form
+                e.stopPropagation();
+              }}
+              // Add data attribute to help form wrapper identify this as special
+              data-file-input="true"
             />
             {imageFile && (
               <Button

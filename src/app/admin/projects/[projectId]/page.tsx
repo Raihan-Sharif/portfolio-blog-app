@@ -264,7 +264,7 @@ export default function ProjectEditor({ params }: ProjectEditorProps) {
             onClick={saveProject}
             disabled={saving}
             className="gap-2"
-            type="button"
+            type="button" // CRITICAL FIX: Explicit button type
           >
             <Save size={16} />
             {saving ? "Saving..." : "Save"}

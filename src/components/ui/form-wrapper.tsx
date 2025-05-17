@@ -17,7 +17,6 @@ export function FormWrapper({
   onSubmit,
   className,
 }: FormWrapperProps) {
-  const [submissionAttempted, setSubmissionAttempted] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
   // Set up a beforeunload listener to warn about unsaved changes
@@ -63,7 +62,6 @@ export function FormWrapper({
   // Handle form submission and prevent default
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSubmissionAttempted(true);
 
     if (onSubmit) {
       onSubmit(e);
@@ -73,23 +71,33 @@ export function FormWrapper({
     setIsEditing(false);
   };
 
-  // Handle button clicks within the form to prevent form submissions
-  const handleButtonClick = (e: React.MouseEvent<HTMLFormElement>) => {
+  // CRITICAL FIX: Proper form event handlers to prevent unwanted submissions
+  const handleClick = (e: React.MouseEvent<HTMLFormElement>) => {
     const target = e.target as HTMLElement;
+
+    // Prevent form submissions for certain elements
     if (target.tagName === "BUTTON" && !target.hasAttribute("type")) {
-      // If a button doesn't have a type, prevent default to avoid form submission
+      // Prevent default for buttons without type
       e.preventDefault();
+    }
+
+    // Prevent form submission when clicking file inputs or ProseMirror content
+    if (
+      target.closest('input[type="file"]') ||
+      target.closest(".ProseMirror")
+    ) {
+      e.stopPropagation();
     }
   };
 
-  // Handle key presses to prevent form submissions on Enter
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLFormElement>) => {
+  // Prevent Enter key from submitting form except in textareas
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     if (e.key === "Enter" && e.target instanceof HTMLElement) {
       // Allow Enter in textareas and specific elements that need it
       if (
         e.target.tagName !== "TEXTAREA" &&
-        !e.target.classList.contains("ProseMirror") &&
-        !e.target.hasAttribute("data-allow-enter")
+        !e.target.closest(".ProseMirror") &&
+        !e.target.closest('[data-allow-enter="true"]')
       ) {
         e.preventDefault();
       }
@@ -100,8 +108,8 @@ export function FormWrapper({
     <form
       className={`form-wrapper${className ? ` ${className}` : ""}`}
       onSubmit={handleSubmit}
-      onClick={handleButtonClick}
-      onKeyDown={handleKeyPress}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
       data-editing={isEditing ? "true" : "false"}
     >
       {children}
