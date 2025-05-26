@@ -1,3 +1,4 @@
+// src/components/ui/form-wrapper.tsx
 "use client";
 
 import React from "react";
@@ -47,7 +48,7 @@ export function FormWrapper({
       onClick={(e) => {
         const target = e.target as HTMLElement;
 
-        // Stop propagation for file inputs
+        // Stop propagation for file inputs to prevent form submission
         if (target.closest('input[type="file"]')) {
           e.stopPropagation();
         }
@@ -56,6 +57,12 @@ export function FormWrapper({
       <form
         onSubmit={handleSubmit}
         onKeyDown={handleKeyDown}
+        // Prevent default behavior for all form events
+        onReset={(e) => e.preventDefault()}
+        onChange={(e) => {
+          // Prevent form submission on change events
+          e.stopPropagation();
+        }}
         // Prevent form submission on button clicks
         onClick={(e) => {
           const target = e.target as HTMLElement;

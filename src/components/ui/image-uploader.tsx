@@ -1,3 +1,4 @@
+// src/components/ui/image-uploader.tsx
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,19 @@ export function ImageUploader({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Prevent any form submission
+    const form = e.target.closest("form");
+    if (form) {
+      form.addEventListener(
+        "submit",
+        (evt) => {
+          evt.preventDefault();
+          evt.stopPropagation();
+        },
+        { once: true }
+      );
+    }
 
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
@@ -200,7 +214,21 @@ export function ImageUploader({
                 onChange={handleFileChange}
                 disabled={uploading}
                 className="cursor-pointer"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Prevent the default form behavior
+                  const form = e.currentTarget.closest("form");
+                  if (form) {
+                    form.addEventListener(
+                      "submit",
+                      (evt) => {
+                        evt.preventDefault();
+                        evt.stopPropagation();
+                      },
+                      { once: true }
+                    );
+                  }
+                }}
               />
             </div>
             {imageFile && (

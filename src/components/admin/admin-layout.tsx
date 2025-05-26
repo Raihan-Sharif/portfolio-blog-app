@@ -1,3 +1,4 @@
+// src/components/admin/admin-layout.tsx
 "use client";
 
 import { useAuth } from "@/components/providers/auth-provider";
@@ -49,7 +50,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       }
 
       try {
-        // Check cached admin status first
+        // Check cached admin status first - now with user-specific key
         const cachedStatus = sessionStorage.getItem(`admin_${user.id}`);
         if (cachedStatus === "true") {
           setIsAdmin(true);
@@ -116,7 +117,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   if (loading || checkingAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full"></div>
+        <div className="text-center">
+          <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mb-4"></div>
+          <p className="text-muted-foreground">Loading admin panel...</p>
+        </div>
       </div>
     );
   }
