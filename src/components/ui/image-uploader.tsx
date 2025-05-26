@@ -1,4 +1,3 @@
-// src/components/ui/image-uploader.tsx
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -29,33 +28,24 @@ export function ImageUploader({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fix for form reloads
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (uploading || imageFile) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [uploading, imageFile]);
-
-  // Update image URL when initialImageUrl changes
   useEffect(() => {
     if (initialImageUrl) {
       setImageUrl(initialImageUrl);
     }
   }, [initialImageUrl]);
 
-  // Function to properly handle file upload with progress tracking
-  // Fix handleFileChange function (around line 53)
+  // Cleanup preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // CRITICAL FIX: Stop event propagation to prevent form submissions
     e.preventDefault();
     e.stopPropagation();
 
@@ -64,32 +54,43 @@ export function ImageUploader({
       setImageFile(file);
       setError(null);
 
-      // Create a preview URL for the selected file
+      // Clean up old preview URL
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+
+      // Create new preview URL
       const objectUrl = URL.createObjectURL(file);
       setPreviewUrl(objectUrl);
     }
   };
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
     setImageUrl(e.target.value);
     setError(null);
   };
 
-  // Fix other event handlers to properly stop propagation
   const handleClearFile = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
     setImageFile(null);
-
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""; // Clear the file input
+      fileInputRef.current.value = "";
     }
-
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
     }
+  };
+
+  const handleClearUrl = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setImageUrl("");
+    onImageUploaded("");
   };
 
   const handleUpload = async (e: React.MouseEvent) => {
@@ -99,86 +100,64 @@ export function ImageUploader({
     try {
       setUploading(true);
       setError(null);
-      setUploadProgress(0);
 
       if (!imageFile) {
-        // If no file selected but we have a URL, use that
         if (imageUrl) {
           onImageUploaded(imageUrl);
           return;
         }
-
         throw new Error("Please select a file or enter an image URL");
       }
 
-      // Generate a unique filename
+      // Validate file size (max 5MB)
+      if (imageFile.size > 5 * 1024 * 1024) {
+        throw new Error("File size must be less than 5MB");
+      }
+
+      // Generate unique filename
       const fileExt = imageFile.name.split(".").pop();
       const fileName = `${Date.now()}-${Math.random()
         .toString(36)
         .substring(2, 15)}.${fileExt}`;
       const filePath = `${folderPath}/${fileName}`;
 
-      // Add console logs for debugging
-      console.log("Starting upload to:", bucketName, filePath);
-      console.log("File size:", imageFile.size, "bytes");
-
-      // Begin simulating progress
-      let progress = 0;
-      const progressInterval = setInterval(() => {
-        progress += 5;
-        if (progress > 90) progress = 90; // Avoid reaching 100% before actually complete
-        setUploadProgress(progress);
-      }, 100);
-
-      // Upload to Supabase storage
+      // Upload to Supabase
       const { data, error: uploadError } = await supabase.storage
         .from(bucketName)
         .upload(filePath, imageFile, {
           cacheControl: "3600",
-          upsert: true,
+          upsert: false,
         });
 
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-
       if (uploadError) {
-        console.error("Upload error:", uploadError);
-        throw new Error(`Upload failed: ${uploadError.message}`);
+        throw uploadError;
       }
-
-      console.log("Upload successful:", data);
 
       // Get public URL
       const { data: urlData } = supabase.storage
         .from(bucketName)
         .getPublicUrl(filePath);
 
-      console.log("Public URL data:", urlData);
-
-      if (!urlData || !urlData.publicUrl) {
+      if (!urlData?.publicUrl) {
         throw new Error("Failed to get public URL");
       }
 
-      // Set the URL and notify parent
+      // Update state and notify parent
       setImageUrl(urlData.publicUrl);
       onImageUploaded(urlData.publicUrl);
 
-      // Reset file input state
+      // Clean up
       setImageFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
-
-      // Clean up preview URL
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
         setPreviewUrl(null);
       }
-
-      console.log("Image upload complete, URL:", urlData.publicUrl);
     } catch (err: any) {
-      console.error("Error uploading image:", err);
-      setError(err.message || "Failed to upload image. Please try again.");
+      console.error("Upload error:", err);
+      setError(err.message || "Failed to upload image");
     } finally {
       setUploading(false);
     }
@@ -189,10 +168,10 @@ export function ImageUploader({
       <div className="space-y-4">
         {/* Current image preview */}
         {imageUrl && !imageFile && (
-          <div className="relative w-full h-40 border rounded-md overflow-hidden mb-2">
+          <div className="relative w-full h-40 border rounded-md overflow-hidden">
             <Image
               src={imageUrl}
-              alt="Uploaded image preview"
+              alt="Current image"
               fill
               className="object-cover"
             />
@@ -200,11 +179,7 @@ export function ImageUploader({
               variant="destructive"
               size="icon"
               className="absolute top-2 right-2"
-              onClick={(e) => {
-                e.preventDefault(); // Prevent form submission
-                setImageUrl("");
-                onImageUploaded("");
-              }}
+              onClick={handleClearUrl}
               type="button"
             >
               <X size={16} />
@@ -212,24 +187,22 @@ export function ImageUploader({
           </div>
         )}
 
-        {/* File input */}
+        {/* File upload section */}
         <div className="space-y-2">
-          <Label htmlFor="image-upload">Upload Image</Label>
+          <Label htmlFor="image-file">Upload Image File</Label>
           <div className="flex gap-2">
-            <Input
-              id="image-upload"
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              disabled={uploading}
-              ref={fileInputRef}
-              onClick={(e) => {
-                // CRITICAL FIX: Prevent event bubbling to form
-                e.stopPropagation();
-              }}
-              // Add data attribute to help form wrapper identify this as special
-              data-file-input="true"
-            />
+            <div className="flex-1">
+              <Input
+                ref={fileInputRef}
+                id="image-file"
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                disabled={uploading}
+                className="cursor-pointer"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
             {imageFile && (
               <Button
                 variant="outline"
@@ -243,15 +216,17 @@ export function ImageUploader({
             )}
           </div>
 
+          {/* File preview */}
           {imageFile && previewUrl && (
             <div className="mt-2">
-              <p className="text-sm text-muted-foreground">
-                Selected: {imageFile.name}
+              <p className="text-sm text-muted-foreground mb-2">
+                Selected: {imageFile.name} ({(imageFile.size / 1024).toFixed(1)}{" "}
+                KB)
               </p>
-              <div className="relative w-full h-40 border rounded-md overflow-hidden mt-2">
+              <div className="relative w-full h-40 border rounded-md overflow-hidden">
                 <Image
                   src={previewUrl}
-                  alt="Image preview"
+                  alt="Preview"
                   fill
                   className="object-cover"
                 />
@@ -260,11 +235,12 @@ export function ImageUploader({
           )}
         </div>
 
-        {/* URL input option */}
+        {/* URL input section */}
         <div className="space-y-2">
-          <Label htmlFor="image-url">Or enter image URL</Label>
+          <Label htmlFor="image-url">Or Enter Image URL</Label>
           <Input
             id="image-url"
+            type="url"
             placeholder="https://example.com/image.jpg"
             value={imageUrl}
             onChange={handleUrlChange}
@@ -272,18 +248,12 @@ export function ImageUploader({
           />
         </div>
 
-        {/* Progress bar */}
-        {uploading && (
-          <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-2">
-            <div
-              className="bg-primary h-2.5 rounded-full transition-all duration-300"
-              style={{ width: `${uploadProgress}%` }}
-            ></div>
+        {/* Error message */}
+        {error && (
+          <div className="text-sm text-destructive bg-destructive/10 p-2 rounded">
+            {error}
           </div>
         )}
-
-        {/* Error message */}
-        {error && <div className="text-sm text-destructive">{error}</div>}
 
         {/* Upload button */}
         <Button
@@ -300,7 +270,7 @@ export function ImageUploader({
           ) : (
             <>
               <ImageIcon className="mr-2 h-4 w-4" />
-              {imageUrl ? "Update Image" : "Upload Image"}
+              {imageFile ? "Upload Image" : "Save Image URL"}
             </>
           )}
         </Button>
