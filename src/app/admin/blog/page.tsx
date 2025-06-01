@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { TabSafeLink } from "@/components/ui/tab-safe-link";
 import {
   Table,
   TableBody,
@@ -268,20 +269,15 @@ export default function AdminBlogPage() {
                             <Trash2 size={16} />
                           </Button>
                           {post.published && (
-                            <Link
+                            <TabSafeLink
                               href={`/blog/${post.slug}`}
                               target="_blank"
                               rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 w-9"
+                              title="View"
                             >
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                title="View"
-                                type="button"
-                              >
-                                <Eye size={16} />
-                              </Button>
-                            </Link>
+                              <Eye size={16} />
+                            </TabSafeLink>
                           )}
                         </div>
                       </TableCell>

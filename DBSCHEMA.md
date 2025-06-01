@@ -481,3 +481,77 @@ LANGUAGE plpgsql;
 
 
 $$
+
+-- Create a function to safely update user roles
+-- This function handles the delete/insert atomically to prevent conflicts
+
+CREATE OR REPLACE FUNCTION update_user_role(p_user_id UUID, p_new_role_id INTEGER)
+RETURNS BOOLEAN AS $$
+DECLARE
+existing_role_id INTEGER;
+BEGIN
+-- Get the current role ID for the user
+SELECT role_id INTO existing_role_id
+FROM user_roles
+WHERE user_id = p_user_id;
+
+    -- If user already has the requested role, do nothing
+    IF existing_role_id = p_new_role_id THEN
+        RETURN TRUE;
+    END IF;
+
+    -- Delete existing role assignment
+    DELETE FROM user_roles WHERE user_id = p_user_id;
+
+    -- Insert new role assignment
+    INSERT INTO user_roles (user_id, role_id)
+    VALUES (p_user_id, p_new_role_id);
+
+    RETURN TRUE;
+
+EXCEPTION
+WHEN OTHERS THEN
+-- If something goes wrong, try to restore the previous role
+IF existing_role_id IS NOT NULL THEN
+INSERT INTO user_roles (user_id, role_id)
+VALUES (p_user_id, existing_role_id)
+ON CONFLICT (user_id, role_id) DO NOTHING;
+END IF;
+
+        -- Re-raise the exception
+        RAISE;
+
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION update_user_role(UUID, INTEGER) TO authenticated;
+
+-- Create an alternative function that uses UPSERT for simpler role management
+CREATE OR REPLACE FUNCTION upsert_user_role(p_user_id UUID, p_role_id INTEGER)
+RETURNS BOOLEAN AS
+$$
+
+BEGIN
+-- Delete any existing roles for this user
+DELETE FROM user_roles WHERE user_id = p_user_id;
+
+    -- Insert the new role
+    INSERT INTO user_roles (user_id, role_id)
+    VALUES (p_user_id, p_role_id);
+
+    RETURN TRUE;
+
+EXCEPTION
+WHEN OTHERS THEN
+RETURN FALSE;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION upsert_user_role(UUID, INTEGER) TO authenticated;
+$$

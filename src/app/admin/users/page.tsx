@@ -46,18 +46,13 @@ interface Profile {
   created_at: string;
 }
 
-// Removed the unused interface
-// interface AuthUser {
-//   id: string;
-//   email: string;
-// }
-
 interface User {
   id: string;
   email: string;
   full_name: string;
   created_at: string;
   role: string;
+  role_id: number;
 }
 
 export default function UsersPage() {
@@ -76,6 +71,7 @@ export default function UsersPage() {
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [addUserSuccess, setAddUserSuccess] = useState(false);
   const [addUserError, setAddUserError] = useState<string | null>(null);
+  const [updatingRoles, setUpdatingRoles] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchUsers();
@@ -104,6 +100,7 @@ export default function UsersPage() {
         "user_roles"
       ).select(`
           user_id,
+          role_id,
           roles(id, name)
         `);
 
@@ -130,6 +127,7 @@ export default function UsersPage() {
           full_name: profile.full_name,
           created_at: profile.created_at,
           role: userRole?.roles?.name || "No role",
+          role_id: userRole?.roles?.id || 0,
         };
       });
 
@@ -173,26 +171,64 @@ export default function UsersPage() {
     );
   });
 
-  const handleRoleChange = async (userId: string, roleId: string) => {
-    try {
-      // First, delete existing role
-      await supabase.from("user_roles").delete().eq("user_id", userId);
+  const handleRoleChange = async (userId: string, newRoleId: string) => {
+    if (updatingRoles.has(userId)) {
+      return; // Prevent multiple simultaneous updates
+    }
 
-      // Then, add new role
-      const { error } = await supabase.from("user_roles").insert({
-        user_id: userId,
-        role_id: parseInt(roleId),
+    try {
+      setUpdatingRoles((prev) => new Set(prev).add(userId));
+
+      const roleId = parseInt(newRoleId);
+
+      // Use the database function for safer role updates
+      const { data, error } = await supabase.rpc("upsert_user_role", {
+        p_user_id: userId,
+        p_role_id: roleId,
       });
 
       if (error) {
         throw error;
       }
 
-      // Update local state
-      fetchUsers();
+      if (data === false) {
+        throw new Error("Failed to update user role");
+      }
+
+      // Update local state immediately for better UX
+      setUsers((prevUsers) =>
+        prevUsers.map((user) =>
+          user.id === userId
+            ? {
+                ...user,
+                role_id: roleId,
+                role: roles.find((r) => r.id === roleId)?.name || user.role,
+              }
+            : user
+        )
+      );
+
+      // Optionally refresh from server to ensure consistency
+      // await fetchUsers();
     } catch (err: any) {
       console.error("Error updating role:", err);
-      alert("Failed to update role. Please try again.");
+
+      // Show user-friendly error message
+      const errorMessage =
+        err.code === "23505"
+          ? "Role update failed due to a conflict. The page will refresh to show the current state."
+          : `Failed to update role: ${err.message}`;
+
+      alert(errorMessage);
+
+      // Refresh users to ensure UI is in sync with database
+      await fetchUsers();
+    } finally {
+      setUpdatingRoles((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(userId);
+        return newSet;
+      });
     }
   };
 
@@ -440,12 +476,11 @@ export default function UsersPage() {
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
                         <Select
-                          defaultValue={roles
-                            .find((r) => r.name === user.role)
-                            ?.id.toString()}
+                          value={user.role_id.toString()}
                           onValueChange={(value) =>
                             handleRoleChange(user.id, value)
                           }
+                          disabled={updatingRoles.has(user.id)}
                         >
                           <SelectTrigger className="w-32">
                             <SelectValue placeholder={user.role} />
@@ -461,6 +496,11 @@ export default function UsersPage() {
                             ))}
                           </SelectContent>
                         </Select>
+                        {updatingRoles.has(user.id) && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Updating...
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
                         {new Date(user.created_at).toLocaleDateString()}

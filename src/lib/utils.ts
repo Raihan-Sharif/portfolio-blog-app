@@ -78,3 +78,103 @@ export function safeNavigate(router: any, url: string) {
     router.push(ensureValidPath(url));
   }
 }
+
+// This prevents session conflicts between tabs
+
+export class SessionManager {
+  private static instance: SessionManager;
+  private tabId: string;
+  private isOriginalTab: boolean;
+
+  private constructor() {
+    this.tabId = this.generateTabId();
+    this.isOriginalTab = this.checkIfOriginalTab();
+    this.setupTabCommunication();
+  }
+
+  public static getInstance(): SessionManager {
+    if (!SessionManager.instance) {
+      SessionManager.instance = new SessionManager();
+    }
+    return SessionManager.instance;
+  }
+
+  private generateTabId(): string {
+    return `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private checkIfOriginalTab(): boolean {
+    const existingTabId = sessionStorage.getItem("activeTabId");
+    if (!existingTabId) {
+      sessionStorage.setItem("activeTabId", this.tabId);
+      return true;
+    }
+    return false;
+  }
+
+  private setupTabCommunication(): void {
+    // Listen for tab close events
+    window.addEventListener("beforeunload", () => {
+      if (this.isOriginalTab) {
+        sessionStorage.removeItem("activeTabId");
+      }
+    });
+
+    // Handle page visibility changes to manage session refreshing
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        // Small delay before refreshing to avoid conflicts
+        setTimeout(() => {
+          this.handleTabFocus();
+        }, 200);
+      }
+    });
+
+    // Handle window focus
+    window.addEventListener("focus", () => {
+      setTimeout(() => {
+        this.handleTabFocus();
+      }, 200);
+    });
+  }
+
+  private handleTabFocus(): void {
+    // Only refresh auth state if this is the original tab or if enough time has passed
+    const lastRefresh = localStorage.getItem("lastAuthRefresh");
+    const timeSinceLastRefresh = lastRefresh
+      ? Date.now() - parseInt(lastRefresh)
+      : 0;
+
+    if (this.isOriginalTab || timeSinceLastRefresh > 5000) {
+      // Trigger a gentle auth refresh
+      this.triggerAuthRefresh();
+    }
+  }
+
+  private triggerAuthRefresh(): void {
+    // Set a flag to indicate we're refreshing
+    localStorage.setItem("lastAuthRefresh", Date.now().toString());
+
+    // Dispatch a custom event that the auth provider can listen to
+    window.dispatchEvent(
+      new CustomEvent("gentleAuthRefresh", {
+        detail: { tabId: this.tabId, isOriginal: this.isOriginalTab },
+      })
+    );
+  }
+
+  public preventSessionConflict(callback: () => void): void {
+    // Only execute callback if this tab should handle auth operations
+    if (this.isOriginalTab) {
+      callback();
+    }
+  }
+
+  public getTabId(): string {
+    return this.tabId;
+  }
+
+  public isOriginal(): boolean {
+    return this.isOriginalTab;
+  }
+}

@@ -11,6 +11,8 @@ import {
   useState,
 } from "react";
 
+import { SessionManager } from "../../lib/utils";
+
 type User = {
   id: string;
   email?: string;
@@ -113,32 +115,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // Simplified refreshUser function - no cross-tab interference
-  const refreshUser = useCallback(async (force: boolean = false) => {
-    // Prevent multiple simultaneous refreshes
-    const refreshKey = `auth-refresh-${Date.now()}`;
-
-    if (!force) {
-      const lastRefreshTime = sessionStorage.getItem("lastAuthRefresh");
-      if (lastRefreshTime) {
-        const lastRefresh = parseInt(lastRefreshTime);
-        // Only allow refresh once every 2 seconds to prevent loops
-        if (Date.now() - lastRefresh < 2000) {
-          return;
-        }
-      }
-    }
-
+  // Simple refresh function - no cross-tab interference
+  const refreshUser = useCallback(async () => {
     try {
-      sessionStorage.setItem("lastAuthRefresh", Date.now().toString());
-      sessionStorage.setItem("currentRefresh", refreshKey);
-
       const { data: sessionData } = await supabase.auth.getSession();
-
-      // Check if another refresh is happening
-      if (sessionStorage.getItem("currentRefresh") !== refreshKey) {
-        return; // Another refresh took over
-      }
 
       if (sessionData?.session?.user) {
         const userDetails = await getUserDetails(sessionData.session.user.id);
@@ -165,31 +145,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(null);
     } finally {
       setLoading(false);
-      sessionStorage.removeItem("currentRefresh");
     }
   }, []);
 
-  // Initial setup of auth state - simplified
+  // Initial setup - get session only once
   useEffect(() => {
     const initAuth = async () => {
       try {
         setLoading(true);
-        const { data } = await supabase.auth.getSession();
 
-        if (data.session?.user) {
-          const userDetails = await getUserDetails(data.session.user.id);
+        // Get current session
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session?.user) {
+          const userDetails = await getUserDetails(session.user.id);
 
           if (userDetails) {
-            const updatedUser = {
-              id: data.session.user.id,
-              email: data.session.user.email,
+            setUser({
+              id: session.user.id,
+              email: session.user.email,
               ...userDetails,
-            };
-            setUser(updatedUser);
+            });
           } else {
             setUser({
-              id: data.session.user.id,
-              email: data.session.user.email,
+              id: session.user.id,
+              email: session.user.email,
               role: "viewer",
             });
           }
@@ -208,7 +190,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
     initAuth();
   }, []);
 
-  // Simplified auth state change listener
+  // In the useEffect for initialization, add:
+  useEffect(() => {
+    const sessionManager = SessionManager.getInstance();
+
+    const handleGentleRefresh = (event: CustomEvent) => {
+      // Only handle refresh if this is the original tab
+      if (sessionManager.isOriginal()) {
+        refreshUser();
+      }
+    };
+
+    window.addEventListener(
+      "gentleAuthRefresh",
+      handleGentleRefresh as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "gentleAuthRefresh",
+        handleGentleRefresh as EventListener
+      );
+    };
+  }, [refreshUser]);
+
+  // Auth state change listener - minimal handling
   useEffect(() => {
     if (!authInitialized) return;
 
@@ -216,7 +222,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       async (event, session) => {
         console.log("Auth state changed:", event);
 
-        // Only handle sign out and sign in events
+        // Only handle explicit sign out and sign in events
         if (event === "SIGNED_OUT") {
           setUser(null);
           setLoading(false);
@@ -225,23 +231,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (event === "SIGNED_IN" && session?.user) {
           setLoading(true);
-          const userDetails = await getUserDetails(session.user.id);
+          try {
+            const userDetails = await getUserDetails(session.user.id);
 
-          if (userDetails) {
-            const updatedUser = {
-              id: session.user.id,
-              email: session.user.email,
-              ...userDetails,
-            };
-            setUser(updatedUser);
-          } else {
-            setUser({
-              id: session.user.id,
-              email: session.user.email,
-              role: "viewer",
-            });
+            if (userDetails) {
+              setUser({
+                id: session.user.id,
+                email: session.user.email,
+                ...userDetails,
+              });
+            } else {
+              setUser({
+                id: session.user.id,
+                email: session.user.email,
+                role: "viewer",
+              });
+            }
+          } catch (err) {
+            console.error("Error handling sign in:", err);
+            setUser(null);
+          } finally {
+            setLoading(false);
           }
-          setLoading(false);
+        }
+
+        // For TOKEN_REFRESHED, just update the current user data silently
+        if (event === "TOKEN_REFRESHED" && session?.user && user) {
+          // Don't set loading true for token refresh - keep UI stable
+          try {
+            const userDetails = await getUserDetails(session.user.id);
+            if (userDetails) {
+              setUser((prev) => ({
+                ...prev,
+                id: session.user.id,
+                email: session.user.email,
+                ...userDetails,
+              }));
+            }
+          } catch (err) {
+            console.error("Error handling token refresh:", err);
+          }
         }
       }
     );
@@ -249,9 +278,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [authInitialized]);
+  }, [authInitialized, user]);
 
-  // Simplified sign out function
+  // Simple sign out
   const signOut = useCallback(async () => {
     setLoading(true);
     await supabase.auth.signOut();
@@ -259,7 +288,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(false);
   }, []);
 
-  // Create a stable context value
+  // Stable context value
   const contextValue = useMemo(
     () => ({
       user,
