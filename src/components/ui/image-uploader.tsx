@@ -47,20 +47,27 @@ export function ImageUploader({
   }, [previewUrl]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // CRITICAL: Stop all event propagation
     e.preventDefault();
     e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
 
     // Prevent any form submission
-    const form = e.target.closest("form");
+    const target = e.target;
+    const form = target.closest("form");
     if (form) {
-      form.addEventListener(
-        "submit",
-        (evt) => {
-          evt.preventDefault();
-          evt.stopPropagation();
-        },
-        { once: true }
-      );
+      // Temporarily disable form submission
+      const originalOnSubmit = form.onsubmit;
+      form.onsubmit = (evt) => {
+        evt.preventDefault();
+        evt.stopPropagation();
+        return false;
+      };
+
+      // Restore after a brief delay
+      setTimeout(() => {
+        form.onsubmit = originalOnSubmit;
+      }, 100);
     }
 
     if (e.target.files && e.target.files.length > 0) {
@@ -81,6 +88,7 @@ export function ImageUploader({
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
+    e.stopPropagation();
     setImageUrl(e.target.value);
     setError(null);
   };
@@ -88,6 +96,7 @@ export function ImageUploader({
   const handleClearFile = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    e.nativeEvent?.stopImmediatePropagation();
 
     setImageFile(null);
     if (fileInputRef.current) {
@@ -102,6 +111,7 @@ export function ImageUploader({
   const handleClearUrl = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    e.nativeEvent?.stopImmediatePropagation();
 
     setImageUrl("");
     onImageUploaded("");
@@ -110,6 +120,7 @@ export function ImageUploader({
   const handleUpload = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    e.nativeEvent?.stopImmediatePropagation();
 
     try {
       setUploading(true);
@@ -177,6 +188,29 @@ export function ImageUploader({
     }
   };
 
+  // Handle input click to prevent form submission
+  const handleInputClick = (e: React.MouseEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+
+    // Get the form and prevent its default behavior temporarily
+    const form = e.currentTarget.closest("form");
+    if (form) {
+      const handleFormSubmit = (evt: Event) => {
+        evt.preventDefault();
+        evt.stopPropagation();
+        return false;
+      };
+
+      // Add temporary event listeners
+      form.addEventListener("submit", handleFormSubmit, { capture: true });
+
+      // Remove them after file selection
+      setTimeout(() => {
+        form.removeEventListener("submit", handleFormSubmit, { capture: true });
+      }, 1000);
+    }
+  };
+
   return (
     <div className={className}>
       <div className="space-y-4">
@@ -212,21 +246,20 @@ export function ImageUploader({
                 type="file"
                 accept="image/*"
                 onChange={handleFileChange}
+                onClick={handleInputClick}
                 disabled={uploading}
                 className="cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Prevent the default form behavior
-                  const form = e.currentTarget.closest("form");
-                  if (form) {
-                    form.addEventListener(
-                      "submit",
-                      (evt) => {
-                        evt.preventDefault();
-                        evt.stopPropagation();
-                      },
-                      { once: true }
-                    );
+                // Additional event prevention
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
+                }}
+                onKeyUp={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.stopPropagation();
                   }
                 }}
               />
@@ -273,6 +306,12 @@ export function ImageUploader({
             value={imageUrl}
             onChange={handleUrlChange}
             disabled={!!imageFile || uploading}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
           />
         </div>
 

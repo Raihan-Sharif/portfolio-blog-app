@@ -113,72 +113,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // Modified refreshUser function with better tab synchronization
+  // Simplified refreshUser function - no cross-tab interference
   const refreshUser = useCallback(async (force: boolean = false) => {
-    // Only rate limit if not forced
+    // Prevent multiple simultaneous refreshes
+    const refreshKey = `auth-refresh-${Date.now()}`;
+
     if (!force) {
-      const lastRefreshTime = localStorage.getItem("lastAuthRefresh");
+      const lastRefreshTime = sessionStorage.getItem("lastAuthRefresh");
       if (lastRefreshTime) {
         const lastRefresh = parseInt(lastRefreshTime);
-        // Only allow refresh once every 5 seconds to prevent loops
-        if (Date.now() - lastRefresh < 5000) {
-          // Still use cached data if available
-          const cachedUserDetails = localStorage.getItem("authUserDetails");
-          if (cachedUserDetails) {
-            try {
-              const parsed = JSON.parse(cachedUserDetails);
-              if (parsed.user) {
-                setUser(parsed.user);
-                setLoading(false);
-              }
-            } catch (e) {
-              console.error("Error parsing cached user details:", e);
-            }
-          }
+        // Only allow refresh once every 2 seconds to prevent loops
+        if (Date.now() - lastRefresh < 2000) {
           return;
         }
       }
     }
 
     try {
-      setLoading(true);
+      sessionStorage.setItem("lastAuthRefresh", Date.now().toString());
+      sessionStorage.setItem("currentRefresh", refreshKey);
 
-      // Set the timestamp for this refresh
-      localStorage.setItem("lastAuthRefresh", Date.now().toString());
-
-      // Add timestamp to avoid browser caching the request
       const { data: sessionData } = await supabase.auth.getSession();
 
+      // Check if another refresh is happening
+      if (sessionStorage.getItem("currentRefresh") !== refreshKey) {
+        return; // Another refresh took over
+      }
+
       if (sessionData?.session?.user) {
-        // Store session in localStorage for cross-tab synchronization
-        localStorage.setItem(
-          "authSession",
-          JSON.stringify({
-            timestamp: Date.now(),
-            userId: sessionData.session.user.id,
-            email: sessionData.session.user.email,
-          })
-        );
-
-        // Check if we have recent user details in cache before fetching new ones
-        const cachedUserDetails = localStorage.getItem("authUserDetails");
-        if (cachedUserDetails && !force) {
-          try {
-            const parsed = JSON.parse(cachedUserDetails);
-            if (
-              parsed.timestamp &&
-              parsed.user.id === sessionData.session.user.id &&
-              Date.now() - parsed.timestamp < 60000 // 1 minute cache
-            ) {
-              setUser(parsed.user);
-              setLoading(false);
-              return;
-            }
-          } catch (e) {
-            console.error("Error parsing cached user details:", e);
-          }
-        }
-
         const userDetails = await getUserDetails(sessionData.session.user.id);
 
         if (userDetails) {
@@ -187,104 +149,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
             email: sessionData.session.user.email,
             ...userDetails,
           };
-
           setUser(updatedUser);
-
-          // Store user details in localStorage
-          localStorage.setItem(
-            "authUserDetails",
-            JSON.stringify({
-              timestamp: Date.now(),
-              user: updatedUser,
-            })
-          );
         } else {
           setUser({
             id: sessionData.session.user.id,
             email: sessionData.session.user.email,
-            role: "viewer", // Ensure a default role is set
+            role: "viewer",
           });
         }
       } else {
         setUser(null);
-        // Clear stored session data
-        localStorage.removeItem("authSession");
-        localStorage.removeItem("authUserDetails");
       }
     } catch (err) {
       console.error("Error refreshing user:", err);
       setUser(null);
     } finally {
       setLoading(false);
+      sessionStorage.removeItem("currentRefresh");
     }
   }, []);
 
-  // Cross-tab communication
-  useEffect(() => {
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === "authSession" || event.key === "authUserDetails") {
-        // Use cached data immediately to avoid loading state
-        if (event.key === "authUserDetails" && event.newValue) {
-          try {
-            const parsed = JSON.parse(event.newValue);
-            if (parsed.user) {
-              setUser(parsed.user);
-              setLoading(false);
-            }
-          } catch (e) {
-            console.error("Error parsing auth storage event:", e);
-          }
-        }
-        // Still refresh in background
-        refreshUser(false);
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-    };
-  }, [refreshUser]);
-
-  // Initial setup of auth state with caching
+  // Initial setup of auth state - simplified
   useEffect(() => {
     const initAuth = async () => {
       try {
         setLoading(true);
-
-        // Try to use cached data first for immediate display
-        const cachedUserDetails = localStorage.getItem("authUserDetails");
-        if (cachedUserDetails) {
-          try {
-            const parsed = JSON.parse(cachedUserDetails);
-            // Only use cache if it's fresh (less than 5 minutes old)
-            if (
-              parsed.timestamp &&
-              Date.now() - parsed.timestamp < 5 * 60 * 1000
-            ) {
-              setUser(parsed.user);
-              setLoading(false);
-            }
-          } catch (e) {
-            console.error("Error parsing cached user details:", e);
-          }
-        }
-
-        // Still get fresh data from the server
         const { data } = await supabase.auth.getSession();
 
         if (data.session?.user) {
-          // Store session data for cross-tab communication
-          localStorage.setItem(
-            "authSession",
-            JSON.stringify({
-              timestamp: Date.now(),
-              userId: data.session.user.id,
-              email: data.session.user.email,
-            })
-          );
-
           const userDetails = await getUserDetails(data.session.user.id);
 
           if (userDetails) {
@@ -293,17 +185,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               email: data.session.user.email,
               ...userDetails,
             };
-
             setUser(updatedUser);
-
-            // Update cached user details
-            localStorage.setItem(
-              "authUserDetails",
-              JSON.stringify({
-                timestamp: Date.now(),
-                user: updatedUser,
-              })
-            );
           } else {
             setUser({
               id: data.session.user.id,
@@ -313,9 +195,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         } else {
           setUser(null);
-          // Clear cached data if not authenticated
-          localStorage.removeItem("authSession");
-          localStorage.removeItem("authUserDetails");
         }
       } catch (err) {
         console.error("Error initializing auth:", err);
@@ -327,36 +206,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     initAuth();
+  }, []);
 
-    // Handle tab/window focus events to refresh authentication
-    const handleFocus = () => {
-      if (authInitialized) {
-        // Use cached data on focus to avoid loading state
-        const cachedUserDetails = localStorage.getItem("authUserDetails");
-        if (cachedUserDetails) {
-          try {
-            const parsed = JSON.parse(cachedUserDetails);
-            if (parsed.user && parsed.timestamp && Date.now() - parsed.timestamp < 5 * 60 * 1000) {
-              setUser(parsed.user);
-              setLoading(false);
-            }
-          } catch (e) {
-            console.error("Error parsing cached user details:", e);
-          }
-        }
-        // Force refresh if cache is stale
-        refreshUser(false);
-      }
-    };
-
-    window.addEventListener("focus", handleFocus);
-
-    return () => {
-      window.removeEventListener("focus", handleFocus);
-    };
-  }, [refreshUser, authInitialized]);
-
-  // Set up auth state change listener with improved handling
+  // Simplified auth state change listener
   useEffect(() => {
     if (!authInitialized) return;
 
@@ -364,23 +216,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       async (event, session) => {
         console.log("Auth state changed:", event);
 
-        // Only set loading if we don't have cached data
-        const cachedUserDetails = localStorage.getItem("authUserDetails");
-        if (!cachedUserDetails || event === "SIGNED_OUT") {
-          setLoading(true);
+        // Only handle sign out and sign in events
+        if (event === "SIGNED_OUT") {
+          setUser(null);
+          setLoading(false);
+          return;
         }
 
-        if (session?.user) {
-          // Update stored session data
-          localStorage.setItem(
-            "authSession",
-            JSON.stringify({
-              timestamp: Date.now(),
-              userId: session.user.id,
-              email: session.user.email,
-            })
-          );
-
+        if (event === "SIGNED_IN" && session?.user) {
+          setLoading(true);
           const userDetails = await getUserDetails(session.user.id);
 
           if (userDetails) {
@@ -389,17 +233,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               email: session.user.email,
               ...userDetails,
             };
-
             setUser(updatedUser);
-
-            // Update cached user details
-            localStorage.setItem(
-              "authUserDetails",
-              JSON.stringify({
-                timestamp: Date.now(),
-                user: updatedUser,
-              })
-            );
           } else {
             setUser({
               id: session.user.id,
@@ -407,15 +241,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
               role: "viewer",
             });
           }
-        } else {
-          setUser(null);
-          // Clear cached data
-          localStorage.removeItem("authSession");
-          localStorage.removeItem("authUserDetails");
-          localStorage.removeItem("lastAuthRefresh");
+          setLoading(false);
         }
-
-        setLoading(false);
       }
     );
 
@@ -424,21 +251,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, [authInitialized]);
 
-  // Sign out function with improved cross-tab handling
+  // Simplified sign out function
   const signOut = useCallback(async () => {
     setLoading(true);
-
-    // Clear cached data first for immediate UI feedback
-    localStorage.removeItem("authSession");
-    localStorage.removeItem("authUserDetails");
-    localStorage.removeItem("lastAuthRefresh");
-
     await supabase.auth.signOut();
     setUser(null);
     setLoading(false);
-
-    // Broadcast a custom event to notify other tabs
-    window.localStorage.setItem("authSignOut", Date.now().toString());
   }, []);
 
   // Create a stable context value

@@ -38,10 +38,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [checkingAdmin, setCheckingAdmin] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const hasCheckedAdmin = useRef(false);
+  const checkingRef = useRef(false);
 
-  // Simplified admin check - only run once
+  // Simplified admin check - only run once per session
   useEffect(() => {
-    if (hasCheckedAdmin.current || loading) return;
+    if (hasCheckedAdmin.current || loading || checkingRef.current) return;
 
     const checkAdmin = async () => {
       if (!user) {
@@ -49,24 +50,33 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         return;
       }
 
+      checkingRef.current = true;
+
       try {
-        // Check cached admin status first - now with user-specific key
-        const cachedStatus = sessionStorage.getItem(`admin_${user.id}`);
+        // Check cached admin status first with user-specific key
+        const cachedStatus = sessionStorage.getItem(`admin_status_${user.id}`);
         if (cachedStatus === "true") {
           setIsAdmin(true);
           setCheckingAdmin(false);
+          hasCheckedAdmin.current = true;
           return;
         }
 
-        // If user has role from auth context, use it
+        if (cachedStatus === "false") {
+          router.push("/");
+          return;
+        }
+
+        // If user has role from auth context, use it first
         if (user.role === "admin") {
           setIsAdmin(true);
-          sessionStorage.setItem(`admin_${user.id}`, "true");
+          sessionStorage.setItem(`admin_status_${user.id}`, "true");
           setCheckingAdmin(false);
+          hasCheckedAdmin.current = true;
           return;
         }
 
-        // Check with database
+        // Only check database if we don't have cached status
         const { data, error } = await supabase.rpc("get_user_with_role", {
           p_user_id: user.id,
         });
@@ -78,16 +88,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           data[0].role_name === "admin"
         ) {
           setIsAdmin(true);
-          sessionStorage.setItem(`admin_${user.id}`, "true");
+          sessionStorage.setItem(`admin_status_${user.id}`, "true");
         } else {
+          sessionStorage.setItem(`admin_status_${user.id}`, "false");
           router.push("/");
         }
       } catch (err) {
         console.error("Admin check error:", err);
+        sessionStorage.setItem(`admin_status_${user.id}`, "false");
         router.push("/");
       } finally {
         setCheckingAdmin(false);
         hasCheckedAdmin.current = true;
+        checkingRef.current = false;
       }
     };
 
@@ -95,7 +108,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }, [user, loading, router, pathname]);
 
   const handleSignOut = useCallback(async () => {
-    sessionStorage.removeItem(`admin_${user?.id}`);
+    // Clear admin status cache
+    if (user?.id) {
+      sessionStorage.removeItem(`admin_status_${user.id}`);
+    }
+    sessionStorage.removeItem("lastAuthRefresh");
+
     await signOut();
     router.push("/");
   }, [user, signOut, router]);
@@ -114,7 +132,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { name: "Settings", href: "/admin/settings", icon: <Settings size={18} /> },
   ];
 
-  if (loading || checkingAdmin) {
+  // Show loading only if we're actually checking and don't have cache
+  if (loading || (checkingAdmin && !hasCheckedAdmin.current)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -234,7 +253,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 <Link href="/profile">Profile</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/">View Site</Link>
+                <Link href="/" target="_blank" rel="noopener noreferrer">
+                  View Site
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut}>
