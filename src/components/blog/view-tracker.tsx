@@ -29,23 +29,30 @@ export default function ViewTracker({ postId }: { postId: number }) {
           // Add a small delay to ensure the page is fully loaded
           setTimeout(async () => {
             try {
+              console.log("Tracking view for post:", postId);
+
               // Call the increment function
-              const { error } = await supabase.rpc("increment_post_view", {
-                post_id_param: postId,
-              });
+              const { data, error } = await supabase.rpc(
+                "increment_post_view",
+                {
+                  post_id_param: postId,
+                }
+              );
 
               if (error) {
                 console.error("Error tracking view:", error);
                 // Reset session storage if there was an error
                 sessionStorage.removeItem(sessionKey);
                 hasTracked.current = false;
+              } else {
+                console.log("View tracked successfully:", data);
               }
             } catch (error) {
               console.error("Error in view tracking:", error);
               sessionStorage.removeItem(sessionKey);
               hasTracked.current = false;
             }
-          }, 1000);
+          }, 2000); // Increased delay to ensure proper loading
         } else {
           hasTracked.current = true;
         }

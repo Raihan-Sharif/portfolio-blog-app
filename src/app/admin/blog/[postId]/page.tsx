@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase/client";
 import { slugify } from "@/lib/utils";
-import { AlertCircle, ArrowLeft, Save } from "lucide-react";
+import { AlertCircle, ArrowLeft, RefreshCw, Save } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -39,6 +39,7 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
   const [allTags, setAllTags] = useState<any[]>([]);
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const hasLoadedRef = useRef(false);
+  const [slugEdited, setSlugEdited] = useState(false); // Track if user manually edited slug
   const [formState, setFormState] = useState({
     title: "",
     slug: "",
@@ -95,6 +96,9 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
             category_id: post.category_id || null,
           });
 
+          // Mark slug as edited since it's from existing post
+          setSlugEdited(true);
+
           // Fetch selected tags
           const { data: postTags, error: tagsError } = await supabase
             .from("post_tags")
@@ -140,12 +144,27 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
     e.preventDefault();
     const { name, value } = e.target;
 
-    // Auto-generate slug from title if it's empty
-    if (name === "title" && (isNewPost || formState.slug === "")) {
+    if (name === "title") {
+      // Auto-generate slug from title if slug hasn't been manually edited
+      if (!slugEdited) {
+        const generatedSlug = slugify(value);
+        setFormState((prev) => ({
+          ...prev,
+          title: value,
+          slug: generatedSlug,
+        }));
+      } else {
+        setFormState((prev) => ({
+          ...prev,
+          title: value,
+        }));
+      }
+    } else if (name === "slug") {
+      // Mark slug as manually edited
+      setSlugEdited(true);
       setFormState((prev) => ({
         ...prev,
-        [name]: value,
-        slug: slugify(value),
+        slug: slugify(value), // Always slugify the slug input
       }));
     } else {
       setFormState((prev) => ({
@@ -186,6 +205,31 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
     );
   };
 
+  // Function to regenerate slug from title
+  const regenerateSlug = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const newSlug = slugify(formState.title);
+    setFormState((prev) => ({
+      ...prev,
+      slug: newSlug,
+    }));
+    setSlugEdited(true);
+  };
+
+  // Check if slug exists
+  const checkSlugExists = async (slug: string, excludeId?: string) => {
+    if (!slug) return false;
+
+    let query = supabase.from("posts").select("id").eq("slug", slug);
+
+    if (excludeId) {
+      query = query.neq("id", excludeId);
+    }
+
+    const { data } = await query;
+    return data && data.length > 0;
+  };
+
   const savePost = async (e?: React.MouseEvent) => {
     if (e) e.preventDefault(); // Prevent form submission
 
@@ -205,6 +249,17 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
 
       if (!title || !slug) {
         throw new Error("Title and slug are required");
+      }
+
+      // Check if slug already exists
+      const slugExists = await checkSlugExists(
+        slug,
+        isNewPost ? undefined : params.postId
+      );
+      if (slugExists) {
+        throw new Error(
+          "This slug already exists. Please choose a different one."
+        );
       }
 
       // Get the current user's ID
@@ -355,24 +410,47 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="title">Title</Label>
+                  <Label htmlFor="title">Title *</Label>
                   <Input
                     id="title"
                     name="title"
                     value={formState.title}
                     onChange={handleChange}
                     placeholder="Post title"
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="slug">Slug</Label>
+                  <Label
+                    htmlFor="slug"
+                    className="flex items-center justify-between"
+                  >
+                    <span>Slug *</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={regenerateSlug}
+                      disabled={!formState.title}
+                      className="h-6 px-2 text-xs"
+                      title="Regenerate slug from title"
+                    >
+                      <RefreshCw size={12} className="mr-1" />
+                      Regenerate
+                    </Button>
+                  </Label>
                   <Input
                     id="slug"
                     name="slug"
                     value={formState.slug}
                     onChange={handleChange}
                     placeholder="post-url-slug"
+                    required
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    URL-friendly version of the title. Will be auto-generated if
+                    left empty.
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="excerpt">Excerpt</Label>
@@ -462,7 +540,7 @@ export default function BlogPostEditor({ params }: BlogPostEditorProps) {
 
             <div>
               <Label htmlFor="content" className="mb-2 block">
-                Content
+                Content *
               </Label>
               <RichTextEditor
                 initialContent={formState.content}

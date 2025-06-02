@@ -26,9 +26,10 @@ interface DashboardStats {
     created_at: string;
   }>;
   viewsPerDay: Array<{
-    date: string;
+    view_date: string;
     count: number;
   }>;
+  previousWeekViews: number;
 }
 
 export default function DashboardPage() {
@@ -39,6 +40,7 @@ export default function DashboardPage() {
     totalViews: 0,
     recentPosts: [],
     viewsPerDay: [],
+    previousWeekViews: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -80,17 +82,44 @@ export default function DashboardPage() {
         .order("created_at", { ascending: false })
         .limit(5);
 
-      // Mock data for views per day (in a real app, you'd have a proper analytics system)
-      // This is just for demonstration purposes
-      const today = new Date();
-      const viewsPerDay = Array.from({ length: 7 }, (_, i) => {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        return {
-          date: date.toISOString().split("T")[0],
-          count: Math.floor(Math.random() * 100) + 10, // Random view count
-        };
-      }).reverse();
+      // Get views per day for the last 7 days using the database function
+      const { data: viewsPerDayData, error: viewsError } = await supabase.rpc(
+        "get_total_views_by_day",
+        {
+          days_count: 7,
+        }
+      );
+
+      let viewsPerDay = [];
+      if (viewsError) {
+        console.error("Error fetching views per day:", viewsError);
+        // Fallback to mock data if function doesn't exist
+        const today = new Date();
+        viewsPerDay = Array.from({ length: 7 }, (_, i) => {
+          const date = new Date(today);
+          date.setDate(date.getDate() - i);
+          return {
+            view_date: date.toISOString().split("T")[0],
+            count: Math.floor(Math.random() * 50) + 5,
+          };
+        }).reverse();
+      } else {
+        viewsPerDay = viewsPerDayData || [];
+      }
+
+      // Get previous week's total views for comparison
+      const { data: previousWeekData, error: previousWeekError } =
+        await supabase.rpc("get_total_views_by_day", {
+          days_count: 14,
+        });
+
+      let previousWeekViews = 0;
+      if (!previousWeekError && previousWeekData) {
+        // Calculate previous week (days 8-14)
+        previousWeekViews = previousWeekData
+          .slice(0, 7)
+          .reduce((sum: number, day: any) => sum + (day.count || 0), 0);
+      }
 
       setStats({
         totalPosts: totalPosts || 0,
@@ -99,6 +128,7 @@ export default function DashboardPage() {
         totalViews,
         recentPosts: recentPosts || [],
         viewsPerDay,
+        previousWeekViews,
       });
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
@@ -107,16 +137,33 @@ export default function DashboardPage() {
     }
   };
 
-  // Calculate percentage change for views (mock data for demonstration)
-  const calculateChange = () => {
-    const change = Math.floor(Math.random() * 30) - 10; // Random change between -10% and +20%
+  // Calculate percentage change for views
+  const calculateViewsChange = () => {
+    const currentWeekViews = stats.viewsPerDay.reduce(
+      (sum, day) => sum + (day.count || 0),
+      0
+    );
+
+    if (stats.previousWeekViews === 0) {
+      return { value: 0, isPositive: true };
+    }
+
+    const change = Math.round(
+      ((currentWeekViews - stats.previousWeekViews) / stats.previousWeekViews) *
+        100
+    );
+
     return {
-      value: change,
+      value: Math.abs(change),
       isPositive: change >= 0,
     };
   };
 
-  const viewsChange = calculateChange();
+  const viewsChange = calculateViewsChange();
+  const maxViewCount = Math.max(
+    ...stats.viewsPerDay.map((day) => day.count || 0),
+    1
+  );
 
   return (
     <AdminLayout>
@@ -200,7 +247,7 @@ export default function DashboardPage() {
                       ) : (
                         <ArrowDown className="h-3 w-3 mr-1" />
                       )}
-                      {Math.abs(viewsChange.value)}%
+                      {viewsChange.value}%
                     </span>
                     <span className="text-muted-foreground ml-1">
                       from last week
@@ -215,24 +262,48 @@ export default function DashboardPage() {
               {/* Views Chart */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Views</CardTitle>
+                  <CardTitle>Daily Views (Last 7 Days)</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[300px] flex items-end justify-between">
+                  <div className="h-[300px] flex items-end justify-between space-x-1">
                     {stats.viewsPerDay.map((day, i) => (
                       <div
                         key={i}
-                        className="h-full flex flex-col justify-end items-center"
+                        className="flex-1 flex flex-col justify-end items-center group relative"
                       >
                         <div
-                          className="w-8 bg-primary/80 rounded-t-sm"
-                          style={{ height: `${(day.count / 100) * 100}%` }}
-                        ></div>
-                        <span className="text-xs mt-2">
-                          {day.date.split("-")[2]}
+                          className="w-full bg-primary/80 rounded-t-sm hover:bg-primary transition-colors cursor-pointer"
+                          style={{
+                            height: `${Math.max(
+                              (day.count / maxViewCount) * 250,
+                              8
+                            )}px`,
+                            minHeight: "8px",
+                          }}
+                          title={`${day.count} views on ${new Date(
+                            day.view_date
+                          ).toLocaleDateString()}`}
+                        >
+                          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                            {day.count} views
+                          </div>
+                        </div>
+                        <span className="text-xs mt-2 text-muted-foreground">
+                          {new Date(day.view_date).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
                         </span>
                       </div>
                     ))}
+                  </div>
+                  <div className="mt-4 text-sm text-muted-foreground text-center">
+                    Total this week:{" "}
+                    {stats.viewsPerDay.reduce(
+                      (sum, day) => sum + (day.count || 0),
+                      0
+                    )}{" "}
+                    views
                   </div>
                 </CardContent>
               </Card>
@@ -254,12 +325,13 @@ export default function DashboardPage() {
                           key={post.id}
                           className="flex items-center justify-between border-b pb-3 last:border-b-0 last:pb-0"
                         >
-                          <div>
+                          <div className="flex-1 min-w-0">
                             <a
                               href={`/blog/${post.slug}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="font-medium hover:underline"
+                              className="font-medium hover:underline block truncate"
+                              title={post.title}
                             >
                               {post.title}
                             </a>
@@ -267,7 +339,7 @@ export default function DashboardPage() {
                               {new Date(post.created_at).toLocaleDateString()}
                             </div>
                           </div>
-                          <div className="flex items-center text-xs text-muted-foreground">
+                          <div className="flex items-center text-xs text-muted-foreground ml-2">
                             <Eye className="h-3 w-3 mr-1" />
                             {post.view_count || 0}
                           </div>

@@ -22,8 +22,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
+import { getReadTime } from "@/lib/utils";
 import {
   AlertCircle,
+  Clock,
   Edit,
   Eye,
   FileText,
@@ -41,12 +43,47 @@ interface Post {
   title: string;
   slug: string;
   published: boolean;
+  content?: any;
   created_at: string;
   updated_at: string;
   view_count: number;
   // Use any for flexibility
   category: any;
   author: any;
+}
+
+// Helper function to extract text content from blog content
+function extractTextContent(content: any): string {
+  if (!content) return "";
+
+  if (typeof content === "string") {
+    // Remove HTML tags
+    return content.replace(/<[^>]*>/g, "");
+  }
+
+  if (content.html && typeof content.html === "string") {
+    // Remove HTML tags from html content
+    return content.html.replace(/<[^>]*>/g, "");
+  }
+
+  if (content.json && content.json.content) {
+    // Extract text from TipTap JSON structure
+    const extractFromNodes = (nodes: any[]): string => {
+      let text = "";
+      nodes.forEach((node: any) => {
+        if (node.type === "text") {
+          text += node.text || "";
+        } else if (node.content) {
+          text += extractFromNodes(node.content);
+        }
+      });
+      return text;
+    };
+
+    return extractFromNodes(content.json.content);
+  }
+
+  return "";
 }
 
 export default function AdminBlogPage() {
@@ -76,6 +113,7 @@ export default function AdminBlogPage() {
           title,
           slug,
           published,
+          content,
           created_at,
           updated_at,
           view_count,
@@ -197,6 +235,7 @@ export default function AdminBlogPage() {
                   <TableHead>Status</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Author</TableHead>
+                  <TableHead>Reading Time</TableHead>
                   <TableHead>Views</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Actions</TableHead>
@@ -205,84 +244,98 @@ export default function AdminBlogPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : filteredPosts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       No posts found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredPosts.map((post) => (
-                    <TableRow key={post.id}>
-                      <TableCell className="font-medium max-w-md truncate">
-                        <div className="flex items-center gap-2">
-                          <FileText
-                            size={16}
-                            className="text-muted-foreground flex-shrink-0"
-                          />
-                          <span className="truncate">{post.title}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={post.published ? "default" : "outline"}
-                          className={post.published ? "bg-green-500" : ""}
-                        >
-                          {post.published ? "Published" : "Draft"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{post.category?.name || "-"}</TableCell>
-                      <TableCell>{post.author?.full_name || "-"}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Eye size={14} className="text-muted-foreground" />
-                          {post.view_count || 0}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(post.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() =>
-                              router.push(`/admin/blog/${post.id}`)
-                            }
-                            title="Edit"
-                            type="button"
+                  filteredPosts.map((post) => {
+                    const textContent = extractTextContent(post.content);
+                    const readingTime = getReadTime(textContent);
+
+                    return (
+                      <TableRow key={post.id}>
+                        <TableCell className="font-medium max-w-md truncate">
+                          <div className="flex items-center gap-2">
+                            <FileText
+                              size={16}
+                              className="text-muted-foreground flex-shrink-0"
+                            />
+                            <span className="truncate">{post.title}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={post.published ? "default" : "outline"}
+                            className={post.published ? "bg-green-500" : ""}
                           >
-                            <Edit size={16} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteClick(post)}
-                            title="Delete"
-                            type="button"
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                          {post.published && (
-                            <TabSafeLink
-                              href={`/blog/${post.slug}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 w-9"
-                              title="View"
+                            {post.published ? "Published" : "Draft"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{post.category?.name || "-"}</TableCell>
+                        <TableCell>{post.author?.full_name || "-"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Clock
+                              size={14}
+                              className="text-muted-foreground"
+                            />
+                            {readingTime} min
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Eye size={14} className="text-muted-foreground" />
+                            {post.view_count || 0}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(post.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                router.push(`/admin/blog/${post.id}`)
+                              }
+                              title="Edit"
+                              type="button"
                             >
-                              <Eye size={16} />
-                            </TabSafeLink>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                              <Edit size={16} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteClick(post)}
+                              title="Delete"
+                              type="button"
+                            >
+                              <Trash2 size={16} />
+                            </Button>
+                            {post.published && (
+                              <TabSafeLink
+                                href={`/blog/${post.slug}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 w-9"
+                                title="View"
+                              >
+                                <Eye size={16} />
+                              </TabSafeLink>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
