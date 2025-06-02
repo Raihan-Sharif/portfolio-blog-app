@@ -1,8 +1,10 @@
 import BlogContent from "@/components/blog/blog-content";
+import ViewTracker from "@/components/blog/view-tracker";
 import { Button } from "@/components/ui/button";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getReadTime } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowLeft, Calendar, Hash, User } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Hash, User } from "lucide-react";
 import { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,6 +14,40 @@ interface BlogPostPageProps {
   params: {
     slug: string;
   };
+}
+
+// Helper function to extract text content from blog content
+function extractTextContent(content: any): string {
+  if (!content) return "";
+
+  if (typeof content === "string") {
+    // Remove HTML tags
+    return content.replace(/<[^>]*>/g, "");
+  }
+
+  if (content.html && typeof content.html === "string") {
+    // Remove HTML tags from html content
+    return content.html.replace(/<[^>]*>/g, "");
+  }
+
+  if (content.json && content.json.content) {
+    // Extract text from TipTap JSON structure
+    const extractFromNodes = (nodes: any[]): string => {
+      let text = "";
+      nodes.forEach((node: any) => {
+        if (node.type === "text") {
+          text += node.text || "";
+        } else if (node.content) {
+          text += extractFromNodes(node.content);
+        }
+      });
+      return text;
+    };
+
+    return extractFromNodes(content.json.content);
+  }
+
+  return "";
 }
 
 // Dynamic metadata
@@ -68,6 +104,10 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     notFound();
   }
 
+  // Calculate reading time
+  const textContent = extractTextContent(post.content);
+  const readingTime = getReadTime(textContent);
+
   // Get post tags with simpler, explicit query
   const { data: tagList } = await supabase
     .from("post_tags")
@@ -82,16 +122,6 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   // Just extract the tags we need without complex mapping
   const tags = tagList ? tagList.map((item) => item.tags) : [];
 
-  // Update view count (could be done with a serverless function in production)
-  const { error: updateError } = await supabase
-    .from("posts")
-    .update({ view_count: (post.view_count || 0) + 1 })
-    .eq("id", post.id);
-
-  if (updateError) {
-    console.error("Error updating view count:", updateError);
-  }
-
   // Get related posts
   const { data: relatedPosts } = await supabase
     .from("posts")
@@ -101,7 +131,9 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
       title,
       slug,
       cover_image_url,
-      created_at
+      created_at,
+      content,
+      excerpt
     `
     )
     .eq("category_id", post.category_id)
@@ -112,6 +144,9 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
   return (
     <div className="min-h-screen">
+      {/* Add ViewTracker component for client-side view tracking */}
+      <ViewTracker postId={post.id} />
+
       {/* Cover Image */}
       {post.cover_image_url && (
         <div className="relative h-[40vh] md:h-[50vh]">
@@ -163,8 +198,12 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
               <User size={14} className="mr-1" />
               <span>{post.author?.full_name || "Anonymous"}</span>
             </div>
+            <div className="flex items-center">
+              <Clock size={14} className="mr-1" />
+              <span>{readingTime} min read</span>
+            </div>
             <div>
-              <span>{post.view_count} views</span>
+              <span>{post.view_count || 0} views</span>
             </div>
           </div>
 
@@ -225,45 +264,55 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             <div className="mt-12 pt-6 border-t">
               <h3 className="text-lg font-semibold mb-6">Related Posts</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {relatedPosts.map((relatedPost) => (
-                  <Link
-                    key={relatedPost.id}
-                    href={`/blog/${relatedPost.slug}`}
-                    className="group"
-                  >
-                    <div className="bg-card rounded-lg overflow-hidden shadow-md">
-                      <div className="relative h-40 w-full">
-                        {relatedPost.cover_image_url ? (
-                          <Image
-                            src={relatedPost.cover_image_url}
-                            alt={relatedPost.title}
-                            fill
-                            className="object-cover transition-transform group-hover:scale-105"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-muted-foreground">
-                              No image
+                {relatedPosts.map((relatedPost) => {
+                  const relatedReadTime = getReadTime(
+                    extractTextContent(relatedPost.content)
+                  );
+
+                  return (
+                    <Link
+                      key={relatedPost.id}
+                      href={`/blog/${relatedPost.slug}`}
+                      className="group"
+                    >
+                      <div className="bg-card rounded-lg overflow-hidden shadow-md">
+                        <div className="relative h-40 w-full">
+                          {relatedPost.cover_image_url ? (
+                            <Image
+                              src={relatedPost.cover_image_url}
+                              alt={relatedPost.title}
+                              fill
+                              className="object-cover transition-transform group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-primary/10 flex items-center justify-center">
+                              <span className="text-muted-foreground">
+                                No image
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-4">
+                          <h4 className="font-medium group-hover:text-primary transition-colors mb-2">
+                            {relatedPost.title}
+                          </h4>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>
+                              {formatDistanceToNow(
+                                new Date(relatedPost.created_at),
+                                { addSuffix: true }
+                              )}
                             </span>
+                            <div className="flex items-center">
+                              <Clock size={12} className="mr-1" />
+                              <span>{relatedReadTime} min</span>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                      <div className="p-4">
-                        <h4 className="font-medium group-hover:text-primary transition-colors">
-                          {relatedPost.title}
-                        </h4>
-                        <div className="text-xs text-muted-foreground mt-2">
-                          <span>
-                            {formatDistanceToNow(
-                              new Date(relatedPost.created_at),
-                              { addSuffix: true }
-                            )}
-                          </span>
                         </div>
                       </div>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           )}

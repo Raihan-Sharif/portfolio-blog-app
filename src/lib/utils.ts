@@ -29,9 +29,22 @@ export function formatDate(date: string | Date): string {
 
 // Read time estimator for blog posts
 export function getReadTime(content: string): number {
-  const wordsPerMinute = 200;
-  const wordCount = content.split(/\s+/g).length;
-  return Math.ceil(wordCount / wordsPerMinute);
+  if (!content || typeof content !== "string") return 1;
+
+  // Remove HTML tags if present
+  const cleanContent = content.replace(/<[^>]*>/g, "");
+
+  // Split by whitespace and filter out empty strings
+  const words = cleanContent.split(/\s+/).filter((word) => word.length > 0);
+
+  if (words.length === 0) return 1;
+
+  // Average reading speed: 200-250 words per minute for adults
+  const wordsPerMinute = 225;
+  const readTime = Math.ceil(words.length / wordsPerMinute);
+
+  // Minimum 1 minute read time
+  return Math.max(readTime, 1);
 }
 
 // Get initials from name
