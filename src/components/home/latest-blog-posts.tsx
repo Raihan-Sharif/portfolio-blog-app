@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { getReadTime } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
-import { ArrowRight, Calendar, Clock, User } from "lucide-react";
+import { ArrowRight, Calendar, Clock, Eye, User } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 // Define the Post interface directly
 interface Post {
@@ -70,6 +71,24 @@ function extractTextContent(content: any): string {
 }
 
 export default function LatestBlogPosts({ posts }: LatestBlogPostsProps) {
+  const router = useRouter();
+
+  // Handle card click - navigate to post
+  const handleCardClick = (slug: string, e: React.MouseEvent) => {
+    // Prevent navigation if clicking on links or buttons
+    const target = e.target as HTMLElement;
+    if (
+      target.tagName === "A" ||
+      target.closest("a") ||
+      target.tagName === "BUTTON" ||
+      target.closest("button")
+    ) {
+      return;
+    }
+
+    router.push(`/blog/${slug}`);
+  };
+
   return (
     <section className="py-20 bg-background">
       <div className="container mx-auto px-4">
@@ -93,15 +112,16 @@ export default function LatestBlogPosts({ posts }: LatestBlogPostsProps) {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.4, delay: index * 0.1 }}
-                className="bg-card rounded-lg overflow-hidden shadow-md"
+                className="bg-card rounded-lg overflow-hidden shadow-md cursor-pointer group hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+                onClick={(e) => handleCardClick(post.slug, e)}
               >
-                <div className="relative h-48 w-full">
+                <div className="relative h-48 w-full overflow-hidden">
                   {post.cover_image_url ? (
                     <Image
                       src={post.cover_image_url}
                       alt={post.title}
                       fill
-                      className="object-cover"
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   ) : (
                     <div className="w-full h-full bg-primary/10 flex items-center justify-center">
@@ -114,14 +134,15 @@ export default function LatestBlogPosts({ posts }: LatestBlogPostsProps) {
                     <div className="mb-2">
                       <Link
                         href={`/blog?category=${post.category.slug}`}
-                        className="text-sm font-medium text-primary"
+                        className="text-sm font-medium text-primary hover:underline"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         {post.category.name}
                       </Link>
                     </div>
                   )}
-                  <h3 className="text-xl font-bold mb-2 hover:text-primary transition-colors">
-                    <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+                  <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors">
+                    {post.title}
                   </h3>
                   <p className="text-muted-foreground mb-4 line-clamp-2">
                     {post.excerpt}
@@ -142,6 +163,10 @@ export default function LatestBlogPosts({ posts }: LatestBlogPostsProps) {
                     <div className="flex items-center">
                       <Clock size={14} className="mr-1" />
                       <span>{readingTime} min read</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Eye size={14} className="mr-1" />
+                      <span>{post.view_count || 0} views</span>
                     </div>
                   </div>
                 </div>
