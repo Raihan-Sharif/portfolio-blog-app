@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/lib/supabase/client";
 import { Mail, MapPin, Phone, Send } from "lucide-react";
 import { useState } from "react";
 
@@ -32,20 +33,44 @@ export default function ContactPage() {
     setSubmitStatus({});
 
     try {
-      // Here you would typically send the form data to your API
-      // For this example, we'll just simulate a successful submission
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Validate required fields
+      if (
+        !formData.name ||
+        !formData.email ||
+        !formData.subject ||
+        !formData.message
+      ) {
+        throw new Error("Please fill in all required fields");
+      }
+      console.log("Form data:", formData);
+      // Save to database
+      const { error } = await supabase.from("contact_messages").insert({
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        subject: formData.subject.trim(),
+        message: formData.message.trim(),
+        status: "pending",
+      });
+
+      if (error) {
+        throw error;
+      }
 
       setSubmitStatus({
         success: true,
-        message: "Thank you! Your message has been sent.",
+        message:
+          "Thank you! Your message has been sent successfully. We'll get back to you soon.",
       });
+
+      // Reset form
       setFormData({ name: "", email: "", subject: "", message: "" });
-    } catch (error) {
-      console.error("Error submitting form:", error);
+    } catch (submitError: any) {
+      console.error("Error submitting form:", submitError);
       setSubmitStatus({
         success: false,
-        message: "There was an error sending your message. Please try again.",
+        message:
+          submitError.message ||
+          "There was an error sending your message. Please try again.",
       });
     } finally {
       setIsSubmitting(false);

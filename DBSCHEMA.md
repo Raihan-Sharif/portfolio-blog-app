@@ -555,3 +555,117 @@ LANGUAGE plpgsql SECURITY DEFINER;
 -- Grant execute permission to authenticated users
 GRANT EXECUTE ON FUNCTION upsert_user_role(UUID, INTEGER) TO authenticated;
 $$
+
+-- Add this to your DBSCHEMA.md file
+
+-- Contact Messages Table
+CREATE TABLE contact_messages (
+id SERIAL PRIMARY KEY,
+name TEXT NOT NULL,
+email TEXT NOT NULL,
+phone TEXT, -- Optional phone number with country code
+subject TEXT NOT NULL,
+message TEXT NOT NULL,
+status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'viewed', 'in_progress', 'resolved')),
+priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+resolved_at TIMESTAMP WITH TIME ZONE,
+resolved_by UUID REFERENCES profiles(id),
+notes TEXT
+);
+
+-- Enable RLS on contact_messages
+ALTER TABLE contact_messages ENABLE ROW LEVEL SECURITY;
+
+-- Admin can view and manage all contact messages
+CREATE POLICY "Admin can manage contact messages"
+ON contact_messages FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+-- Function to update contact message status
+CREATE OR REPLACE FUNCTION update_contact_message_status(
+p_message_id INTEGER,
+p_status TEXT,
+p_notes TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+current_user_id UUID;
+BEGIN
+-- Get current user
+current_user_id := auth.uid();
+
+-- Update the message
+UPDATE contact_messages
+SET
+status = p_status,
+updated_at = NOW(),
+resolved_at = CASE WHEN p_status = 'resolved' THEN NOW() ELSE resolved_at END,
+resolved_by = CASE WHEN p_status = 'resolved' THEN current_user_id ELSE resolved_by END,
+notes = COALESCE(p_notes, notes)
+WHERE id = p_message_id;
+
+RETURN FOUND;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION update_contact_message_status(INTEGER, TEXT, TEXT) TO authenticated;
+
+-- Function to safely delete a user and handle cascades
+CREATE OR REPLACE FUNCTION delete_user_safely(p_user_id UUID)
+RETURNS BOOLEAN AS
+$$
+
+BEGIN
+-- First, check if the current user is an admin
+IF NOT EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+) THEN
+RAISE EXCEPTION 'Only admins can delete users';
+END IF;
+
+-- Prevent admin from deleting themselves
+IF p_user_id = auth.uid() THEN
+RAISE EXCEPTION 'Cannot delete your own account';
+END IF;
+
+-- Update posts to set author to null or reassign to current admin
+UPDATE posts
+SET author_id = auth.uid()
+WHERE author_id = p_user_id;
+
+-- Update contact messages resolved_by if they resolved any
+UPDATE contact_messages
+SET resolved_by = NULL
+WHERE resolved_by = p_user_id;
+
+-- Delete user roles (will cascade)
+DELETE FROM user_roles WHERE user_id = p_user_id;
+
+-- Delete profile
+DELETE FROM profiles WHERE id = p_user_id;
+
+-- Note: The auth.users deletion should be handled via Supabase admin API
+-- This function only handles the application data
+
+RETURN TRUE;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION delete_user_safely(UUID) TO authenticated;
+$$

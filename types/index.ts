@@ -99,6 +99,22 @@ export type SocialLink = {
   updated_at?: string;
 };
 
+export type ContactMessage = {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  subject: string;
+  message: string;
+  status: "pending" | "viewed" | "in_progress" | "resolved";
+  priority: "low" | "normal" | "high" | "urgent";
+  created_at: string;
+  updated_at: string;
+  resolved_at?: string;
+  resolved_by?: string;
+  notes?: string;
+};
+
 // Supabase response types
 export interface RoleData {
   name: string;

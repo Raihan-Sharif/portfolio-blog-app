@@ -17,6 +17,7 @@ import {
   FileText,
   Home,
   LogOut,
+  Mail,
   Menu,
   Settings,
   Users,
@@ -129,6 +130,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: <Briefcase size={18} />,
     },
     { name: "Users", href: "/admin/users", icon: <Users size={18} /> },
+    { name: "Messages", href: "/admin/contact", icon: <Mail size={18} /> },
     { name: "Settings", href: "/admin/settings", icon: <Settings size={18} /> },
   ];
 

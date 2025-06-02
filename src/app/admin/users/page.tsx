@@ -1,10 +1,12 @@
 "use client";
 
 import AdminLayout from "@/components/admin/admin-layout";
+import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -28,7 +30,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
-import { AlertCircle, CheckCircle, Search, UserPlus } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle,
+  Search,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 // Define interfaces for type safety
@@ -56,6 +64,7 @@ interface User {
 }
 
 export default function UsersPage() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +81,12 @@ export default function UsersPage() {
   const [addUserSuccess, setAddUserSuccess] = useState(false);
   const [addUserError, setAddUserError] = useState<string | null>(null);
   const [updatingRoles, setUpdatingRoles] = useState<Set<string>>(new Set());
+
+  // Delete user states
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   useEffect(() => {
     fetchUsers();
@@ -321,6 +336,60 @@ export default function UsersPage() {
     }
   };
 
+  const handleDeleteClick = (user: User) => {
+    setUserToDelete(user);
+    setDeleteConfirmText("");
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!userToDelete || deleteConfirmText !== "DELETE") return;
+
+    try {
+      setIsDeleting(true);
+
+      // Use the database function to safely delete user
+      const { data, error } = await supabase.rpc("delete_user_safely", {
+        p_user_id: userToDelete.id,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data === false) {
+        throw new Error("Failed to delete user");
+      }
+
+      // Remove user from local state
+      setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
+      setDeleteConfirmText("");
+    } catch (err: any) {
+      console.error("Error deleting user:", err);
+
+      let errorMessage = "Failed to delete user. Please try again.";
+      if (err.message.includes("Only admins can delete users")) {
+        errorMessage = "Only administrators can delete users.";
+      } else if (err.message.includes("Cannot delete your own account")) {
+        errorMessage = "You cannot delete your own account.";
+      }
+
+      alert(errorMessage);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const canDeleteUser = (user: User) => {
+    // Can't delete yourself
+    if (user.id === currentUser?.id) return false;
+    // Can't delete other admins (for safety)
+    if (user.role === "admin") return false;
+    return true;
+  };
+
   return (
     <AdminLayout>
       <div className="container px-4 py-6">
@@ -506,7 +575,24 @@ export default function UsersPage() {
                         {new Date(user.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        {/* Additional actions can be added here */}
+                        <div className="flex items-center gap-2">
+                          {canDeleteUser(user) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteClick(user)}
+                              title="Delete User"
+                              type="button"
+                            >
+                              <Trash2 size={16} />
+                            </Button>
+                          )}
+                          {user.id === currentUser?.id && (
+                            <span className="text-xs text-muted-foreground px-2">
+                              (You)
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -515,6 +601,63 @@ export default function UsersPage() {
             </Table>
           </div>
         </div>
+
+        {/* Delete User Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete User</DialogTitle>
+              <DialogDescription>
+                This action will permanently delete{" "}
+                <span className="font-semibold">{userToDelete?.full_name}</span>{" "}
+                and all associated data. This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
+                <strong>Warning:</strong> This will:
+                <ul className="list-disc list-inside mt-2 space-y-1">
+                  <li>Delete the user's profile and account data</li>
+                  <li>Reassign their authored posts to you</li>
+                  <li>Remove their role assignments</li>
+                </ul>
+              </div>
+
+              <div>
+                <Label htmlFor="deleteConfirm">
+                  Type <strong>DELETE</strong> to confirm:
+                </Label>
+                <Input
+                  id="deleteConfirm"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="DELETE"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setDeleteDialogOpen(false)}
+                disabled={isDeleting}
+                type="button"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting || deleteConfirmText !== "DELETE"}
+                type="button"
+              >
+                {isDeleting ? "Deleting..." : "Delete User"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   );
