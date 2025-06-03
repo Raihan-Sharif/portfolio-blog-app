@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { getReadTime } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
-import { Calendar, Clock, Hash, User } from "lucide-react";
+import { Calendar, Clock, Eye, Hash, User } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 // Define the types locally instead of importing from @/types
 interface Category {
@@ -90,6 +91,8 @@ export default function BlogGrid({
   tags,
   selectedTag,
 }: BlogGridProps) {
+  const router = useRouter();
+
   if (posts.length === 0) {
     return (
       <div className="container mx-auto px-4 py-20">
@@ -106,6 +109,22 @@ export default function BlogGrid({
     );
   }
 
+  // Handle card click - navigate to post
+  const handleCardClick = (slug: string, e: React.MouseEvent) => {
+    // Prevent navigation if clicking on links or buttons
+    const target = e.target as HTMLElement;
+    if (
+      target.tagName === "A" ||
+      target.closest("a") ||
+      target.tagName === "BUTTON" ||
+      target.closest("button")
+    ) {
+      return;
+    }
+
+    router.push(`/blog/${slug}`);
+  };
+
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
@@ -121,15 +140,16 @@ export default function BlogGrid({
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: index * 0.1 }}
-                  className="bg-card rounded-lg overflow-hidden shadow-md flex flex-col"
+                  className="bg-card rounded-lg overflow-hidden shadow-md flex flex-col cursor-pointer group hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+                  onClick={(e) => handleCardClick(post.slug, e)}
                 >
-                  <div className="relative h-48 w-full">
+                  <div className="relative h-48 w-full overflow-hidden">
                     {post.cover_image_url ? (
                       <Image
                         src={post.cover_image_url}
                         alt={post.title}
                         fill
-                        className="object-cover"
+                        className="object-cover transition-transform duration-300 group-hover:scale-105"
                       />
                     ) : (
                       <div className="w-full h-full bg-primary/10 flex items-center justify-center">
@@ -142,14 +162,15 @@ export default function BlogGrid({
                       <div className="mb-2">
                         <Link
                           href={`/blog?category=${post.category.slug}`}
-                          className="text-sm font-medium text-primary"
+                          className="text-sm font-medium text-primary hover:underline"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           {post.category.name}
                         </Link>
                       </div>
                     )}
-                    <h3 className="text-xl font-bold mb-2 hover:text-primary transition-colors">
-                      <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+                    <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors">
+                      {post.title}
                     </h3>
                     <p className="text-muted-foreground mb-4 line-clamp-3 flex-1">
                       {post.excerpt}
@@ -170,6 +191,10 @@ export default function BlogGrid({
                       <div className="flex items-center">
                         <Clock size={12} className="mr-1" />
                         <span>{readingTime} min read</span>
+                      </div>
+                      <div className="flex items-center">
+                        <Eye size={12} className="mr-1" />
+                        <span>{post.view_count || 0} views</span>
                       </div>
                     </div>
                   </div>
@@ -217,7 +242,7 @@ export default function BlogGrid({
                 <Link
                   key={tag.id}
                   href={`/blog?tag=${tag.slug}`}
-                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs ${
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs transition-colors hover:shadow-sm ${
                     selectedTag === tag.slug
                       ? "bg-primary text-primary-foreground"
                       : "bg-accent hover:bg-primary/10"
