@@ -669,3 +669,108 @@ LANGUAGE plpgsql SECURITY DEFINER;
 -- Grant execute permission
 GRANT EXECUTE ON FUNCTION delete_user_safely(UUID) TO authenticated;
 $$
+
+---
+
+-- Add this to your DBSCHEMA.md file
+
+-- Hero Settings Table
+CREATE TABLE hero_settings (
+id SERIAL PRIMARY KEY,
+title TEXT NOT NULL,
+subtitle TEXT,
+description TEXT,
+hero_image_url TEXT,
+background_svg_url TEXT,
+cta_primary_text TEXT DEFAULT 'View My Work',
+cta_primary_url TEXT DEFAULT '/projects',
+cta_secondary_text TEXT DEFAULT 'Contact Me',
+cta_secondary_url TEXT DEFAULT '/contact',
+highlight_words JSONB, -- For highlighting specific words in title/subtitle
+is_active BOOLEAN DEFAULT true,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Insert default hero content
+INSERT INTO hero_settings (
+title,
+subtitle,
+description,
+cta_primary_text,
+cta_primary_url,
+cta_secondary_text,
+cta_secondary_url,
+highlight_words,
+is_active
+) VALUES (
+'Hi, I''m Raihan Sharif',
+'Full Stack Developer',
+'With over 6 years of experience, I specialize in building modern web applications using .NET, ASP.NET, React, Next.js, JavaScript, SQL Server, and DevOps. I focus on creating robust, scalable solutions with exceptional user experiences.',
+'View My Work',
+'/projects',
+'Contact Me',
+'/contact',
+'["Raihan Sharif"]'::jsonb,
+true
+);
+
+-- Enable RLS
+ALTER TABLE hero_settings ENABLE ROW LEVEL SECURITY;
+
+-- Public can read active hero settings
+CREATE POLICY "Hero settings are viewable by everyone"
+ON hero_settings FOR SELECT
+USING (is_active = true);
+
+-- Admin can manage hero settings
+CREATE POLICY "Admin can manage hero settings"
+ON hero_settings FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+-- Function to get active hero settings
+CREATE OR REPLACE FUNCTION get_active_hero_settings()
+RETURNS TABLE (
+id INTEGER,
+title TEXT,
+subtitle TEXT,
+description TEXT,
+hero_image_url TEXT,
+background_svg_url TEXT,
+cta_primary_text TEXT,
+cta_primary_url TEXT,
+cta_secondary_text TEXT,
+cta_secondary_url TEXT,
+highlight_words JSONB
+) AS $$
+BEGIN
+RETURN QUERY
+SELECT
+h.id,
+h.title,
+h.subtitle,
+h.description,
+h.hero_image_url,
+h.background_svg_url,
+h.cta_primary_text,
+h.cta_primary_url,
+h.cta_secondary_text,
+h.cta_secondary_url,
+h.highlight_words
+FROM hero_settings h
+WHERE h.is_active = true
+ORDER BY h.updated_at DESC
+LIMIT 1;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+------
+$$
