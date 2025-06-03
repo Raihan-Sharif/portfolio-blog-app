@@ -36,7 +36,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [checkingAdmin, setCheckingAdmin] = useState(false);
+  const [adminCheckLoading, setAdminCheckLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Cache and refs for better performance
@@ -46,17 +46,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const hasInitialized = useRef(false);
   const checkInProgress = useRef(false);
 
-  // Cache admin status for 5 minutes
-  const CACHE_DURATION = 5 * 60 * 1000;
+  // Cache admin status for 10 minutes (longer than before)
+  const CACHE_DURATION = 10 * 60 * 1000;
 
-  // Optimized admin check with caching
+  // Optimized admin check with better caching
   const checkAdminStatus = useCallback(
-    async (userId: string) => {
-      if (checkInProgress.current) return null;
+    async (userId: string, forceCheck: boolean = false) => {
+      if (checkInProgress.current && !forceCheck) return null;
 
       // Check memory cache first
       const cached = adminStatusCache.current.get(userId);
-      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      if (
+        cached &&
+        Date.now() - cached.timestamp < CACHE_DURATION &&
+        !forceCheck
+      ) {
         return cached.status;
       }
 
@@ -65,7 +69,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       const sessionCached = sessionStorage.getItem(sessionKey);
       const sessionTimestamp = sessionStorage.getItem(`${sessionKey}_time`);
 
-      if (sessionCached && sessionTimestamp) {
+      if (sessionCached && sessionTimestamp && !forceCheck) {
         const timestamp = parseInt(sessionTimestamp);
         if (Date.now() - timestamp < CACHE_DURATION) {
           const status = sessionCached === "true";
@@ -115,7 +119,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     [user?.role]
   );
 
-  // Main admin check effect
+  // Main admin check effect - only run once or when user changes
   useEffect(() => {
     if (loading) return;
 
@@ -127,8 +131,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
 
     const initializeAdminCheck = async () => {
+      // If already initialized and we have cached result, use it
       if (hasInitialized.current) {
-        // If already initialized, just use cached result if available
         const cached = adminStatusCache.current.get(user.id);
         if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
           setIsAdmin(cached.status);
@@ -139,7 +143,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         }
       }
 
-      setCheckingAdmin(true);
+      // Only show loading for initial check or when we really need to check
+      if (!hasInitialized.current) {
+        setAdminCheckLoading(true);
+      }
 
       try {
         const adminStatus = await checkAdminStatus(user.id);
@@ -156,7 +163,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         console.error("Error checking admin status:", err);
         router.push("/");
       } finally {
-        setCheckingAdmin(false);
+        setAdminCheckLoading(false);
       }
     };
 
@@ -190,8 +197,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { name: "Settings", href: "/admin/settings", icon: <Settings size={18} /> },
   ];
 
-  // Show loading only if we're actually checking and user exists
-  if (loading || (user && checkingAdmin && !hasInitialized.current)) {
+  // Show loading only during initial auth loading or initial admin check
+  if (loading || (!hasInitialized.current && adminCheckLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -204,7 +211,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   // If user exists but is not admin, don't render anything (redirect will happen)
   if (user && hasInitialized.current && !isAdmin) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">Redirecting...</p>
+        </div>
+      </div>
+    );
   }
 
   // If no user and not loading, don't render anything (redirect will happen)
