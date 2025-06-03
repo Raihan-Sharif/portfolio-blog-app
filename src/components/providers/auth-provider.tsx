@@ -1,3 +1,4 @@
+// src/components/providers/auth-provider.tsx
 "use client";
 
 import { supabase } from "@/lib/supabase/client";
@@ -46,20 +47,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true);
   const [authInitialized, setAuthInitialized] = useState(false);
 
-  // Cache management with more aggressive caching
+  // Cache management
   const userCacheRef = useRef<Map<string, User>>(new Map());
   const lastRefreshRef = useRef<number>(0);
-  const lastFocusRefreshRef = useRef<number>(0);
-  const refreshThrottleMs = 2000;
-  const focusRefreshThrottleMs = 10 * 60 * 1000; // 10 minutes for focus refreshes
   const isRefreshingRef = useRef(false);
+  const refreshThrottleMs = 5000; // Increased throttle time
 
   // Function to get user details with role information
   const getUserDetails = useCallback(async (userId: string) => {
     try {
       // Check cache first with longer TTL
       const cached = userCacheRef.current.get(userId);
-      if (cached && Date.now() - lastRefreshRef.current < 5 * 60 * 1000) {
+      if (cached && Date.now() - lastRefreshRef.current < 10 * 60 * 1000) {
+        // 10 minutes
         return cached;
       }
 
@@ -80,7 +80,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (profileError) {
           console.error("Error fetching profile:", profileError);
-          return cached || null; // Return cached if available
+          return cached || null;
         }
 
         const userDetails = {
@@ -135,52 +135,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
-  // Silent refresh function - doesn't trigger loading states
-  const silentRefreshUser = useCallback(async () => {
-    const now = Date.now();
-    if (
-      now - lastRefreshRef.current < refreshThrottleMs ||
-      isRefreshingRef.current
-    ) {
-      return;
-    }
-
-    isRefreshingRef.current = true;
-    lastRefreshRef.current = now;
-
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-
-      if (sessionData?.session?.user) {
-        const userDetails = await getUserDetails(sessionData.session.user.id);
-
-        if (userDetails) {
-          const updatedUser = {
-            id: sessionData.session.user.id,
-            email: sessionData.session.user.email,
-            ...userDetails,
-          };
-          setUser(updatedUser);
-        } else {
-          setUser({
-            id: sessionData.session.user.id,
-            email: sessionData.session.user.email,
-            role: "viewer",
-          });
-        }
-      } else {
-        setUser(null);
-        userCacheRef.current.clear();
-      }
-    } catch (err) {
-      console.error("Error in silent refresh:", err);
-      // Don't clear user state on silent refresh errors
-    } finally {
-      isRefreshingRef.current = false;
-    }
-  }, [getUserDetails]);
-
-  // Public refresh function - can trigger loading for explicit refreshes
+  // Throttled refresh function
   const refreshUser = useCallback(async () => {
     const now = Date.now();
     if (
@@ -194,8 +149,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     lastRefreshRef.current = now;
 
     try {
-      setLoading(true); // Only show loading for explicit refreshes
-
       const { data: sessionData } = await supabase.auth.getSession();
 
       if (sessionData?.session?.user) {
@@ -221,9 +174,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (err) {
       console.error("Error refreshing user:", err);
-      setUser(null);
     } finally {
-      setLoading(false);
       isRefreshingRef.current = false;
     }
   }, [getUserDetails]);
@@ -269,51 +220,52 @@ export function AuthProvider({ children }: AuthProviderProps) {
     initAuth();
   }, [getUserDetails]);
 
-  // Optimized tab focus handling - much less aggressive
+  const lastFocusRefresh = useRef<number>(0);
+
+  // Simplified and less aggressive focus handling
   useEffect(() => {
     if (!authInitialized || !user) return;
 
     let focusTimeout: NodeJS.Timeout;
-
-    const handleFocus = () => {
-      if (focusTimeout) {
-        clearTimeout(focusTimeout);
-      }
-
-      const now = Date.now();
-      const timeSinceLastFocusRefresh = now - lastFocusRefreshRef.current;
-
-      // Only refresh if it's been more than 10 minutes since last focus refresh
-      // and the user session might be stale
-      if (timeSinceLastFocusRefresh > focusRefreshThrottleMs) {
-        focusTimeout = setTimeout(() => {
-          lastFocusRefreshRef.current = now;
-          // Use silent refresh to avoid loading states
-          silentRefreshUser();
-        }, 2000); // 2 second delay to avoid rapid refreshes
-      }
-    };
+    const FOCUS_REFRESH_THROTTLE = 30 * 60 * 1000; // 30 minutes
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && !document.hidden && user) {
-        handleFocus();
+      // Only refresh if:
+      // 1. Tab becomes visible
+      // 2. User is logged in
+      // 3. It's been more than 30 minutes since last focus refresh
+      // 4. User is not currently navigating (no pending refreshes)
+      if (
+        document.visibilityState === "visible" &&
+        !document.hidden &&
+        user &&
+        Date.now() - lastFocusRefresh.current > FOCUS_REFRESH_THROTTLE &&
+        !isRefreshingRef.current
+      ) {
+        if (focusTimeout) {
+          clearTimeout(focusTimeout);
+        }
+
+        // Add a longer delay to avoid interfering with navigation
+        focusTimeout = setTimeout(() => {
+          lastFocusRefresh.current = Date.now();
+          refreshUser();
+        }, 5000); // 5 second delay
       }
     };
 
-    // Only add listeners if user is logged in
-    window.addEventListener("focus", handleFocus);
+    // Only add visibility change listener, remove focus listener that was more aggressive
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       if (focusTimeout) {
         clearTimeout(focusTimeout);
       }
-      window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [authInitialized, user, silentRefreshUser]);
+  }, [authInitialized, user, refreshUser]);
 
-  // Simplified auth state change listener
+  // Simplified auth state change listener - only handle explicit events
   useEffect(() => {
     if (!authInitialized) return;
 
@@ -330,7 +282,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         if (event === "SIGNED_IN" && session?.user) {
-          // Don't show loading for sign in as it's already handled elsewhere
           try {
             const userDetails = await getUserDetails(session.user.id);
 
@@ -352,29 +303,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         }
 
-        // For TOKEN_REFRESHED, silently update without loading states
-        if (event === "TOKEN_REFRESHED" && session?.user && user) {
-          try {
-            const userDetails = await getUserDetails(session.user.id);
-            if (userDetails) {
-              setUser((prev) => ({
-                ...prev,
-                id: session.user.id,
-                email: session.user.email,
-                ...userDetails,
-              }));
-            }
-          } catch (err) {
-            console.error("Error handling token refresh:", err);
-          }
-        }
+        // Don't handle TOKEN_REFRESHED to avoid interfering with navigation
       }
     );
 
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [authInitialized, user, getUserDetails]);
+  }, [authInitialized, getUserDetails]);
 
   // Simple sign out
   const signOut = useCallback(async () => {
