@@ -25,12 +25,13 @@ export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  // Admin role caching
+  // Admin role caching with longer TTL and better management
   const [isAdmin, setIsAdmin] = useState(false);
   const adminCheckCache = useRef<
     Map<string, { status: boolean; timestamp: number }>
   >(new Map());
-  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+  const adminCheckInProgress = useRef(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -73,7 +74,7 @@ export function Navbar() {
       }
 
       // Check sessionStorage
-      const sessionKey = `admin_status_${userId}`;
+      const sessionKey = `navbar_admin_status_${userId}`;
       const sessionCached = sessionStorage.getItem(sessionKey);
       const sessionTimestamp = sessionStorage.getItem(`${sessionKey}_time`);
 
@@ -88,6 +89,13 @@ export function Navbar() {
           return status;
         }
       }
+
+      // Prevent concurrent calls
+      if (adminCheckInProgress.current) {
+        return false; // Return false for safety during concurrent calls
+      }
+
+      adminCheckInProgress.current = true;
 
       try {
         const { data, error } = await supabase.rpc("get_user_with_role", {
@@ -109,24 +117,44 @@ export function Navbar() {
       } catch (err) {
         console.error("Error checking role:", err);
         return false;
+      } finally {
+        adminCheckInProgress.current = false;
       }
     },
     [user?.role]
   );
 
-  // Check admin role when user changes
+  // Check admin role when user changes, but don't block UI
   useEffect(() => {
     if (!user) {
       setIsAdmin(false);
       return;
     }
 
-    const initAdminCheck = async () => {
+    // Quick check from cache first
+    const cached = adminCheckCache.current.get(user.id);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      setIsAdmin(cached.status);
+      return;
+    }
+
+    // If user role is already admin in context, set it immediately
+    if (user.role === "admin") {
+      setIsAdmin(true);
+      adminCheckCache.current.set(user.id, {
+        status: true,
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
+    // Async check without blocking
+    const checkAsync = async () => {
       const adminStatus = await checkAdminRole(user.id);
       setIsAdmin(adminStatus);
     };
 
-    initAdminCheck();
+    checkAsync();
   }, [user, checkAdminRole]);
 
   // Base navigation links
