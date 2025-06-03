@@ -16,7 +16,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { LayoutDashboard, LogOut, Menu, User, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -24,6 +24,13 @@ export function Navbar() {
   const { user, loading, signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+
+  // Admin role caching
+  const [isAdmin, setIsAdmin] = useState(false);
+  const adminCheckCache = useRef<
+    Map<string, { status: boolean; timestamp: number }>
+  >(new Map());
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
   useEffect(() => {
     const handleScroll = () => {
@@ -38,46 +45,89 @@ export function Navbar() {
   const closeMenu = () => setIsOpen(false);
 
   const handleSignOut = async () => {
+    // Clear admin cache
+    if (user?.id) {
+      adminCheckCache.current.delete(user.id);
+    }
     await signOut();
     router.push("/");
   };
 
-  // Check for admin role directly
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    if (user) {
-      // If we already know they're an admin from the context, use that
-      if (user.role === "admin") {
-        setIsAdmin(true);
-        return;
+  // Optimized admin check with aggressive caching
+  const checkAdminRole = useCallback(
+    async (userId: string) => {
+      // Check memory cache first
+      const cached = adminCheckCache.current.get(userId);
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        return cached.status;
       }
 
-      // Otherwise check directly
-      const checkRole = async () => {
-        try {
-          const { data, error } = await supabase.rpc("get_user_with_role", {
-            p_user_id: user.id,
+      // If user has role from auth context, use it directly
+      if (user?.role === "admin") {
+        const adminStatus = true;
+        adminCheckCache.current.set(userId, {
+          status: adminStatus,
+          timestamp: Date.now(),
+        });
+        return adminStatus;
+      }
+
+      // Check sessionStorage
+      const sessionKey = `admin_status_${userId}`;
+      const sessionCached = sessionStorage.getItem(sessionKey);
+      const sessionTimestamp = sessionStorage.getItem(`${sessionKey}_time`);
+
+      if (sessionCached && sessionTimestamp) {
+        const timestamp = parseInt(sessionTimestamp);
+        if (Date.now() - timestamp < CACHE_DURATION) {
+          const status = sessionCached === "true";
+          adminCheckCache.current.set(userId, {
+            status,
+            timestamp: Date.now(),
           });
-
-          if (error) {
-            console.error("Error checking role directly:", error);
-            return;
-          }
-
-          if (data && data.length > 0 && data[0].role_name === "admin") {
-            setIsAdmin(true);
-          }
-        } catch (err) {
-          console.error("Error checking role directly:", err);
+          return status;
         }
-      };
+      }
 
-      checkRole();
-    } else {
+      try {
+        const { data, error } = await supabase.rpc("get_user_with_role", {
+          p_user_id: userId,
+        });
+
+        const adminStatus =
+          !error && data && data.length > 0 && data[0].role_name === "admin";
+
+        // Cache the result in both memory and session storage
+        adminCheckCache.current.set(userId, {
+          status: adminStatus,
+          timestamp: Date.now(),
+        });
+        sessionStorage.setItem(sessionKey, adminStatus.toString());
+        sessionStorage.setItem(`${sessionKey}_time`, Date.now().toString());
+
+        return adminStatus;
+      } catch (err) {
+        console.error("Error checking role:", err);
+        return false;
+      }
+    },
+    [user?.role]
+  );
+
+  // Check admin role when user changes
+  useEffect(() => {
+    if (!user) {
       setIsAdmin(false);
+      return;
     }
-  }, [user]);
+
+    const initAdminCheck = async () => {
+      const adminStatus = await checkAdminRole(user.id);
+      setIsAdmin(adminStatus);
+    };
+
+    initAdminCheck();
+  }, [user, checkAdminRole]);
 
   // Base navigation links
   const baseNavLinks = [
