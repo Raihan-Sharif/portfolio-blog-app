@@ -36,63 +36,59 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [adminCheckLoading, setAdminCheckLoading] = useState(false);
+  const [adminLoading, setAdminLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // Cache and refs for better performance
-  const adminStatusCache = useRef<
+  // Refs for better state management
+  const hasInitialized = useRef(false);
+  const isCheckingAdmin = useRef(false);
+  const adminCache = useRef<
     Map<string, { status: boolean; timestamp: number }>
   >(new Map());
-  const hasInitialized = useRef(false);
-  const checkInProgress = useRef(false);
+  const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes cache
 
-  // Cache admin status for 10 minutes (longer than before)
-  const CACHE_DURATION = 10 * 60 * 1000;
-
-  // Optimized admin check with better caching
+  // Optimized admin check with aggressive caching
   const checkAdminStatus = useCallback(
-    async (userId: string, forceCheck: boolean = false) => {
-      if (checkInProgress.current && !forceCheck) return null;
-
-      // Check memory cache first
-      const cached = adminStatusCache.current.get(userId);
-      if (
-        cached &&
-        Date.now() - cached.timestamp < CACHE_DURATION &&
-        !forceCheck
-      ) {
+    async (userId: string) => {
+      // Check cache first
+      const cached = adminCache.current.get(userId);
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
         return cached.status;
       }
 
-      // Check sessionStorage
-      const sessionKey = `admin_status_${userId}`;
-      const sessionCached = sessionStorage.getItem(sessionKey);
-      const sessionTimestamp = sessionStorage.getItem(`${sessionKey}_time`);
-
-      if (sessionCached && sessionTimestamp && !forceCheck) {
-        const timestamp = parseInt(sessionTimestamp);
-        if (Date.now() - timestamp < CACHE_DURATION) {
-          const status = sessionCached === "true";
-          adminStatusCache.current.set(userId, { status, timestamp });
-          return status;
-        }
+      // Prevent concurrent checks
+      if (isCheckingAdmin.current) {
+        return null;
       }
 
-      // If user has role from auth context, use it
-      if (user?.role === "admin") {
-        const adminStatus = true;
-        adminStatusCache.current.set(userId, {
-          status: adminStatus,
-          timestamp: Date.now(),
-        });
-        sessionStorage.setItem(sessionKey, "true");
-        sessionStorage.setItem(`${sessionKey}_time`, Date.now().toString());
-        return adminStatus;
-      }
-
-      checkInProgress.current = true;
+      isCheckingAdmin.current = true;
 
       try {
+        // Quick check from user role first
+        if (user?.role === "admin") {
+          const adminStatus = true;
+          adminCache.current.set(userId, {
+            status: adminStatus,
+            timestamp: Date.now(),
+          });
+          return adminStatus;
+        }
+
+        // Check sessionStorage for faster access
+        const sessionKey = `admin_${userId}`;
+        const sessionData = sessionStorage.getItem(sessionKey);
+        const sessionTime = sessionStorage.getItem(`${sessionKey}_time`);
+
+        if (sessionData && sessionTime) {
+          const timestamp = parseInt(sessionTime);
+          if (Date.now() - timestamp < CACHE_DURATION) {
+            const status = sessionData === "true";
+            adminCache.current.set(userId, { status, timestamp: Date.now() });
+            return status;
+          }
+        }
+
+        // Database check as last resort
         const { data, error } = await supabase.rpc("get_user_with_role", {
           p_user_id: userId,
         });
@@ -101,7 +97,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           !error && data && data.length > 0 && data[0].role_name === "admin";
 
         // Cache the result
-        adminStatusCache.current.set(userId, {
+        adminCache.current.set(userId, {
           status: adminStatus,
           timestamp: Date.now(),
         });
@@ -110,80 +106,75 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
         return adminStatus;
       } catch (err) {
-        console.error("Admin check error:", err);
+        console.error("Error checking admin status:", err);
         return false;
       } finally {
-        checkInProgress.current = false;
+        isCheckingAdmin.current = false;
       }
     },
     [user?.role]
   );
 
-  // Main admin check effect - only run once or when user changes
+  // Initialize admin status only once
   useEffect(() => {
-    if (loading) return;
+    if (loading || hasInitialized.current) return;
 
     if (!user) {
-      if (hasInitialized.current) {
+      // Only redirect if we've finished loading and there's no user
+      if (!loading) {
         router.push("/sign-in?redirect=" + encodeURIComponent(pathname));
       }
       return;
     }
 
-    const initializeAdminCheck = async () => {
-      // If already initialized and we have cached result, use it
-      if (hasInitialized.current) {
-        const cached = adminStatusCache.current.get(user.id);
-        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-          setIsAdmin(cached.status);
-          if (!cached.status) {
-            router.push("/");
-          }
-          return;
-        }
-      }
+    const initializeAdmin = async () => {
+      // Don't show loading for navigation between admin pages
+      const shouldShowLoading = !hasInitialized.current;
 
-      // Only show loading for initial check or when we really need to check
-      if (!hasInitialized.current) {
-        setAdminCheckLoading(true);
+      if (shouldShowLoading) {
+        setAdminLoading(true);
       }
 
       try {
         const adminStatus = await checkAdminStatus(user.id);
 
-        if (adminStatus === null) return; // Check in progress or failed
+        if (adminStatus !== null) {
+          setIsAdmin(adminStatus);
+          hasInitialized.current = true;
 
-        setIsAdmin(adminStatus);
-        hasInitialized.current = true;
-
-        if (!adminStatus) {
-          router.push("/");
+          // Only redirect if not admin and we're sure about the status
+          if (!adminStatus && !loading) {
+            router.push("/");
+          }
         }
       } catch (err) {
-        console.error("Error checking admin status:", err);
-        router.push("/");
+        console.error("Error initializing admin:", err);
+        if (!loading) {
+          router.push("/");
+        }
       } finally {
-        setAdminCheckLoading(false);
+        if (shouldShowLoading) {
+          setAdminLoading(false);
+        }
       }
     };
 
-    initializeAdminCheck();
+    initializeAdmin();
   }, [user, loading, router, pathname, checkAdminStatus]);
 
+  // Handle sign out
   const handleSignOut = useCallback(async () => {
-    // Clear admin status cache
     if (user?.id) {
-      adminStatusCache.current.delete(user.id);
-      sessionStorage.removeItem(`admin_status_${user.id}`);
-      sessionStorage.removeItem(`admin_status_${user.id}_time`);
+      adminCache.current.delete(user.id);
+      sessionStorage.removeItem(`admin_${user.id}`);
+      sessionStorage.removeItem(`admin_${user.id}_time`);
     }
 
     await signOut();
     router.push("/");
   }, [user, signOut, router]);
 
-  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
-
+  // Navigation items
   const navItems = [
     { name: "Dashboard", href: "/admin/dashboard", icon: <Home size={18} /> },
     { name: "Blog Posts", href: "/admin/blog", icon: <FileText size={18} /> },
@@ -197,20 +188,25 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { name: "Settings", href: "/admin/settings", icon: <Settings size={18} /> },
   ];
 
-  // Show loading only during initial auth loading or initial admin check
-  if (loading || (!hasInitialized.current && adminCheckLoading)) {
+  // Show loading only during initial admin check, not during navigation
+  if (loading || (adminLoading && !hasInitialized.current)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mb-4"></div>
+          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading admin panel...</p>
         </div>
       </div>
     );
   }
 
-  // If user exists but is not admin, don't render anything (redirect will happen)
-  if (user && hasInitialized.current && !isAdmin) {
+  // Don't render anything if user is not authenticated
+  if (!user) {
+    return null;
+  }
+
+  // Don't render anything if user is not admin (redirect will happen)
+  if (hasInitialized.current && !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -220,10 +216,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     );
   }
 
-  // If no user and not loading, don't render anything (redirect will happen)
-  if (!user && !loading) {
-    return null;
+  // Show admin layout only if user is confirmed admin
+  if (!hasInitialized.current || !isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Verifying permissions...</p>
+        </div>
+      </div>
+    );
   }
+
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   return (
     <div className="bg-background min-h-screen flex">
@@ -268,6 +273,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       ? "bg-primary text-primary-foreground"
                       : "hover:bg-accent"
                   )}
+                  onClick={() => {
+                    // Close mobile sidebar on navigation
+                    if (window.innerWidth < 768) {
+                      setIsSidebarOpen(false);
+                    }
+                  }}
                 >
                   <span className="mr-3">{item.icon}</span>
                   {item.name}
@@ -284,7 +295,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     ?.split(" ")
                     .map((n) => n[0])
                     .join("")
-                    .toUpperCase() || "U"}
+                    .toUpperCase() || "A"}
                 </span>
               </div>
               <div className="ml-3">
