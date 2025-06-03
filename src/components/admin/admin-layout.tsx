@@ -36,84 +36,140 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [checkingAdmin, setCheckingAdmin] = useState(true);
+  const [checkingAdmin, setCheckingAdmin] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const hasCheckedAdmin = useRef(false);
-  const checkingRef = useRef(false);
 
-  // Simplified admin check - only run once per session
-  useEffect(() => {
-    if (hasCheckedAdmin.current || loading || checkingRef.current) return;
+  // Cache and refs for better performance
+  const adminStatusCache = useRef<
+    Map<string, { status: boolean; timestamp: number }>
+  >(new Map());
+  const hasInitialized = useRef(false);
+  const checkInProgress = useRef(false);
 
-    const checkAdmin = async () => {
-      if (!user) {
-        router.push("/sign-in?redirect=" + encodeURIComponent(pathname));
-        return;
+  // Cache admin status for 5 minutes
+  const CACHE_DURATION = 5 * 60 * 1000;
+
+  // Optimized admin check with caching
+  const checkAdminStatus = useCallback(
+    async (userId: string) => {
+      if (checkInProgress.current) return null;
+
+      // Check memory cache first
+      const cached = adminStatusCache.current.get(userId);
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        return cached.status;
       }
 
-      checkingRef.current = true;
+      // Check sessionStorage
+      const sessionKey = `admin_status_${userId}`;
+      const sessionCached = sessionStorage.getItem(sessionKey);
+      const sessionTimestamp = sessionStorage.getItem(`${sessionKey}_time`);
+
+      if (sessionCached && sessionTimestamp) {
+        const timestamp = parseInt(sessionTimestamp);
+        if (Date.now() - timestamp < CACHE_DURATION) {
+          const status = sessionCached === "true";
+          adminStatusCache.current.set(userId, { status, timestamp });
+          return status;
+        }
+      }
+
+      // If user has role from auth context, use it
+      if (user?.role === "admin") {
+        const adminStatus = true;
+        adminStatusCache.current.set(userId, {
+          status: adminStatus,
+          timestamp: Date.now(),
+        });
+        sessionStorage.setItem(sessionKey, "true");
+        sessionStorage.setItem(`${sessionKey}_time`, Date.now().toString());
+        return adminStatus;
+      }
+
+      checkInProgress.current = true;
 
       try {
-        // Check cached admin status first with user-specific key
-        const cachedStatus = sessionStorage.getItem(`admin_status_${user.id}`);
-        if (cachedStatus === "true") {
-          setIsAdmin(true);
-          setCheckingAdmin(false);
-          hasCheckedAdmin.current = true;
-          return;
-        }
-
-        if (cachedStatus === "false") {
-          router.push("/");
-          return;
-        }
-
-        // If user has role from auth context, use it first
-        if (user.role === "admin") {
-          setIsAdmin(true);
-          sessionStorage.setItem(`admin_status_${user.id}`, "true");
-          setCheckingAdmin(false);
-          hasCheckedAdmin.current = true;
-          return;
-        }
-
-        // Only check database if we don't have cached status
         const { data, error } = await supabase.rpc("get_user_with_role", {
-          p_user_id: user.id,
+          p_user_id: userId,
         });
 
-        if (
-          !error &&
-          data &&
-          data.length > 0 &&
-          data[0].role_name === "admin"
-        ) {
-          setIsAdmin(true);
-          sessionStorage.setItem(`admin_status_${user.id}`, "true");
-        } else {
-          sessionStorage.setItem(`admin_status_${user.id}`, "false");
+        const adminStatus =
+          !error && data && data.length > 0 && data[0].role_name === "admin";
+
+        // Cache the result
+        adminStatusCache.current.set(userId, {
+          status: adminStatus,
+          timestamp: Date.now(),
+        });
+        sessionStorage.setItem(sessionKey, adminStatus.toString());
+        sessionStorage.setItem(`${sessionKey}_time`, Date.now().toString());
+
+        return adminStatus;
+      } catch (err) {
+        console.error("Admin check error:", err);
+        return false;
+      } finally {
+        checkInProgress.current = false;
+      }
+    },
+    [user?.role]
+  );
+
+  // Main admin check effect
+  useEffect(() => {
+    if (loading) return;
+
+    if (!user) {
+      if (hasInitialized.current) {
+        router.push("/sign-in?redirect=" + encodeURIComponent(pathname));
+      }
+      return;
+    }
+
+    const initializeAdminCheck = async () => {
+      if (hasInitialized.current) {
+        // If already initialized, just use cached result if available
+        const cached = adminStatusCache.current.get(user.id);
+        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+          setIsAdmin(cached.status);
+          if (!cached.status) {
+            router.push("/");
+          }
+          return;
+        }
+      }
+
+      setCheckingAdmin(true);
+
+      try {
+        const adminStatus = await checkAdminStatus(user.id);
+
+        if (adminStatus === null) return; // Check in progress or failed
+
+        setIsAdmin(adminStatus);
+        hasInitialized.current = true;
+
+        if (!adminStatus) {
           router.push("/");
         }
       } catch (err) {
-        console.error("Admin check error:", err);
-        sessionStorage.setItem(`admin_status_${user.id}`, "false");
+        console.error("Error checking admin status:", err);
         router.push("/");
       } finally {
         setCheckingAdmin(false);
-        hasCheckedAdmin.current = true;
-        checkingRef.current = false;
       }
     };
 
-    checkAdmin();
-  }, [user, loading, router, pathname]);
+    initializeAdminCheck();
+  }, [user, loading, router, pathname, checkAdminStatus]);
 
   const handleSignOut = useCallback(async () => {
     // Clear admin status cache
     if (user?.id) {
+      adminStatusCache.current.delete(user.id);
       sessionStorage.removeItem(`admin_status_${user.id}`);
+      sessionStorage.removeItem(`admin_status_${user.id}_time`);
     }
-    sessionStorage.removeItem("lastAuthRefresh");
 
     await signOut();
     router.push("/");
@@ -134,8 +190,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { name: "Settings", href: "/admin/settings", icon: <Settings size={18} /> },
   ];
 
-  // Show loading only if we're actually checking and don't have cache
-  if (loading || (checkingAdmin && !hasCheckedAdmin.current)) {
+  // Show loading only if we're actually checking and user exists
+  if (loading || (user && checkingAdmin && !hasInitialized.current)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -146,7 +202,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     );
   }
 
-  if (!isAdmin) {
+  // If user exists but is not admin, don't render anything (redirect will happen)
+  if (user && hasInitialized.current && !isAdmin) {
+    return null;
+  }
+
+  // If no user and not loading, don't render anything (redirect will happen)
+  if (!user && !loading) {
     return null;
   }
 
