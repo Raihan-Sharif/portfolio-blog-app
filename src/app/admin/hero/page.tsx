@@ -449,7 +449,7 @@ function HeroPreview({ formState }: { formState: any }) {
     if (!highlightWords.length) return text;
 
     let highlightedText = text;
-    highlightWords.forEach((word) => {
+    highlightWords.forEach((word: string) => {
       if (word) {
         const regex = new RegExp(`(${word})`, "gi");
         highlightedText = highlightedText.replace(
