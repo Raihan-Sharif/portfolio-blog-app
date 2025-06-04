@@ -20,6 +20,7 @@ import {
   Mail,
   Menu,
   Settings,
+  Star,
   Users,
   X,
 } from "lucide-react";
@@ -182,6 +183,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       name: "Projects",
       href: "/admin/projects",
       icon: <Briefcase size={18} />,
+    },
+    {
+      name: "Hero Section",
+      href: "/admin/hero",
+      icon: <Star size={18} />,
     },
     { name: "Users", href: "/admin/users", icon: <Users size={18} /> },
     { name: "Messages", href: "/admin/contact", icon: <Mail size={18} /> },
