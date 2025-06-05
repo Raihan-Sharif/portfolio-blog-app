@@ -19,6 +19,7 @@ import {
   LogOut,
   Mail,
   Menu,
+  Phone,
   Settings,
   Star,
   Users,
@@ -190,6 +191,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: <Star size={18} />,
     },
     { name: "Users", href: "/admin/users", icon: <Users size={18} /> },
+    {
+      name: "Contact",
+      href: "/admin/contact-management",
+      icon: <Phone size={18} />,
+    },
     { name: "Messages", href: "/admin/contact", icon: <Mail size={18} /> },
     { name: "Settings", href: "/admin/settings", icon: <Settings size={18} /> },
   ];
