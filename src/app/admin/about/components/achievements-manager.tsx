@@ -1,4 +1,3 @@
-// src/app/admin/about/components/achievements-manager.tsx
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -31,8 +30,8 @@ import { supabase } from "@/lib/supabase/client";
 import {
   AlertCircle,
   Award,
+  BadgeCheck,
   Calendar,
-  Certificate,
   Edit,
   ExternalLink,
   Eye,
@@ -53,7 +52,7 @@ interface Achievement {
   description?: string;
   achievement_date?: string;
   organization?: string;
-  certificate_url?: string;
+  BadgeCheck_url?: string;
   achievement_url?: string;
   achievement_type?: string;
   display_order: number;
@@ -75,7 +74,7 @@ export default function AchievementsManager() {
     description: "",
     achievement_date: "",
     organization: "",
-    certificate_url: "",
+    BadgeCheck_url: "",
     achievement_url: "",
     achievement_type: "award",
     display_order: 0,
@@ -108,7 +107,7 @@ export default function AchievementsManager() {
       description: "",
       achievement_date: "",
       organization: "",
-      certificate_url: "",
+      BadgeCheck_url: "",
       achievement_url: "",
       achievement_type: "award",
       display_order: 0,
@@ -123,7 +122,7 @@ export default function AchievementsManager() {
       description: achievement.description || "",
       achievement_date: achievement.achievement_date || "",
       organization: achievement.organization || "",
-      certificate_url: achievement.certificate_url || "",
+      BadgeCheck_url: achievement.BadgeCheck_url || "",
       achievement_url: achievement.achievement_url || "",
       achievement_type: achievement.achievement_type || "award",
       display_order: achievement.display_order,
@@ -217,7 +216,7 @@ export default function AchievementsManager() {
       case "award":
         return <Trophy className="w-4 h-4 text-yellow-600" />;
       case "certification":
-        return <Certificate className="w-4 h-4 text-blue-600" />;
+        return <BadgeCheck className="w-4 h-4 text-blue-600" />;
       case "recognition":
         return <Star className="w-4 h-4 text-purple-600" />;
       case "publication":
@@ -393,21 +392,21 @@ export default function AchievementsManager() {
                 </div>
 
                 <div>
-                  <Label htmlFor="certificate_url">Certificate URL</Label>
+                  <Label htmlFor="BadgeCheck_url">BadgeCheck URL</Label>
                   <Input
-                    id="certificate_url"
+                    id="BadgeCheck_url"
                     type="url"
-                    value={formData.certificate_url}
+                    value={formData.BadgeCheck_url}
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        certificate_url: e.target.value,
+                        BadgeCheck_url: e.target.value,
                       }))
                     }
-                    placeholder="https://certificate-link.com"
+                    placeholder="https://BadgeCheck-link.com"
                   />
                   <p className="text-sm text-muted-foreground mt-1">
-                    Link to the certificate or proof document
+                    Link to the BadgeCheck or proof document
                   </p>
                 </div>
               </div>
@@ -548,16 +547,16 @@ export default function AchievementsManager() {
                         <Edit className="w-4 h-4" />
                       </Button>
 
-                      {achievement.certificate_url && (
+                      {achievement.BadgeCheck_url && (
                         <a
-                          href={achievement.certificate_url}
+                          href={achievement.BadgeCheck_url}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
                           <Button
                             variant="ghost"
                             size="icon"
-                            title="View Certificate"
+                            title="View BadgeCheck"
                           >
                             <Award className="w-4 h-4" />
                           </Button>
