@@ -1119,3 +1119,392 @@ true
 );
 
 ---
+
+-- Enhanced Projects Database Schema
+-- Add this to your DBSCHEMA.md file
+
+-- Project Categories Table
+CREATE TABLE project_categories (
+id SERIAL PRIMARY KEY,
+name TEXT UNIQUE NOT NULL,
+slug TEXT UNIQUE NOT NULL,
+description TEXT,
+icon TEXT,
+color TEXT DEFAULT '#3b82f6',
+display_order INTEGER DEFAULT 0,
+is_active BOOLEAN DEFAULT true,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Technologies Table
+CREATE TABLE technologies (
+id SERIAL PRIMARY KEY,
+name TEXT UNIQUE NOT NULL,
+slug TEXT UNIQUE NOT NULL,
+description TEXT,
+icon TEXT,
+color TEXT DEFAULT '#3b82f6',
+category TEXT, -- 'frontend', 'backend', 'database', 'devops', 'mobile', 'design', 'other'
+official_url TEXT,
+is_active BOOLEAN DEFAULT true,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enhanced Projects Table
+DROP TABLE IF EXISTS projects CASCADE;
+CREATE TABLE projects (
+id SERIAL PRIMARY KEY,
+title TEXT NOT NULL,
+slug TEXT UNIQUE NOT NULL,
+subtitle TEXT,
+description TEXT,
+content JSONB,
+
+-- Media
+featured_image_url TEXT,
+hero_image_url TEXT,
+gallery_images JSONB, -- Array of image objects with URLs, captions, alt text
+video_url TEXT,
+demo_video_url TEXT,
+
+-- Links
+github_url TEXT,
+demo_url TEXT,
+case_study_url TEXT,
+documentation_url TEXT,
+api_docs_url TEXT,
+
+-- Project Details
+category_id INTEGER REFERENCES project_categories(id),
+project_type TEXT CHECK (project_type IN ('web-app', 'mobile-app', 'desktop-app', 'api', 'website', 'e-commerce', 'saas', 'game', 'other')),
+status TEXT CHECK (status IN ('planning', 'in-progress', 'completed', 'maintenance', 'archived')) DEFAULT 'completed',
+
+-- Timeline
+start_date DATE,
+end_date DATE,
+duration_months INTEGER,
+
+-- Team & Client
+client_name TEXT,
+client_url TEXT,
+team_size INTEGER,
+my_role TEXT,
+
+-- Technical Details
+platform TEXT, -- 'web', 'mobile', 'desktop', 'cross-platform'
+target_audience TEXT,
+key_features JSONB, -- Array of feature objects
+challenges_faced JSONB, -- Array of challenge objects
+solutions_implemented JSONB, -- Array of solution objects
+
+-- Results & Metrics
+results_achieved JSONB, -- Performance metrics, user growth, etc.
+user_feedback JSONB, -- Testimonials, ratings, reviews
+
+-- Development Info
+development_methodology TEXT, -- 'agile', 'waterfall', 'scrum', 'kanban'
+version_control TEXT DEFAULT 'git',
+deployment_platform TEXT,
+hosting_provider TEXT,
+
+-- SEO & Visibility
+featured BOOLEAN DEFAULT false,
+priority INTEGER DEFAULT 0,
+display_order INTEGER DEFAULT 0,
+is_public BOOLEAN DEFAULT true,
+is_active BOOLEAN DEFAULT true,
+
+-- Metadata
+view_count INTEGER DEFAULT 0,
+like_count INTEGER DEFAULT 0,
+share_count INTEGER DEFAULT 0,
+
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Project Technologies Junction Table
+CREATE TABLE project_technologies (
+id SERIAL PRIMARY KEY,
+project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+technology_id INTEGER REFERENCES technologies(id) ON DELETE CASCADE,
+category TEXT, -- 'frontend', 'backend', 'database', 'devops', 'design', 'other'
+proficiency_level TEXT CHECK (proficiency_level IN ('beginner', 'intermediate', 'advanced', 'expert')),
+is_primary BOOLEAN DEFAULT false,
+display_order INTEGER DEFAULT 0,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+UNIQUE(project_id, technology_id)
+);
+
+-- Project Views Tracking
+CREATE TABLE project_views (
+id SERIAL PRIMARY KEY,
+project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+view_date DATE NOT NULL DEFAULT CURRENT_DATE,
+view_count INTEGER NOT NULL DEFAULT 1,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+UNIQUE (project_id, view_date)
+);
+
+-- Enable RLS
+ALTER TABLE project_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE technologies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE project_technologies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE project_views ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+-- Public read access for active items
+CREATE POLICY "Active project categories are viewable by everyone"
+ON project_categories FOR SELECT USING (is_active = true);
+
+CREATE POLICY "Active technologies are viewable by everyone"
+ON technologies FOR SELECT USING (is_active = true);
+
+CREATE POLICY "Public projects are viewable by everyone"
+ON projects FOR SELECT USING (is_public = true AND is_active = true);
+
+CREATE POLICY "Project technologies are viewable by everyone"
+ON project_technologies FOR SELECT USING (
+EXISTS (
+SELECT 1 FROM projects p
+WHERE p.id = project_id AND p.is_public = true AND p.is_active = true
+)
+);
+
+-- Admin write access
+CREATE POLICY "Admin can manage project categories"
+ON project_categories FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+CREATE POLICY "Admin can manage technologies"
+ON technologies FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+CREATE POLICY "Admin can manage projects"
+ON projects FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+CREATE POLICY "Admin can manage project technologies"
+ON project_technologies FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+-- Insert Sample Data
+INSERT INTO project_categories (name, slug, description, icon, color, display_order) VALUES
+('Web Applications', 'web-applications', 'Full-stack web applications and platforms', 'Globe', '#3b82f6', 1),
+('Mobile Apps', 'mobile-apps', 'iOS and Android mobile applications', 'Smartphone', '#10b981', 2),
+('E-commerce', 'e-commerce', 'Online stores and marketplace solutions', 'ShoppingCart', '#f59e0b', 3),
+('SaaS Platforms', 'saas-platforms', 'Software as a Service solutions', 'Cloud', '#8b5cf6', 4),
+('APIs & Backend', 'apis-backend', 'RESTful APIs and backend services', 'Server', '#ef4444', 5),
+('Dashboard & Analytics', 'dashboard-analytics', 'Admin dashboards and data visualization', 'BarChart3', '#06b6d4', 6);
+
+INSERT INTO technologies (name, slug, description, icon, category, official_url, color) VALUES
+-- Frontend
+('React', 'react', 'A JavaScript library for building user interfaces', 'Code2', 'frontend', 'https://reactjs.org', '#61dafb'),
+('Next.js', 'nextjs', 'The React framework for production', 'Globe', 'frontend', 'https://nextjs.org', '#000000'),
+('TypeScript', 'typescript', 'Typed JavaScript at scale', 'FileCode', 'frontend', 'https://typescriptlang.org', '#3178c6'),
+('Tailwind CSS', 'tailwind-css', 'A utility-first CSS framework', 'Palette', 'frontend', 'https://tailwindcss.com', '#06b6d4'),
+('JavaScript', 'javascript', 'The programming language of the web', 'FileCode', 'frontend', 'https://developer.mozilla.org/en-US/docs/Web/JavaScript', '#f7df1e'),
+
+-- Backend
+('.NET Core', 'dotnet-core', 'Cross-platform .NET framework', 'Server', 'backend', 'https://dotnet.microsoft.com', '#512bd4'),
+('ASP.NET', 'aspnet', 'Web framework for .NET', 'Server', 'backend', 'https://dotnet.microsoft.com/en-us/apps/aspnet', '#512bd4'),
+('Node.js', 'nodejs', 'JavaScript runtime for server-side development', 'Server', 'backend', 'https://nodejs.org', '#339933'),
+('Express.js', 'expressjs', 'Web framework for Node.js', 'Server', 'backend', 'https://expressjs.com', '#000000'),
+
+-- Database
+('SQL Server', 'sql-server', 'Microsoft SQL Server database', 'Database', 'database', 'https://www.microsoft.com/en-us/sql-server', '#cc2927'),
+('PostgreSQL', 'postgresql', 'Advanced open source database', 'Database', 'database', 'https://postgresql.org', '#336791'),
+('Supabase', 'supabase', 'Open source Firebase alternative', 'Database', 'database', 'https://supabase.com', '#3ecf8e'),
+('MongoDB', 'mongodb', 'NoSQL document database', 'Database', 'database', 'https://mongodb.com', '#47a248'),
+
+-- DevOps
+('Docker', 'docker', 'Containerization platform', 'Boxes', 'devops', 'https://docker.com', '#2496ed'),
+('Azure DevOps', 'azure-devops', 'Microsoft DevOps platform', 'Settings', 'devops', 'https://dev.azure.com', '#0078d4'),
+('GitHub Actions', 'github-actions', 'CI/CD platform by GitHub', 'GitBranch', 'devops', 'https://github.com/features/actions', '#2088ff'),
+('Vercel', 'vercel', 'Deployment platform for frontend frameworks', 'Cloud', 'devops', 'https://vercel.com', '#000000'),
+
+-- Tools
+('Git', 'git', 'Distributed version control system', 'GitBranch', 'devops', 'https://git-scm.com', '#f05032'),
+('GitHub', 'github', 'Git repository hosting service', 'Github', 'devops', 'https://github.com', '#181717'),
+('Figma', 'figma', 'Collaborative design tool', 'Palette', 'design', 'https://figma.com', '#f24e1e'),
+('Postman', 'postman', 'API development platform', 'Network', 'devops', 'https://postman.com', '#ff6c37');
+
+-- Functions
+CREATE OR REPLACE FUNCTION increment_project_view(project_id_param INTEGER)
+RETURNS VOID AS $$
+BEGIN
+-- Update main projects table
+UPDATE projects
+SET view_count = view_count + 1, updated_at = NOW()
+WHERE id = project_id_param;
+
+-- Update/insert daily view count
+INSERT INTO project_views (project_id, view_date, view_count)
+VALUES (project_id_param, CURRENT_DATE, 1)
+ON CONFLICT (project_id, view_date)
+DO UPDATE SET view_count = project_views.view_count + 1;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_project_with_details(project_slug TEXT)
+RETURNS TABLE (
+  id INTEGER,
+  title TEXT,
+  slug TEXT,
+  subtitle TEXT,
+  description TEXT,
+  content JSONB,
+  featured_image_url TEXT,
+  hero_image_url TEXT,
+  gallery_images JSONB,
+  video_url TEXT,
+  demo_video_url TEXT,
+  github_url TEXT,
+  demo_url TEXT,
+  case_study_url TEXT,
+  documentation_url TEXT,
+  api_docs_url TEXT,
+  category_name TEXT,
+  category_slug TEXT,
+  category_color TEXT,
+  project_type TEXT,
+  status TEXT,
+  start_date DATE,
+  end_date DATE,
+  duration_months INTEGER,
+  client_name TEXT,
+  client_url TEXT,
+  team_size INTEGER,
+  my_role TEXT,
+  platform TEXT,
+  target_audience TEXT,
+  key_features JSONB,
+  challenges_faced JSONB,
+  solutions_implemented JSONB,
+  results_achieved JSONB,
+  user_feedback JSONB,
+  development_methodology TEXT,
+  version_control TEXT,
+  deployment_platform TEXT,
+  hosting_provider TEXT,
+  featured BOOLEAN,
+  priority INTEGER,
+  view_count INTEGER,
+  like_count INTEGER,
+  share_count INTEGER,
+  technologies JSONB,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+SELECT
+p.id,
+p.title,
+p.slug,
+p.subtitle,
+p.description,
+p.content,
+p.featured_image_url,
+p.hero_image_url,
+p.gallery_images,
+p.video_url,
+p.demo_video_url,
+p.github_url,
+p.demo_url,
+p.case_study_url,
+p.documentation_url,
+p.api_docs_url,
+pc.name as category_name,
+pc.slug as category_slug,
+pc.color as category_color,
+p.project_type,
+p.status,
+p.start_date,
+p.end_date,
+p.duration_months,
+p.client_name,
+p.client_url,
+p.team_size,
+p.my_role,
+p.platform,
+p.target_audience,
+p.key_features,
+p.challenges_faced,
+p.solutions_implemented,
+p.results_achieved,
+p.user_feedback,
+p.development_methodology,
+p.version_control,
+p.deployment_platform,
+p.hosting_provider,
+p.featured,
+p.priority,
+p.view_count,
+p.like_count,
+p.share_count,
+COALESCE(
+(
+SELECT jsonb_agg(
+jsonb_build_object(
+'id', t.id,
+'name', t.name,
+'slug', t.slug,
+'icon', t.icon,
+'color', t.color,
+'category', t.category,
+'official_url', t.official_url,
+'proficiency_level', pt.proficiency_level,
+'is_primary', pt.is_primary
+) ORDER BY pt.is_primary DESC, pt.display_order, t.name
+)
+FROM project_technologies pt
+JOIN technologies t ON pt.technology_id = t.id
+WHERE pt.project_id = p.id AND t.is_active = true
+),
+'[]'::jsonb
+) as technologies,
+p.created_at,
+p.updated_at
+FROM projects p
+LEFT JOIN project_categories pc ON p.category_id = pc.id
+WHERE p.slug = project_slug
+AND p.is_public = true
+AND p.is_active = true;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+----------
+$$

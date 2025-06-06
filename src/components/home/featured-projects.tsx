@@ -1,122 +1,819 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
-import { ArrowRight, ExternalLink, Github } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  Award,
+  Calendar,
+  ChevronDown,
+  Clock,
+  Code2,
+  ExternalLink,
+  Eye,
+  Filter,
+  Github,
+  Globe,
+  Heart,
+  Layers,
+  Monitor,
+  Play,
+  Search,
+  Server,
+  Smartphone,
+  Star,
+  Target,
+  Users,
+  X,
+} from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import { useMemo, useState } from "react";
 
-// Define the Project interface directly
+// Enhanced interfaces (same as featured projects)
+interface Technology {
+  id: number;
+  name: string;
+  slug: string;
+  icon?: string;
+  color?: string;
+  category: string;
+  official_url?: string;
+  proficiency_level?: string;
+  is_primary: boolean;
+}
+
+interface ProjectCategory {
+  id: number;
+  name: string;
+  slug: string;
+  color?: string;
+  icon?: string;
+}
+
 interface Project {
   id: number;
   title: string;
   slug: string;
+  subtitle?: string;
   description?: string;
-  content?: any;
-  image_url?: string;
+  featured_image_url?: string;
+  hero_image_url?: string;
+  gallery_images?: Array<{
+    url: string;
+    caption?: string;
+    alt?: string;
+  }>;
+  video_url?: string;
+  demo_video_url?: string;
   github_url?: string;
   demo_url?: string;
+  case_study_url?: string;
+  documentation_url?: string;
+  category?: ProjectCategory;
+  project_type?: string;
+  status?: string;
+  start_date?: string;
+  end_date?: string;
+  duration_months?: number;
+  client_name?: string;
+  team_size?: number;
+  my_role?: string;
+  platform?: string;
+  key_features?: Array<{
+    title: string;
+    description: string;
+    icon?: string;
+  }>;
+  results_achieved?: Array<{
+    metric: string;
+    value: string;
+    description?: string;
+  }>;
+  technologies?: Technology[];
   featured: boolean;
+  priority: number;
+  view_count: number;
+  like_count: number;
+  share_count: number;
   created_at: string;
   updated_at?: string;
 }
 
-interface FeaturedProjectsProps {
+interface EnhancedProjectsPageProps {
   projects: Project[];
+  categories: ProjectCategory[];
 }
 
-export default function FeaturedProjects({ projects }: FeaturedProjectsProps) {
+const getPlatformIcon = (platform?: string, className = "w-4 h-4") => {
+  const iconProps = { className: cn(className, "text-muted-foreground") };
+
+  switch (platform?.toLowerCase()) {
+    case "web":
+      return <Globe {...iconProps} />;
+    case "mobile":
+      return <Smartphone {...iconProps} />;
+    case "desktop":
+      return <Monitor {...iconProps} />;
+    case "cross-platform":
+      return <Server {...iconProps} />;
+    default:
+      return <Globe {...iconProps} />;
+  }
+};
+
+const getStatusColor = (status?: string) => {
+  switch (status) {
+    case "completed":
+      return "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400";
+    case "in-progress":
+      return "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400";
+    case "maintenance":
+      return "bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400";
+    case "planning":
+      return "bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400";
+    default:
+      return "bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400";
+  }
+};
+
+const getProjectTypeIcon = (type?: string) => {
+  const iconProps = { size: 16, className: "text-muted-foreground" };
+
+  switch (type) {
+    case "web-app":
+      return <Globe {...iconProps} />;
+    case "mobile-app":
+      return <Smartphone {...iconProps} />;
+    case "desktop-app":
+      return <Monitor {...iconProps} />;
+    case "api":
+      return <Server {...iconProps} />;
+    case "e-commerce":
+      return <Star {...iconProps} />;
+    case "saas":
+      return <Layers {...iconProps} />;
+    default:
+      return <Code2 {...iconProps} />;
+  }
+};
+
+export default function EnhancedProjectsPage({
+  projects,
+  categories,
+}: EnhancedProjectsPageProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<
+    "newest" | "oldest" | "popular" | "featured"
+  >("newest");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Get unique platforms and statuses for filters
+  const uniquePlatforms = useMemo(() => {
+    const platforms = projects.map((p) => p.platform).filter(Boolean);
+    return [...new Set(platforms)];
+  }, [projects]);
+
+  const uniqueStatuses = useMemo(() => {
+    const statuses = projects.map((p) => p.status).filter(Boolean);
+    return [...new Set(statuses)];
+  }, [projects]);
+
+  // Filter and sort projects
+  const filteredAndSortedProjects = useMemo(() => {
+    let filtered = projects.filter((project) => {
+      const matchesSearch =
+        !searchQuery ||
+        project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        project.description
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        project.technologies?.some((tech) =>
+          tech.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+      const matchesCategory =
+        !selectedCategory || project.category?.slug === selectedCategory;
+
+      const matchesPlatform =
+        !selectedPlatform || project.platform === selectedPlatform;
+
+      const matchesStatus =
+        !selectedStatus || project.status === selectedStatus;
+
+      return (
+        matchesSearch && matchesCategory && matchesPlatform && matchesStatus
+      );
+    });
+
+    // Sort projects
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "newest":
+          return (
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+        case "oldest":
+          return (
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+        case "popular":
+          return b.view_count + b.like_count - (a.view_count + a.like_count);
+        case "featured":
+          if (a.featured && !b.featured) return -1;
+          if (!a.featured && b.featured) return 1;
+          return b.priority - a.priority;
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [
+    projects,
+    searchQuery,
+    selectedCategory,
+    selectedPlatform,
+    selectedStatus,
+    sortBy,
+  ]);
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSelectedCategory(null);
+    setSelectedPlatform(null);
+    setSelectedStatus(null);
+  };
+
+  const hasActiveFilters =
+    searchQuery || selectedCategory || selectedPlatform || selectedStatus;
+
   return (
-    <section className="py-20 bg-background">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl font-bold mb-4">Featured Projects</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Here are some of my recent projects. These demonstrate my skills and
-            expertise in different technologies and domains.
-          </p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-accent/30 to-background">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 right-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-20 left-20 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-500/5 rounded-full blur-2xl animate-pulse delay-500"></div>
+      </div>
 
-        <div className="space-y-24">
-          {projects.map((project, index) => (
-            <motion.div
-              key={project.id}
-              initial={{ opacity: 0, y: 50 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              className={cn(
-                "flex flex-col md:flex-row gap-8 items-center",
-                index % 2 !== 0 && "md:flex-row-reverse"
-              )}
-            >
-              <div className="flex-1 relative rounded-lg overflow-hidden aspect-video shadow-xl">
-                {project.image_url ? (
-                  <Image
-                    src={project.image_url}
-                    alt={project.title}
-                    fill
-                    className="object-cover"
+      <div className="relative z-10">
+        <div className="container mx-auto px-4 py-16 md:py-24">
+          {/* Header */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-16"
+          >
+            <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-primary via-purple-600 to-blue-600 bg-clip-text text-transparent">
+              My Projects
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+              Explore my portfolio of {projects.length} projects spanning
+              various technologies and industries. From web applications to
+              mobile solutions, each project represents innovation and technical
+              excellence.
+            </p>
+          </motion.div>
+
+          {/* Search and Filters */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="mb-12"
+          >
+            <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-white/10 p-6 shadow-xl">
+              {/* Search Bar */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Search projects by name, description, or technology..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-background/50"
+                />
+              </div>
+
+              {/* Filter Toggle */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="gap-2"
+                >
+                  <Filter className="w-4 h-4" />
+                  Filters
+                  <ChevronDown
+                    className={cn(
+                      "w-4 h-4 transition-transform",
+                      showFilters && "rotate-180"
+                    )}
                   />
-                ) : (
-                  <div className="w-full h-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-muted-foreground">
-                      No image available
-                    </span>
+                </Button>
+
+                <div className="flex flex-wrap gap-2 items-center">
+                  {/* Sort Dropdown */}
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    className="px-3 py-2 bg-background border border-border rounded-md text-sm"
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="popular">Most Popular</option>
+                    <option value="featured">Featured First</option>
+                  </select>
+
+                  {/* View Mode Toggle */}
+                  <div className="flex border border-border rounded-md overflow-hidden">
+                    <button
+                      onClick={() => setViewMode("grid")}
+                      className={cn(
+                        "px-3 py-2 text-sm transition-colors",
+                        viewMode === "grid"
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-accent"
+                      )}
+                    >
+                      Grid
+                    </button>
+                    <button
+                      onClick={() => setViewMode("list")}
+                      className={cn(
+                        "px-3 py-2 text-sm transition-colors",
+                        viewMode === "list"
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-accent"
+                      )}
+                    >
+                      List
+                    </button>
                   </div>
+                </div>
+              </div>
+
+              {/* Advanced Filters */}
+              <AnimatePresence>
+                {showFilters && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-border/50 mt-4">
+                      {/* Category Filter */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Category
+                        </label>
+                        <select
+                          value={selectedCategory || ""}
+                          onChange={(e) =>
+                            setSelectedCategory(e.target.value || null)
+                          }
+                          className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm"
+                        >
+                          <option value="">All Categories</option>
+                          {categories.map((category) => (
+                            <option key={category.id} value={category.slug}>
+                              {category.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Platform Filter */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Platform
+                        </label>
+                        <select
+                          value={selectedPlatform || ""}
+                          onChange={(e) =>
+                            setSelectedPlatform(e.target.value || null)
+                          }
+                          className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm"
+                        >
+                          <option value="">All Platforms</option>
+                          {uniquePlatforms.map((platform) => (
+                            <option key={platform} value={platform}>
+                              {platform?.charAt(0).toUpperCase() +
+                                platform?.slice(1)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Status Filter */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Status
+                        </label>
+                        <select
+                          value={selectedStatus || ""}
+                          onChange={(e) =>
+                            setSelectedStatus(e.target.value || null)
+                          }
+                          className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm"
+                        >
+                          <option value="">All Statuses</option>
+                          {uniqueStatuses.map((status) => (
+                            <option key={status} value={status}>
+                              {status?.charAt(0).toUpperCase() +
+                                status?.slice(1)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {hasActiveFilters && (
+                      <div className="flex justify-between items-center pt-4">
+                        <div className="flex flex-wrap gap-2">
+                          {searchQuery && (
+                            <Badge variant="secondary" className="gap-1">
+                              Search: {searchQuery}
+                              <X
+                                className="w-3 h-3 cursor-pointer"
+                                onClick={() => setSearchQuery("")}
+                              />
+                            </Badge>
+                          )}
+                          {selectedCategory && (
+                            <Badge variant="secondary" className="gap-1">
+                              Category:{" "}
+                              {
+                                categories.find(
+                                  (c) => c.slug === selectedCategory
+                                )?.name
+                              }
+                              <X
+                                className="w-3 h-3 cursor-pointer"
+                                onClick={() => setSelectedCategory(null)}
+                              />
+                            </Badge>
+                          )}
+                          {selectedPlatform && (
+                            <Badge variant="secondary" className="gap-1">
+                              Platform: {selectedPlatform}
+                              <X
+                                className="w-3 h-3 cursor-pointer"
+                                onClick={() => setSelectedPlatform(null)}
+                              />
+                            </Badge>
+                          )}
+                          {selectedStatus && (
+                            <Badge variant="secondary" className="gap-1">
+                              Status: {selectedStatus}
+                              <X
+                                className="w-3 h-3 cursor-pointer"
+                                onClick={() => setSelectedStatus(null)}
+                              />
+                            </Badge>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={clearFilters}
+                          className="gap-1"
+                        >
+                          <X className="w-3 h-3" />
+                          Clear All
+                        </Button>
+                      </div>
+                    )}
+                  </motion.div>
                 )}
-              </div>
+              </AnimatePresence>
+            </div>
+          </motion.div>
 
-              <div className="flex-1 md:max-w-md">
-                <h3 className="text-2xl font-bold mb-4">{project.title}</h3>
-                <p className="text-muted-foreground mb-6">
-                  {project.description}
+          {/* Results Count */}
+          <div className="mb-8 text-center">
+            <p className="text-muted-foreground">
+              Showing {filteredAndSortedProjects.length} of {projects.length}{" "}
+              projects
+            </p>
+          </div>
+
+          {/* Projects Grid/List */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            {filteredAndSortedProjects.length === 0 ? (
+              <div className="text-center py-20">
+                <Target className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold mb-2">
+                  No projects found
+                </h3>
+                <p className="text-muted-foreground mb-4">
+                  Try adjusting your search criteria or filters.
                 </p>
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {/* Project tags would go here */}
-                </div>
-                <div className="flex flex-wrap gap-4">
-                  {project.demo_url && (
-                    <a
-                      href={project.demo_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Button size="sm" className="gap-2">
-                        <ExternalLink size={16} />
-                        Live Demo
-                      </Button>
-                    </a>
-                  )}
-
-                  {project.github_url && (
-                    <a
-                      href={project.github_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Button size="sm" variant="outline" className="gap-2">
-                        <Github size={16} />
-                        Source Code
-                      </Button>
-                    </a>
-                  )}
-                </div>
+                <Button onClick={clearFilters} variant="outline">
+                  Clear Filters
+                </Button>
               </div>
-            </motion.div>
-          ))}
-        </div>
+            ) : (
+              <div
+                className={cn(
+                  "grid gap-8",
+                  viewMode === "grid"
+                    ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+                    : "grid-cols-1"
+                )}
+              >
+                {filteredAndSortedProjects.map((project, index) => (
+                  <motion.div
+                    key={project.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                    className={cn(
+                      "group bg-card/50 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2",
+                      viewMode === "list" && "flex flex-col md:flex-row"
+                    )}
+                  >
+                    {/* Project Image */}
+                    <div
+                      className={cn(
+                        "relative overflow-hidden",
+                        viewMode === "grid"
+                          ? "aspect-video"
+                          : "md:w-80 aspect-video md:aspect-square"
+                      )}
+                    >
+                      {project.featured_image_url || project.hero_image_url ? (
+                        <Image
+                          src={
+                            project.featured_image_url ||
+                            project.hero_image_url ||
+                            ""
+                          }
+                          alt={project.title}
+                          fill
+                          className="object-cover transition-transform duration-700 group-hover:scale-110"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
+                          {getProjectTypeIcon(project.project_type)}
+                        </div>
+                      )}
 
-        <div className="text-center mt-16">
-          <Link href="/projects">
-            <Button className="gap-2">
-              View All Projects
-              <ArrowRight size={16} />
-            </Button>
-          </Link>
+                      {/* Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                      {/* Quick Action Buttons */}
+                      <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        {project.demo_url && (
+                          <a
+                            href={project.demo_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button
+                              size="sm"
+                              className="bg-white/20 backdrop-blur-sm hover:bg-white/30 border border-white/30"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </Button>
+                          </a>
+                        )}
+                        {project.github_url && (
+                          <a
+                            href={project.github_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="bg-white/20 backdrop-blur-sm hover:bg-white/30 border border-white/30"
+                            >
+                              <Github className="w-4 h-4" />
+                            </Button>
+                          </a>
+                        )}
+                        {project.demo_video_url && (
+                          <a
+                            href={project.demo_video_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="bg-white/20 backdrop-blur-sm hover:bg-white/30 border border-white/30"
+                            >
+                              <Play className="w-4 h-4" />
+                            </Button>
+                          </a>
+                        )}
+                      </div>
+
+                      {/* Badges */}
+                      <div className="absolute top-4 left-4 flex flex-col gap-2">
+                        {project.featured && (
+                          <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0">
+                            <Star className="w-3 h-3 mr-1" />
+                            Featured
+                          </Badge>
+                        )}
+                        {project.status && (
+                          <Badge className={getStatusColor(project.status)}>
+                            {project.status.charAt(0).toUpperCase() +
+                              project.status.slice(1)}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Stats */}
+                      <div className="absolute bottom-4 right-4 flex gap-2">
+                        <div className="bg-black/40 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
+                          <Eye className="w-3 h-3 text-white" />
+                          <span className="text-white text-xs">
+                            {project.view_count || 0}
+                          </span>
+                        </div>
+                        {project.like_count > 0 && (
+                          <div className="bg-black/40 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
+                            <Heart className="w-3 h-3 text-red-400" />
+                            <span className="text-white text-xs">
+                              {project.like_count}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Project Details */}
+                    <div className="p-6 flex-1">
+                      {/* Category and Platform */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          {project.category && (
+                            <Badge
+                              variant="outline"
+                              style={{ borderColor: project.category.color }}
+                            >
+                              {project.category.name}
+                            </Badge>
+                          )}
+                          <div className="flex items-center gap-1">
+                            {getPlatformIcon(project.platform)}
+                            <span className="text-xs text-muted-foreground capitalize">
+                              {project.platform || "Web"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {project.start_date && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(project.start_date).getFullYear()}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Title and Subtitle */}
+                      <div className="mb-4">
+                        <h3 className="text-xl font-bold mb-1 group-hover:text-primary transition-colors">
+                          {project.title}
+                        </h3>
+                        {project.subtitle && (
+                          <p className="text-sm text-muted-foreground font-medium">
+                            {project.subtitle}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Description */}
+                      <p className="text-muted-foreground text-sm mb-4 line-clamp-3">
+                        {project.description}
+                      </p>
+
+                      {/* Technologies */}
+                      {project.technologies &&
+                        project.technologies.length > 0 && (
+                          <div className="mb-4">
+                            <div className="flex flex-wrap gap-1">
+                              {project.technologies
+                                .filter((tech) => tech.is_primary)
+                                .slice(0, 4)
+                                .map((tech) => (
+                                  <Badge
+                                    key={tech.id}
+                                    variant="outline"
+                                    className="text-xs"
+                                    style={{ borderColor: tech.color }}
+                                  >
+                                    {tech.name}
+                                  </Badge>
+                                ))}
+                              {project.technologies.filter(
+                                (tech) => tech.is_primary
+                              ).length > 4 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +
+                                  {project.technologies.filter(
+                                    (tech) => tech.is_primary
+                                  ).length - 4}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                      {/* Metrics */}
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
+                        {project.duration_months && (
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            <span>{project.duration_months}mo</span>
+                          </div>
+                        )}
+                        {project.team_size && (
+                          <div className="flex items-center gap-1">
+                            <Users className="w-3 h-3" />
+                            <span>{project.team_size}</span>
+                          </div>
+                        )}
+                        {project.client_name && (
+                          <div className="flex items-center gap-1">
+                            <Award className="w-3 h-3" />
+                            <span>Client Project</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap gap-2">
+                        {project.demo_url && (
+                          <a
+                            href={project.demo_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button size="sm" className="gap-1">
+                              <ExternalLink className="w-3 h-3" />
+                              Demo
+                            </Button>
+                          </a>
+                        )}
+                        {project.github_url && (
+                          <a
+                            href={project.github_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1"
+                            >
+                              <Github className="w-3 h-3" />
+                              Code
+                            </Button>
+                          </a>
+                        )}
+                        {project.case_study_url && (
+                          <a
+                            href={project.case_study_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1"
+                            >
+                              <Star className="w-3 h-3" />
+                              Case Study
+                            </Button>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+
+          {/* Load More or Pagination can be added here */}
         </div>
       </div>
-    </section>
+    </div>
   );
 }
