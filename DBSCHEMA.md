@@ -774,3 +774,348 @@ LANGUAGE plpgsql;
 
 ------
 $$
+
+-- Contact Information Table
+CREATE TABLE contact_info (
+id SERIAL PRIMARY KEY,
+type TEXT NOT NULL, -- 'email', 'phone', 'address', 'social', 'website'
+label TEXT NOT NULL, -- 'Email', 'Phone', 'WhatsApp', 'Office Address', etc.
+value TEXT NOT NULL, -- actual value
+icon TEXT, -- lucide icon name
+is_primary BOOLEAN DEFAULT FALSE,
+is_whatsapp BOOLEAN DEFAULT FALSE, -- for phone numbers
+display_order INTEGER DEFAULT 0,
+is_active BOOLEAN DEFAULT TRUE,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Business Hours Table
+CREATE TABLE business_hours (
+id SERIAL PRIMARY KEY,
+day_of_week INTEGER NOT NULL, -- 0 = Sunday, 1 = Monday, etc.
+day_name TEXT NOT NULL,
+is_open BOOLEAN DEFAULT TRUE,
+open_time TIME,
+close_time TIME,
+timezone TEXT DEFAULT 'GMT+6',
+is_active BOOLEAN DEFAULT TRUE,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Availability Status Table
+CREATE TABLE availability_status (
+id SERIAL PRIMARY KEY,
+status TEXT NOT NULL, -- 'available', 'busy', 'unavailable'
+title TEXT NOT NULL,
+description TEXT,
+response_time TEXT, -- '24 hours', 'Same day', etc.
+is_current BOOLEAN DEFAULT FALSE,
+color_class TEXT DEFAULT 'bg-green-500', -- for status indicator
+is_active BOOLEAN DEFAULT TRUE,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE contact_info ENABLE ROW LEVEL SECURITY;
+ALTER TABLE business_hours ENABLE ROW LEVEL SECURITY;
+ALTER TABLE availability_status ENABLE ROW LEVEL SECURITY;
+
+-- Public can read contact info
+CREATE POLICY "Contact info is viewable by everyone"
+ON contact_info FOR SELECT USING (is_active = true);
+
+CREATE POLICY "Business hours are viewable by everyone"
+ON business_hours FOR SELECT USING (is_active = true);
+
+CREATE POLICY "Availability status is viewable by everyone"
+ON availability_status FOR SELECT USING (is_active = true);
+
+-- Admin can manage all
+CREATE POLICY "Admin can manage contact info"
+ON contact_info FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+CREATE POLICY "Admin can manage business hours"
+ON business_hours FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+CREATE POLICY "Admin can manage availability status"
+ON availability_status FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+-- Insert initial data
+INSERT INTO contact_info (type, label, value, icon, is_primary, is_whatsapp, display_order) VALUES
+('email', 'Email', 'raihan.raju@gmail.com', 'Mail', true, false, 1),
+('phone', 'Phone', '+8801722102046', 'Phone', true, false, 2),
+('phone', 'WhatsApp', '+8801722102046', 'MessageCircle', false, true, 3),
+('address', 'Location', 'Dhaka, Bangladesh', 'MapPin', false, false, 4);
+
+INSERT INTO business_hours (day_of_week, day_name, is_open, open_time, close_time) VALUES
+(1, 'Monday', true, '09:00', '18:00'),
+(2, 'Tuesday', true, '09:00', '18:00'),
+(3, 'Wednesday', true, '09:00', '18:00'),
+(4, 'Thursday', true, '09:00', '18:00'),
+(5, 'Friday', true, '09:00', '18:00'),
+(6, 'Saturday', true, '10:00', '16:00'),
+(0, 'Sunday', false, null, null);
+
+INSERT INTO availability_status (status, title, description, response_time, is_current, color_class) VALUES
+('available', 'Available for Projects', 'Currently accepting new freelance projects and collaborations.', 'Within 24 hours', true, 'bg-green-500'),
+('busy', 'Partially Available', 'Currently working on projects but open to discuss new opportunities.', 'Within 48 hours', false, 'bg-yellow-500'),
+('unavailable', 'Fully Booked', 'Not accepting new projects at the moment.', 'Will respond when available', false, 'bg-red-500');
+
+-- Update contact_messages table to include phone field if not exists
+ALTER TABLE contact_messages ADD COLUMN IF NOT EXISTS phone TEXT;
+
+---
+
+-- Add these tables to your existing DBSCHEMA.md file
+
+-- About Settings Table
+CREATE TABLE about_settings (
+id SERIAL PRIMARY KEY,
+title TEXT NOT NULL DEFAULT 'About Me',
+subtitle TEXT,
+description TEXT,
+profile_image_url TEXT,
+resume_url TEXT,
+years_experience INTEGER,
+location TEXT,
+email TEXT,
+phone TEXT,
+website TEXT,
+linkedin_url TEXT,
+github_url TEXT,
+skills_summary TEXT,
+is_active BOOLEAN DEFAULT true,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Experience Table  
+CREATE TABLE experience (
+id SERIAL PRIMARY KEY,
+company TEXT NOT NULL,
+position TEXT NOT NULL,
+location TEXT,
+start_date DATE NOT NULL,
+end_date DATE,
+is_current BOOLEAN DEFAULT false,
+description TEXT,
+technologies JSONB,
+company_logo_url TEXT,
+company_url TEXT,
+employment_type TEXT CHECK (employment_type IN ('full-time', 'part-time', 'contract', 'freelance', 'internship')),
+display_order INTEGER DEFAULT 0,
+is_active BOOLEAN DEFAULT true,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Education Table
+CREATE TABLE education (
+id SERIAL PRIMARY KEY,
+institution TEXT NOT NULL,
+degree TEXT NOT NULL,
+field_of_study TEXT,
+start_date DATE NOT NULL,
+end_date DATE,
+is_current BOOLEAN DEFAULT false,
+description TEXT,
+grade_gpa TEXT,
+institution_logo_url TEXT,
+institution_url TEXT,
+degree_type TEXT CHECK (degree_type IN ('bachelor', 'master', 'phd', 'diploma', 'certificate', 'other')),
+display_order INTEGER DEFAULT 0,
+is_active BOOLEAN DEFAULT true,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Courses Table
+CREATE TABLE courses (
+id SERIAL PRIMARY KEY,
+title TEXT NOT NULL,
+provider TEXT NOT NULL,
+description TEXT,
+completion_date DATE,
+certificate_url TEXT,
+course_url TEXT,
+duration TEXT,
+skills_learned JSONB,
+instructor TEXT,
+platform TEXT,
+rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+display_order INTEGER DEFAULT 0,
+is_active BOOLEAN DEFAULT true,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Workshops Table
+CREATE TABLE workshops (
+id SERIAL PRIMARY KEY,
+title TEXT NOT NULL,
+organizer TEXT NOT NULL,
+description TEXT,
+event_date DATE,
+location TEXT,
+event_type TEXT CHECK (event_type IN ('attended', 'conducted', 'participated', 'organized')),
+certificate_url TEXT,
+event_url TEXT,
+skills_gained JSONB,
+duration TEXT,
+attendees_count INTEGER,
+display_order INTEGER DEFAULT 0,
+is_active BOOLEAN DEFAULT true,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Achievements Table
+CREATE TABLE achievements (
+id SERIAL PRIMARY KEY,
+title TEXT NOT NULL,
+description TEXT,
+achievement_date DATE,
+organization TEXT,
+certificate_url TEXT,
+achievement_url TEXT,
+achievement_type TEXT CHECK (achievement_type IN ('award', 'certification', 'recognition', 'publication', 'other')),
+display_order INTEGER DEFAULT 0,
+is_active BOOLEAN DEFAULT true,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS on all new tables
+ALTER TABLE about_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE experience ENABLE ROW LEVEL SECURITY;
+ALTER TABLE education ENABLE ROW LEVEL SECURITY;
+ALTER TABLE courses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workshops ENABLE ROW LEVEL SECURITY;
+ALTER TABLE achievements ENABLE ROW LEVEL SECURITY;
+
+-- About settings: Public read, admin write
+CREATE POLICY "About settings are viewable by everyone"
+ON about_settings FOR SELECT USING (is_active = true);
+
+CREATE POLICY "Admin can manage about settings"
+ON about_settings FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+-- Experience: Public read active entries, admin write
+CREATE POLICY "Active experience are viewable by everyone"
+ON experience FOR SELECT USING (is_active = true);
+
+CREATE POLICY "Admin can manage experience"
+ON experience FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+-- Education: Public read active entries, admin write
+CREATE POLICY "Active education are viewable by everyone"
+ON education FOR SELECT USING (is_active = true);
+
+CREATE POLICY "Admin can manage education"
+ON education FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+-- Courses: Public read active entries, admin write
+CREATE POLICY "Active courses are viewable by everyone"
+ON courses FOR SELECT USING (is_active = true);
+
+CREATE POLICY "Admin can manage courses"
+ON courses FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+-- Workshops: Public read active entries, admin write
+CREATE POLICY "Active workshops are viewable by everyone"
+ON workshops FOR SELECT USING (is_active = true);
+
+CREATE POLICY "Admin can manage workshops"
+ON workshops FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+-- Achievements: Public read active entries, admin write
+CREATE POLICY "Active achievements are viewable by everyone"
+ON achievements FOR SELECT USING (is_active = true);
+
+CREATE POLICY "Admin can manage achievements"
+ON achievements FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+-- Insert default about settings
+INSERT INTO about_settings (
+title,
+subtitle,
+description,
+years_experience,
+location,
+is_active
+) VALUES (
+'About Me',
+'Full Stack Developer',
+'Passionate developer with expertise in modern web technologies.',
+6,
+'Chittagong, Bangladesh',
+true
+);
+
+---

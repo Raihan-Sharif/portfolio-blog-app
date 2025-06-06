@@ -16,6 +16,7 @@ import {
   Briefcase,
   FileText,
   Home,
+  Info,
   LogOut,
   Mail,
   Menu,
@@ -197,6 +198,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: <Phone size={18} />,
     },
     { name: "Messages", href: "/admin/contact", icon: <Mail size={18} /> },
+    { name: "About Page", href: "/admin/about", icon: <Info size={18} /> },
     { name: "Settings", href: "/admin/settings", icon: <Settings size={18} /> },
   ];
 
