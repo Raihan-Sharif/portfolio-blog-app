@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -29,9 +30,11 @@ import {
   X,
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
-// Enhanced interfaces (same as featured projects)
+// Enhanced interfaces
 interface Technology {
   id: number;
   name: string;
@@ -104,6 +107,11 @@ interface Project {
 interface EnhancedProjectsPageProps {
   projects: Project[];
   categories: ProjectCategory[];
+  showFilters?: boolean;
+  maxProjects?: number;
+  showViewAll?: boolean;
+  title?: string;
+  subtitle?: string;
 }
 
 const getPlatformIcon = (platform?: string, className = "w-4 h-4") => {
@@ -159,10 +167,16 @@ const getProjectTypeIcon = (type?: string) => {
   }
 };
 
-export default function EnhancedProjectsPage({
+export default function EnhancedFeaturedProjects({
   projects,
   categories,
+  showFilters = true,
+  maxProjects,
+  showViewAll = true,
+  title = "My Projects",
+  subtitle,
 }: EnhancedProjectsPageProps) {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
@@ -171,7 +185,7 @@ export default function EnhancedProjectsPage({
     "newest" | "oldest" | "popular" | "featured"
   >("newest");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFiltersPanel, setShowFiltersPanel] = useState(false);
 
   // Get unique platforms and statuses for filters
   const uniquePlatforms = useMemo(() => {
@@ -183,6 +197,23 @@ export default function EnhancedProjectsPage({
     const statuses = projects.map((p) => p.status).filter(Boolean);
     return [...new Set(statuses)];
   }, [projects]);
+
+  // Handle project click with view tracking
+  const handleProjectClick = async (project: Project) => {
+    try {
+      // Increment view count in database
+      await supabase.rpc("increment_project_view", {
+        project_id_param: project.id,
+      });
+
+      // Navigate to project detail page
+      router.push(`/projects/${project.slug}`);
+    } catch (error) {
+      console.error("Error tracking project view:", error);
+      // Still navigate even if tracking fails
+      router.push(`/projects/${project.slug}`);
+    }
+  };
 
   // Filter and sort projects
   const filteredAndSortedProjects = useMemo(() => {
@@ -233,6 +264,11 @@ export default function EnhancedProjectsPage({
       }
     });
 
+    // Limit projects if maxProjects is specified
+    if (maxProjects) {
+      filtered = filtered.slice(0, maxProjects);
+    }
+
     return filtered;
   }, [
     projects,
@@ -241,6 +277,7 @@ export default function EnhancedProjectsPage({
     selectedPlatform,
     selectedStatus,
     sortBy,
+    maxProjects,
   ]);
 
   const clearFilters = () => {
@@ -271,240 +308,242 @@ export default function EnhancedProjectsPage({
             transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-primary via-purple-600 to-blue-600 bg-clip-text text-transparent">
-              My Projects
-            </h1>
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-primary via-purple-600 to-blue-600 bg-clip-text text-transparent">
+              {title}
+            </h2>
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-              Explore my portfolio of {projects.length} projects spanning
-              various technologies and industries. From web applications to
-              mobile solutions, each project represents innovation and technical
-              excellence.
+              {subtitle ||
+                `Explore my portfolio of ${projects.length} projects spanning various technologies and industries. From web applications to mobile solutions, each project represents innovation and technical excellence.`}
             </p>
           </motion.div>
 
-          {/* Search and Filters */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="mb-12"
-          >
-            <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-white/10 p-6 shadow-xl">
-              {/* Search Bar */}
-              <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input
-                  placeholder="Search projects by name, description, or technology..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-background/50"
-                />
-              </div>
-
-              {/* Filter Toggle */}
-              <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="gap-2"
-                >
-                  <Filter className="w-4 h-4" />
-                  Filters
-                  <ChevronDown
-                    className={cn(
-                      "w-4 h-4 transition-transform",
-                      showFilters && "rotate-180"
-                    )}
+          {/* Search and Filters - Only show if showFilters is true */}
+          {showFilters && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="mb-12"
+            >
+              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-white/10 p-6 shadow-xl">
+                {/* Search Bar */}
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Search projects by name, description, or technology..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 bg-background/50"
                   />
-                </Button>
+                </div>
 
-                <div className="flex flex-wrap gap-2 items-center">
-                  {/* Sort Dropdown */}
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
-                    className="px-3 py-2 bg-background border border-border rounded-md text-sm"
+                {/* Filter Toggle */}
+                <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowFiltersPanel(!showFiltersPanel)}
+                    className="gap-2"
                   >
-                    <option value="newest">Newest First</option>
-                    <option value="oldest">Oldest First</option>
-                    <option value="popular">Most Popular</option>
-                    <option value="featured">Featured First</option>
-                  </select>
+                    <Filter className="w-4 h-4" />
+                    Filters
+                    <ChevronDown
+                      className={cn(
+                        "w-4 h-4 transition-transform",
+                        showFiltersPanel && "rotate-180"
+                      )}
+                    />
+                  </Button>
 
-                  {/* View Mode Toggle */}
-                  <div className="flex border border-border rounded-md overflow-hidden">
-                    <button
-                      onClick={() => setViewMode("grid")}
-                      className={cn(
-                        "px-3 py-2 text-sm transition-colors",
-                        viewMode === "grid"
-                          ? "bg-primary text-primary-foreground"
-                          : "hover:bg-accent"
-                      )}
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {/* Sort Dropdown */}
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as any)}
+                      className="px-3 py-2 bg-background border border-border rounded-md text-sm"
                     >
-                      Grid
-                    </button>
-                    <button
-                      onClick={() => setViewMode("list")}
-                      className={cn(
-                        "px-3 py-2 text-sm transition-colors",
-                        viewMode === "list"
-                          ? "bg-primary text-primary-foreground"
-                          : "hover:bg-accent"
-                      )}
-                    >
-                      List
-                    </button>
+                      <option value="newest">Newest First</option>
+                      <option value="oldest">Oldest First</option>
+                      <option value="popular">Most Popular</option>
+                      <option value="featured">Featured First</option>
+                    </select>
+
+                    {/* View Mode Toggle */}
+                    <div className="flex border border-border rounded-md overflow-hidden">
+                      <button
+                        onClick={() => setViewMode("grid")}
+                        className={cn(
+                          "px-3 py-2 text-sm transition-colors",
+                          viewMode === "grid"
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-accent"
+                        )}
+                      >
+                        Grid
+                      </button>
+                      <button
+                        onClick={() => setViewMode("list")}
+                        className={cn(
+                          "px-3 py-2 text-sm transition-colors",
+                          viewMode === "list"
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-accent"
+                        )}
+                      >
+                        List
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Advanced Filters */}
-              <AnimatePresence>
-                {showFilters && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-border/50 mt-4">
-                      {/* Category Filter */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Category
-                        </label>
-                        <select
-                          value={selectedCategory || ""}
-                          onChange={(e) =>
-                            setSelectedCategory(e.target.value || null)
-                          }
-                          className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm"
-                        >
-                          <option value="">All Categories</option>
-                          {categories.map((category) => (
-                            <option key={category.id} value={category.slug}>
-                              {category.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Platform Filter */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Platform
-                        </label>
-                        <select
-                          value={selectedPlatform || ""}
-                          onChange={(e) =>
-                            setSelectedPlatform(e.target.value || null)
-                          }
-                          className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm"
-                        >
-                          <option value="">All Platforms</option>
-                          {uniquePlatforms.map((platform) => (
-                            <option key={platform} value={platform}>
-                              {platform?.charAt(0).toUpperCase() +
-                                platform?.slice(1)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Status Filter */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Status
-                        </label>
-                        <select
-                          value={selectedStatus || ""}
-                          onChange={(e) =>
-                            setSelectedStatus(e.target.value || null)
-                          }
-                          className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm"
-                        >
-                          <option value="">All Statuses</option>
-                          {uniqueStatuses.map((status) => (
-                            <option key={status} value={status}>
-                              {status?.charAt(0).toUpperCase() +
-                                status?.slice(1)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {hasActiveFilters && (
-                      <div className="flex justify-between items-center pt-4">
-                        <div className="flex flex-wrap gap-2">
-                          {searchQuery && (
-                            <Badge variant="secondary" className="gap-1">
-                              Search: {searchQuery}
-                              <X
-                                className="w-3 h-3 cursor-pointer"
-                                onClick={() => setSearchQuery("")}
-                              />
-                            </Badge>
-                          )}
-                          {selectedCategory && (
-                            <Badge variant="secondary" className="gap-1">
-                              Category:{" "}
-                              {
-                                categories.find(
-                                  (c) => c.slug === selectedCategory
-                                )?.name
-                              }
-                              <X
-                                className="w-3 h-3 cursor-pointer"
-                                onClick={() => setSelectedCategory(null)}
-                              />
-                            </Badge>
-                          )}
-                          {selectedPlatform && (
-                            <Badge variant="secondary" className="gap-1">
-                              Platform: {selectedPlatform}
-                              <X
-                                className="w-3 h-3 cursor-pointer"
-                                onClick={() => setSelectedPlatform(null)}
-                              />
-                            </Badge>
-                          )}
-                          {selectedStatus && (
-                            <Badge variant="secondary" className="gap-1">
-                              Status: {selectedStatus}
-                              <X
-                                className="w-3 h-3 cursor-pointer"
-                                onClick={() => setSelectedStatus(null)}
-                              />
-                            </Badge>
-                          )}
+                {/* Advanced Filters */}
+                <AnimatePresence>
+                  {showFiltersPanel && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-border/50 mt-4">
+                        {/* Category Filter */}
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Category
+                          </label>
+                          <select
+                            value={selectedCategory || ""}
+                            onChange={(e) =>
+                              setSelectedCategory(e.target.value || null)
+                            }
+                            className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm"
+                          >
+                            <option value="">All Categories</option>
+                            {categories.map((category) => (
+                              <option key={category.id} value={category.slug}>
+                                {category.name}
+                              </option>
+                            ))}
+                          </select>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={clearFilters}
-                          className="gap-1"
-                        >
-                          <X className="w-3 h-3" />
-                          Clear All
-                        </Button>
+
+                        {/* Platform Filter */}
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Platform
+                          </label>
+                          <select
+                            value={selectedPlatform || ""}
+                            onChange={(e) =>
+                              setSelectedPlatform(e.target.value || null)
+                            }
+                            className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm"
+                          >
+                            <option value="">All Platforms</option>
+                            {uniquePlatforms.map((platform) => (
+                              <option key={platform} value={platform}>
+                                {platform?.charAt(0).toUpperCase() +
+                                  platform?.slice(1)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Status Filter */}
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Status
+                          </label>
+                          <select
+                            value={selectedStatus || ""}
+                            onChange={(e) =>
+                              setSelectedStatus(e.target.value || null)
+                            }
+                            className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm"
+                          >
+                            <option value="">All Statuses</option>
+                            {uniqueStatuses.map((status) => (
+                              <option key={status} value={status}>
+                                {status?.charAt(0).toUpperCase() +
+                                  status?.slice(1)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
+
+                      {hasActiveFilters && (
+                        <div className="flex justify-between items-center pt-4">
+                          <div className="flex flex-wrap gap-2">
+                            {searchQuery && (
+                              <Badge variant="secondary" className="gap-1">
+                                Search: {searchQuery}
+                                <X
+                                  className="w-3 h-3 cursor-pointer"
+                                  onClick={() => setSearchQuery("")}
+                                />
+                              </Badge>
+                            )}
+                            {selectedCategory && (
+                              <Badge variant="secondary" className="gap-1">
+                                Category:{" "}
+                                {
+                                  categories.find(
+                                    (c) => c.slug === selectedCategory
+                                  )?.name
+                                }
+                                <X
+                                  className="w-3 h-3 cursor-pointer"
+                                  onClick={() => setSelectedCategory(null)}
+                                />
+                              </Badge>
+                            )}
+                            {selectedPlatform && (
+                              <Badge variant="secondary" className="gap-1">
+                                Platform: {selectedPlatform}
+                                <X
+                                  className="w-3 h-3 cursor-pointer"
+                                  onClick={() => setSelectedPlatform(null)}
+                                />
+                              </Badge>
+                            )}
+                            {selectedStatus && (
+                              <Badge variant="secondary" className="gap-1">
+                                Status: {selectedStatus}
+                                <X
+                                  className="w-3 h-3 cursor-pointer"
+                                  onClick={() => setSelectedStatus(null)}
+                                />
+                              </Badge>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearFilters}
+                            className="gap-1"
+                          >
+                            <X className="w-3 h-3" />
+                            Clear All
+                          </Button>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          )}
 
           {/* Results Count */}
-          <div className="mb-8 text-center">
-            <p className="text-muted-foreground">
-              Showing {filteredAndSortedProjects.length} of {projects.length}{" "}
-              projects
-            </p>
-          </div>
+          {showFilters && (
+            <div className="mb-8 text-center">
+              <p className="text-muted-foreground">
+                Showing {filteredAndSortedProjects.length} of {projects.length}{" "}
+                projects
+              </p>
+            </div>
+          )}
 
           {/* Projects Grid/List */}
           <motion.div
@@ -521,9 +560,11 @@ export default function EnhancedProjectsPage({
                 <p className="text-muted-foreground mb-4">
                   Try adjusting your search criteria or filters.
                 </p>
-                <Button onClick={clearFilters} variant="outline">
-                  Clear Filters
-                </Button>
+                {hasActiveFilters && (
+                  <Button onClick={clearFilters} variant="outline">
+                    Clear Filters
+                  </Button>
+                )}
               </div>
             ) : (
               <div
@@ -541,9 +582,10 @@ export default function EnhancedProjectsPage({
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: index * 0.1 }}
                     className={cn(
-                      "group bg-card/50 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2",
+                      "group bg-card/50 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2 cursor-pointer",
                       viewMode === "list" && "flex flex-col md:flex-row"
                     )}
+                    onClick={() => handleProjectClick(project)}
                   >
                     {/* Project Image */}
                     <div
@@ -581,6 +623,7 @@ export default function EnhancedProjectsPage({
                             href={project.demo_url}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <Button
                               size="sm"
@@ -595,6 +638,7 @@ export default function EnhancedProjectsPage({
                             href={project.github_url}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <Button
                               size="sm"
@@ -610,6 +654,7 @@ export default function EnhancedProjectsPage({
                             href={project.demo_video_url}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <Button
                               size="sm"
@@ -764,6 +809,7 @@ export default function EnhancedProjectsPage({
                             href={project.demo_url}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <Button size="sm" className="gap-1">
                               <ExternalLink className="w-3 h-3" />
@@ -776,6 +822,7 @@ export default function EnhancedProjectsPage({
                             href={project.github_url}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <Button
                               size="sm"
@@ -792,6 +839,7 @@ export default function EnhancedProjectsPage({
                             href={project.case_study_url}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <Button
                               size="sm"
@@ -811,7 +859,25 @@ export default function EnhancedProjectsPage({
             )}
           </motion.div>
 
-          {/* Load More or Pagination can be added here */}
+          {/* View All Projects Button */}
+          {showViewAll && maxProjects && projects.length > maxProjects && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="text-center mt-12"
+            >
+              <Link href="/projects">
+                <Button
+                  size="lg"
+                  className="gap-2 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
+                >
+                  View All Projects
+                  <ExternalLink className="w-4 h-4" />
+                </Button>
+              </Link>
+            </motion.div>
+          )}
         </div>
       </div>
     </div>

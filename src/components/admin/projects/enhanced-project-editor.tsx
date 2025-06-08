@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ImageUploader } from "@/components/ui/image-uploader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -32,7 +33,7 @@ import {
 } from "lucide-react";
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface Technology {
   id: number;
@@ -66,12 +67,6 @@ interface KeyFeature {
   title: string;
   description: string;
   icon?: string;
-}
-
-interface Challenge {
-  title: string;
-  description: string;
-  solution?: string;
 }
 
 interface Result {
@@ -146,9 +141,8 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
     deployment_platform: "",
     hosting_provider: "",
 
-    // Features, Challenges, Results
+    // Features, Results
     key_features: [] as KeyFeature[],
-    challenges_faced: [] as Challenge[],
     results_achieved: [] as Result[],
 
     // SEO & Visibility
@@ -196,7 +190,7 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
     }
   };
 
-  const loadProject = async () => {
+  const loadProject = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -259,7 +253,6 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
           hosting_provider: project.hosting_provider || "",
 
           key_features: project.key_features || [],
-          challenges_faced: project.challenges_faced || [],
           results_achieved: project.results_achieved || [],
 
           featured: project.featured || false,
@@ -276,7 +269,7 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.projectId]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({
@@ -316,32 +309,6 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
     setFormData((prev) => ({
       ...prev,
       key_features: prev.key_features.filter((_, i) => i !== index),
-    }));
-  };
-
-  const addChallenge = () => {
-    setFormData((prev) => ({
-      ...prev,
-      challenges_faced: [
-        ...prev.challenges_faced,
-        { title: "", description: "", solution: "" },
-      ],
-    }));
-  };
-
-  const updateChallenge = (index: number, field: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      challenges_faced: prev.challenges_faced.map((challenge, i) =>
-        i === index ? { ...challenge, [field]: value } : challenge
-      ),
-    }));
-  };
-
-  const removeChallenge = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      challenges_faced: prev.challenges_faced.filter((_, i) => i !== index),
     }));
   };
 
@@ -543,13 +510,12 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
 
       <div className="max-w-6xl mx-auto">
         <Tabs defaultValue="basic" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
             <TabsTrigger value="media">Media</TabsTrigger>
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="technologies">Tech Stack</TabsTrigger>
             <TabsTrigger value="features">Features</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
           {/* Basic Information */}
@@ -683,6 +649,71 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
                     </Select>
                   </div>
                 </div>
+
+                {/* Settings */}
+                <div className="space-y-4 pt-6 border-t">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="priority">Priority</Label>
+                      <Input
+                        id="priority"
+                        type="number"
+                        value={formData.priority}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "priority",
+                            parseInt(e.target.value) || 0
+                          )
+                        }
+                        placeholder="0"
+                      />
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Higher numbers appear first
+                      </p>
+                    </div>
+                    <div>
+                      <Label htmlFor="target_audience">Target Audience</Label>
+                      <Input
+                        id="target_audience"
+                        value={formData.target_audience}
+                        onChange={(e) =>
+                          handleInputChange("target_audience", e.target.value)
+                        }
+                        placeholder="Developers, Businesses, etc."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={formData.featured}
+                        onCheckedChange={(checked) =>
+                          handleInputChange("featured", checked)
+                        }
+                      />
+                      <Label>Featured Project</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={formData.is_public}
+                        onCheckedChange={(checked) =>
+                          handleInputChange("is_public", checked)
+                        }
+                      />
+                      <Label>Public (visible to visitors)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={formData.is_active}
+                        onCheckedChange={(checked) =>
+                          handleInputChange("is_active", checked)
+                        }
+                      />
+                      <Label>Active</Label>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -693,30 +724,42 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
               <CardHeader>
                 <CardTitle>Media & Assets</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <Label>Featured Image</Label>
-                    <Input
-                      value={formData.featured_image_url}
-                      onChange={(e) =>
-                        handleInputChange("featured_image_url", e.target.value)
-                      }
-                      placeholder="https://example.com/image.jpg"
-                    />
-                  </div>
-                  <div>
-                    <Label>Hero Image</Label>
-                    <Input
-                      value={formData.hero_image_url}
-                      onChange={(e) =>
-                        handleInputChange("hero_image_url", e.target.value)
-                      }
-                      placeholder="https://example.com/hero.jpg"
-                    />
-                  </div>
+              <CardContent className="space-y-8">
+                {/* Featured Image */}
+                <div>
+                  <Label className="text-base font-semibold">
+                    Featured Image
+                  </Label>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Main image displayed in project cards and listings
+                  </p>
+                  <ImageUploader
+                    initialImageUrl={formData.featured_image_url}
+                    onImageUploaded={(url) =>
+                      handleInputChange("featured_image_url", url)
+                    }
+                    bucketName="raihan-blog-app"
+                    folderPath="projects"
+                  />
                 </div>
 
+                {/* Hero Image */}
+                <div>
+                  <Label className="text-base font-semibold">Hero Image</Label>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Large banner image for the project detail page
+                  </p>
+                  <ImageUploader
+                    initialImageUrl={formData.hero_image_url}
+                    onImageUploaded={(url) =>
+                      handleInputChange("hero_image_url", url)
+                    }
+                    bucketName="raihan-blog-app"
+                    folderPath="projects"
+                  />
+                </div>
+
+                {/* Video URLs */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <Label htmlFor="video_url">Video URL</Label>
@@ -745,11 +788,14 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
                 {/* Gallery Images */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <Label>Gallery Images</Label>
+                    <Label className="text-base font-semibold">
+                      Gallery Images
+                    </Label>
                     <Button
                       onClick={addGalleryImage}
                       size="sm"
                       className="gap-2"
+                      type="button"
                     >
                       <Plus className="w-4 h-4" />
                       Add Image
@@ -763,6 +809,7 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
                           onClick={() => removeGalleryImage(index)}
                           size="sm"
                           variant="destructive"
+                          type="button"
                         >
                           <X className="w-4 h-4" />
                         </Button>
@@ -1125,6 +1172,7 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
                           onClick={() => removeTechnology(index)}
                           size="sm"
                           variant="destructive"
+                          type="button"
                         >
                           <X className="w-4 h-4" />
                         </Button>
@@ -1200,7 +1248,12 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
                       <Star className="w-5 h-5" />
                       Key Features
                     </CardTitle>
-                    <Button onClick={addKeyFeature} size="sm" className="gap-2">
+                    <Button
+                      onClick={addKeyFeature}
+                      size="sm"
+                      className="gap-2"
+                      type="button"
+                    >
                       <Plus className="w-4 h-4" />
                       Add Feature
                     </Button>
@@ -1215,6 +1268,7 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
                           onClick={() => removeKeyFeature(index)}
                           size="sm"
                           variant="destructive"
+                          type="button"
                         >
                           <X className="w-4 h-4" />
                         </Button>
@@ -1269,7 +1323,12 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
                       <Award className="w-5 h-5" />
                       Results Achieved
                     </CardTitle>
-                    <Button onClick={addResult} size="sm" className="gap-2">
+                    <Button
+                      onClick={addResult}
+                      size="sm"
+                      className="gap-2"
+                      type="button"
+                    >
                       <Plus className="w-4 h-4" />
                       Add Result
                     </Button>
@@ -1284,6 +1343,7 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
                           onClick={() => removeResult(index)}
                           size="sm"
                           variant="destructive"
+                          type="button"
                         >
                           <X className="w-4 h-4" />
                         </Button>
@@ -1325,78 +1385,6 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-
-          {/* Settings */}
-          <TabsContent value="settings">
-            <Card>
-              <CardHeader>
-                <CardTitle>Project Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <Label htmlFor="priority">Priority</Label>
-                    <Input
-                      id="priority"
-                      type="number"
-                      value={formData.priority}
-                      onChange={(e) =>
-                        handleInputChange(
-                          "priority",
-                          parseInt(e.target.value) || 0
-                        )
-                      }
-                      placeholder="0"
-                    />
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Higher numbers appear first
-                    </p>
-                  </div>
-                  <div>
-                    <Label htmlFor="target_audience">Target Audience</Label>
-                    <Input
-                      id="target_audience"
-                      value={formData.target_audience}
-                      onChange={(e) =>
-                        handleInputChange("target_audience", e.target.value)
-                      }
-                      placeholder="Developers, Businesses, etc."
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={formData.featured}
-                      onCheckedChange={(checked) =>
-                        handleInputChange("featured", checked)
-                      }
-                    />
-                    <Label>Featured Project</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={formData.is_public}
-                      onCheckedChange={(checked) =>
-                        handleInputChange("is_public", checked)
-                      }
-                    />
-                    <Label>Public (visible to visitors)</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={formData.is_active}
-                      onCheckedChange={(checked) =>
-                        handleInputChange("is_active", checked)
-                      }
-                    />
-                    <Label>Active</Label>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
       </div>

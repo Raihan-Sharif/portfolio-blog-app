@@ -1,6 +1,7 @@
 import Contact from "@/components/home/contact";
 // import FeaturedProjects from "@/components/home/featured-projects";
-import EnhanchedFeaturedProjects from "@/components/home/enhanced-featured-projects";
+import EnhancedFeaturedProjects from "@/components/home/enhanced-featured-projects";
+
 import Hero from "@/components/home/hero";
 import LatestBlogPosts from "@/components/home/latest-blog-posts";
 import Skills from "@/components/home/skills";
@@ -19,14 +20,14 @@ export default async function HomePage() {
   const supabase = createServerSupabaseClient();
 
   // Fetch featured projects
-  // Fetch featured projects
+  // Fetch featured projects with categories and technologies
   const { data: featuredProjects } = await supabase
     .from("projects")
     .select(
       `
       *,
       category:project_categories(*),
-      technologies:project_technologies(
+      project_technologies(
         technology:technologies(*)
       )
     `
@@ -35,7 +36,14 @@ export default async function HomePage() {
     .eq("is_public", true)
     .eq("is_active", true)
     .order("priority", { ascending: false })
-    .limit(5);
+    .limit(6);
+
+  // Fetch all project categories for filtering
+  const { data: projectCategories } = await supabase
+    .from("project_categories")
+    .select("*")
+    .eq("is_active", true)
+    .order("display_order");
 
   // Fetch latest blog posts
   const { data: latestPosts } = await supabase
@@ -52,10 +60,27 @@ export default async function HomePage() {
     .order("proficiency", { ascending: false })
     .limit(10);
 
+  // Process projects to include technologies properly
+  const processedProjects =
+    featuredProjects?.map((project) => ({
+      ...project,
+      technologies:
+        project.project_technologies?.map((pt: any) => ({
+          ...pt.technology,
+          is_primary: pt.is_primary || false,
+          proficiency_level: pt.proficiency_level,
+        })) || [],
+    })) || [];
+
   return (
     <>
       <Hero />
-      <EnhanchedFeaturedProjects projects={featuredProjects || []} />
+      <EnhancedFeaturedProjects
+        projects={processedProjects}
+        categories={projectCategories || []}
+        showFilters={false}
+        maxProjects={6}
+      />
       <Skills skills={skills || []} />
       <LatestBlogPosts posts={latestPosts || []} />
       <Contact />

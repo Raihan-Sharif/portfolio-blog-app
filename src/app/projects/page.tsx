@@ -1,5 +1,5 @@
 // app/projects/page.tsx
-import EnhancedProjectsPage from "@/components/home/enhanced-featured-projects";
+import EnhancedFeaturedProjects from "@/components/home/enhanced-featured-projects";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const revalidate = 3600; // Revalidate at most once per hour
@@ -21,9 +21,15 @@ export default async function ProjectsPage() {
     `
       )
       .eq("is_public", true)
-      .eq("is_active", true),
+      .eq("is_active", true)
+      .order("featured", { ascending: false })
+      .order("priority", { ascending: false }),
 
-    supabase.from("project_categories").select("*").eq("is_active", true),
+    supabase
+      .from("project_categories")
+      .select("*")
+      .eq("is_active", true)
+      .order("display_order"),
   ]);
 
   // Process projects data to match the enhanced component interface
@@ -39,9 +45,15 @@ export default async function ProjectsPage() {
     })) || [];
 
   return (
-    <EnhancedProjectsPage
-      projects={processedProjects}
-      categories={categoriesResponse.data || []}
-    />
+    <div className="pt-0">
+      <EnhancedFeaturedProjects
+        projects={processedProjects}
+        categories={categoriesResponse.data || []}
+        showFilters={true}
+        showViewAll={false}
+        title="All Projects"
+        subtitle="Explore my complete portfolio of projects spanning various technologies and industries."
+      />
+    </div>
   );
 }
