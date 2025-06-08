@@ -2,15 +2,6 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-// Table components replaced with div-based implementation
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -19,6 +10,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
@@ -150,14 +149,10 @@ export default function AdminProjectsList() {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
-  const [selectedVisibility, setSelectedVisibility] = useState<string | null>(
-    null
-  );
-  const [sortBy, setSortBy] = useState<
-    "newest" | "oldest" | "popular" | "priority"
-  >("newest");
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
+  const [selectedVisibility, setSelectedVisibility] = useState<string>("");
+  const [sortBy, setSortBy] = useState<string>("newest");
 
   // Stats
   const [stats, setStats] = useState({
@@ -477,16 +472,16 @@ export default function AdminProjectsList() {
               />
             </div>
 
-            {/* Category Filter */}
+            {/* Category Filter - FIXED: Added placeholder SelectItem */}
             <Select
-              value={selectedCategory || ""}
-              onValueChange={(value) => setSelectedCategory(value || null)}
+              value={selectedCategory}
+              onValueChange={(value) => setSelectedCategory(value)}
             >
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
                 {categories.map((category) => (
                   <SelectItem key={category.id} value={category.slug}>
                     {category.name}
@@ -495,16 +490,16 @@ export default function AdminProjectsList() {
               </SelectContent>
             </Select>
 
-            {/* Status Filter */}
+            {/* Status Filter - FIXED: Added placeholder SelectItem */}
             <Select
-              value={selectedStatus || ""}
-              onValueChange={(value) => setSelectedStatus(value || null)}
+              value={selectedStatus}
+              onValueChange={(value) => setSelectedStatus(value)}
             >
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="planning">Planning</SelectItem>
                 <SelectItem value="in-progress">In Progress</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
@@ -513,26 +508,23 @@ export default function AdminProjectsList() {
               </SelectContent>
             </Select>
 
-            {/* Visibility Filter */}
+            {/* Visibility Filter - FIXED: Added placeholder SelectItem */}
             <Select
-              value={selectedVisibility || ""}
-              onValueChange={(value) => setSelectedVisibility(value || null)}
+              value={selectedVisibility}
+              onValueChange={(value) => setSelectedVisibility(value)}
             >
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="All Visibility" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="public">Public</SelectItem>
                 <SelectItem value="private">Private</SelectItem>
               </SelectContent>
             </Select>
 
-            {/* Sort */}
-            <Select
-              value={sortBy}
-              onValueChange={(value) => setSortBy(value as any)}
-            >
+            {/* Sort - FIXED: Using proper values */}
+            <Select value={sortBy} onValueChange={(value) => setSortBy(value)}>
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue />
               </SelectTrigger>
