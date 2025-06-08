@@ -1,5 +1,6 @@
 import Contact from "@/components/home/contact";
-import FeaturedProjects from "@/components/home/featured-projects";
+// import FeaturedProjects from "@/components/home/featured-projects";
+import EnhanchedFeaturedProjects from "@/components/home/enhanced-featured-projects";
 import Hero from "@/components/home/hero";
 import LatestBlogPosts from "@/components/home/latest-blog-posts";
 import Skills from "@/components/home/skills";
@@ -18,12 +19,23 @@ export default async function HomePage() {
   const supabase = createServerSupabaseClient();
 
   // Fetch featured projects
+  // Fetch featured projects
   const { data: featuredProjects } = await supabase
     .from("projects")
-    .select("*")
+    .select(
+      `
+      *,
+      category:project_categories(*),
+      technologies:project_technologies(
+        technology:technologies(*)
+      )
+    `
+    )
     .eq("featured", true)
-    .order("created_at", { ascending: false })
-    .limit(3);
+    .eq("is_public", true)
+    .eq("is_active", true)
+    .order("priority", { ascending: false })
+    .limit(5);
 
   // Fetch latest blog posts
   const { data: latestPosts } = await supabase
@@ -43,7 +55,7 @@ export default async function HomePage() {
   return (
     <>
       <Hero />
-      <FeaturedProjects projects={featuredProjects || []} />
+      <EnhanchedFeaturedProjects projects={featuredProjects || []} />
       <Skills skills={skills || []} />
       <LatestBlogPosts posts={latestPosts || []} />
       <Contact />
