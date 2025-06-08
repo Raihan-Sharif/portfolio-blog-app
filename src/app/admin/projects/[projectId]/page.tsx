@@ -1,10 +1,15 @@
-// app/admin/projects/[id]/page.tsx
-import AdminProjectEditor from "@/components/admin/projects/enhanced-project-editor";
+// app/admin/projects/[projectId]/page.tsx
+import AdminLayout from "@/components/admin/admin-layout";
+import EnhancedProjectEditor from "@/components/admin/projects/enhanced-project-editor";
 
 export default function AdminProjectEditorPage({
   params,
 }: {
-  params: { id: string };
+  params: { projectId: string };
 }) {
-  return <AdminProjectEditor params={params} />;
+  return (
+    <AdminLayout>
+      <EnhancedProjectEditor params={params} />
+    </AdminLayout>
+  );
 }

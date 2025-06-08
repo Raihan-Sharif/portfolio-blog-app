@@ -1,5 +1,6 @@
 // app/projects/[slug]/page.tsx
 import ProjectDetailPage from "@/components/projects/project-detail-page";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 
 export default async function ProjectPage({
@@ -7,6 +8,8 @@ export default async function ProjectPage({
 }: {
   params: { slug: string };
 }) {
+  const supabase = createServerSupabaseClient();
+
   const { data: project } = await supabase
     .rpc("get_project_with_details", { project_slug: params.slug })
     .single();
