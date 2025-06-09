@@ -1,6 +1,8 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -10,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ANIMATIONS, GRADIENTS, SPACING } from "@/lib/design-constants";
 import {
   countries,
   formatPhoneNumber,
@@ -20,6 +23,10 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import { motion } from "framer-motion";
 import {
+  AlertCircle,
+  ArrowRight,
+  Briefcase,
+  CheckCircle,
   Clock,
   ExternalLink,
   Mail,
@@ -28,9 +35,14 @@ import {
   Phone,
   Send,
   Star,
+  TrendingUp,
+  User,
+  Users,
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
+// Keep all the same interfaces as before
 interface ContactInfo {
   id: number;
   type: string;
@@ -62,15 +74,8 @@ interface AvailabilityStatus {
   color_class: string;
 }
 
-interface ContactComponentProps {
-  showForm?: boolean;
-  showFullLayout?: boolean;
-  className?: string;
-}
-
 const getIcon = (iconName: string, size: number = 20) => {
   const iconProps = { size };
-
   switch (iconName) {
     case "Mail":
       return <Mail {...iconProps} />;
@@ -87,11 +92,7 @@ const getIcon = (iconName: string, size: number = 20) => {
   }
 };
 
-export default function DynamicContact({
-  showForm = true,
-  showFullLayout = true,
-  className = "",
-}: ContactComponentProps) {
+export default function Contact() {
   const [contactInfo, setContactInfo] = useState<ContactInfo[]>([]);
   const [businessHours, setBusinessHours] = useState<BusinessHours[]>([]);
   const [availability, setAvailability] = useState<AvailabilityStatus | null>(
@@ -125,33 +126,32 @@ export default function DynamicContact({
     try {
       setLoading(true);
 
-      // Fetch contact info
-      const { data: contactData, error: contactError } = await supabase
-        .from("contact_info")
-        .select("*")
-        .eq("is_active", true)
-        .order("display_order");
-
-      if (contactError) throw contactError;
-
-      // Fetch business hours
-      const { data: hoursData, error: hoursError } = await supabase
-        .from("business_hours")
-        .select("*")
-        .eq("is_active", true)
-        .order("day_of_week");
-
-      if (hoursError) throw hoursError;
-
-      // Fetch current availability
-      const { data: availabilityData, error: availabilityError } =
-        await supabase
+      const [
+        { data: contactData, error: contactError },
+        { data: hoursData, error: hoursError },
+        { data: availabilityData, error: availabilityError },
+      ] = await Promise.all([
+        supabase
+          .from("contact_info")
+          .select("*")
+          .eq("is_active", true)
+          .order("display_order")
+          .limit(3), // Only show top 3 for home page
+        supabase
+          .from("business_hours")
+          .select("*")
+          .eq("is_active", true)
+          .order("day_of_week"),
+        supabase
           .from("availability_status")
           .select("*")
           .eq("is_current", true)
           .eq("is_active", true)
-          .single();
+          .single(),
+      ]);
 
+      if (contactError) throw contactError;
+      if (hoursError) throw hoursError;
       if (availabilityError && availabilityError.code !== "PGRST116") {
         throw availabilityError;
       }
@@ -166,15 +166,13 @@ export default function DynamicContact({
     }
   };
 
+  // Keep all the same form handler functions...
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-
-    if (name === "phone") {
-      setPhoneError("");
-    }
+    if (name === "phone") setPhoneError("");
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -197,7 +195,6 @@ export default function DynamicContact({
     if (country) {
       setSelectedCountry(country);
       setPhoneError("");
-
       if (formData.phone) {
         const cleanNumber = formData.phone.replace(/\D/g, "");
         const formatted = formatPhoneNumber(cleanNumber, countryCode);
@@ -300,7 +297,7 @@ export default function DynamicContact({
     const todayHours = businessHours.find((h) => h.day_of_week === today);
 
     if (!todayHours || !todayHours.is_open) {
-      return { isOpen: false, text: "Closed today" };
+      return { isOpen: false, text: "Closed today", color: "bg-red-500" };
     }
 
     const now = new Date();
@@ -309,343 +306,510 @@ export default function DynamicContact({
     const closeTime = parseInt(todayHours.close_time?.replace(":", "") || "0");
 
     if (currentTime >= openTime && currentTime <= closeTime) {
-      return { isOpen: true, text: `Open until ${todayHours.close_time}` };
+      return {
+        isOpen: true,
+        text: `Open until ${todayHours.close_time}`,
+        color: "bg-green-500",
+      };
     } else if (currentTime < openTime) {
-      return { isOpen: false, text: `Opens at ${todayHours.open_time}` };
+      return {
+        isOpen: false,
+        text: `Opens at ${todayHours.open_time}`,
+        color: "bg-yellow-500",
+      };
     } else {
-      return { isOpen: false, text: "Closed" };
+      return { isOpen: false, text: "Closed", color: "bg-red-500" };
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
-      </div>
+      <section className={`${SPACING.section} ${GRADIENTS.background}`}>
+        <div className={SPACING.container}>
+          <div className="flex items-center justify-center py-16">
+            <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
+          </div>
+        </div>
+      </section>
     );
   }
-
-  const containerClass = showFullLayout ? "min-h-screen bg-background" : "";
 
   const dayStatus = getCurrentDayStatus();
 
   return (
-    <section className={`py-20 ${containerClass} ${className}`}>
-      <div className="container mx-auto px-4">
-        {showFullLayout && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-16"
-          >
-            <h1 className="text-3xl md:text-4xl font-bold mb-6 bg-gradient-to-r from-primary via-purple-600 to-blue-600 bg-clip-text text-transparent">
-              Get In Touch
-            </h1>
-            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-              Have a project in mind or want to discuss a collaboration? Feel
-              free to reach out using the form below or through my contact
-              information.
-            </p>
-          </motion.div>
-        )}
+    <section
+      className={`${SPACING.section} ${GRADIENTS.background} relative overflow-hidden`}
+    >
+      {/* Background Elements */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-20 right-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-20 left-20 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+      </div>
 
-        <div
-          className={`grid grid-cols-1 ${
-            showForm ? "lg:grid-cols-2" : "lg:grid-cols-1"
-          } gap-12`}
+      <div className={`${SPACING.container} relative z-10`}>
+        {/* Section Header */}
+        <motion.div {...ANIMATIONS.fadeIn} className="text-center mb-16">
+          <h2
+            className={`text-4xl md:text-5xl font-bold mb-6 ${GRADIENTS.primaryText}`}
+          >
+            Get In Touch
+          </h2>
+          <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+            Ready to bring your ideas to life? Let's discuss your next project
+            or collaboration.
+            <span className="block mt-2 text-primary font-semibold">
+              Quick response • Professional service • Quality results
+            </span>
+          </p>
+        </motion.div>
+
+        {/* Stats/Features */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16"
         >
+          <div className="text-center p-6 rounded-2xl bg-card/60 backdrop-blur-sm border border-white/10 hover:shadow-lg transition-all duration-300 group">
+            <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-300">
+              <Clock className="w-6 h-6 text-primary" />
+            </div>
+            <div className="font-semibold mb-1">Quick Response</div>
+            <div className="text-sm text-muted-foreground">
+              {availability?.response_time || "Within 24 hours"}
+            </div>
+          </div>
+
+          <div className="text-center p-6 rounded-2xl bg-card/60 backdrop-blur-sm border border-white/10 hover:shadow-lg transition-all duration-300 group">
+            <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-300">
+              <CheckCircle className="w-6 h-6 text-green-600" />
+            </div>
+            <div className="font-semibold mb-1">Available Now</div>
+            <div className="text-sm text-muted-foreground">
+              {availability?.title || "Ready for new projects"}
+            </div>
+          </div>
+
+          <div className="text-center p-6 rounded-2xl bg-card/60 backdrop-blur-sm border border-white/10 hover:shadow-lg transition-all duration-300 group">
+            <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-300">
+              <Users className="w-6 h-6 text-blue-600" />
+            </div>
+            <div className="font-semibold mb-1">100+ Projects</div>
+            <div className="text-sm text-muted-foreground">
+              Successfully delivered
+            </div>
+          </div>
+
+          <div className="text-center p-6 rounded-2xl bg-card/60 backdrop-blur-sm border border-white/10 hover:shadow-lg transition-all duration-300 group">
+            <div className="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-300">
+              <TrendingUp className="w-6 h-6 text-purple-600" />
+            </div>
+            <div className="font-semibold mb-1">6+ Years</div>
+            <div className="text-sm text-muted-foreground">
+              Professional experience
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Contact Information */}
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="space-y-8"
           >
-            <h2 className="text-2xl font-semibold mb-8">Contact Information</h2>
-
             {/* Availability Status */}
             {availability && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-8 p-4 rounded-lg border bg-card"
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <div
-                    className={`w-3 h-3 rounded-full ${availability.color_class}`}
-                  ></div>
-                  <h3 className="font-semibold">{availability.title}</h3>
-                </div>
-                <p className="text-muted-foreground text-sm mb-2">
-                  {availability.description}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Response time: {availability.response_time}
-                </p>
-              </motion.div>
+              <Card className="bg-card/60 backdrop-blur-sm border-white/10 hover:shadow-lg transition-all duration-300">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3">
+                    <div
+                      className={`w-3 h-3 rounded-full ${availability.color_class} animate-pulse`}
+                    ></div>
+                    {availability.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-3">
+                    {availability.description}
+                  </p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="w-4 h-4 text-primary" />
+                    <span>Response time: {availability.response_time}</span>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* Contact Methods */}
-            <div className="space-y-6 mb-8">
-              {contactInfo.map((contact, index) => (
-                <motion.div
-                  key={contact.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 * (index + 1) }}
-                  className="flex items-start gap-4 p-4 rounded-lg border bg-card hover:shadow-md transition-all duration-200 cursor-pointer group"
-                  onClick={() => handleContactClick(contact)}
-                >
-                  <div className="flex-shrink-0 p-3 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
-                    <div className="text-primary">
-                      {getIcon(contact.icon || "Mail")}
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-medium flex items-center gap-2">
-                      {contact.label}
-                      {contact.is_primary && (
-                        <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                      )}
-                      {contact.is_whatsapp && (
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                          WhatsApp
-                        </span>
-                      )}
-                    </h3>
-                    <p className="text-muted-foreground mt-1 group-hover:text-primary transition-colors">
-                      {contact.value}
-                    </p>
-                  </div>
-                  <ExternalLink className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Business Hours */}
-            {businessHours.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="bg-card p-6 rounded-lg border"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Clock className="w-5 h-5" />
-                    Working Hours
-                  </h3>
-                  <div
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      dayStatus.isOpen
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
+            <Card className="bg-card/60 backdrop-blur-sm border-white/10 hover:shadow-lg transition-all duration-300">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5 text-primary" />
+                  Contact Methods
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {contactInfo.map((contact, index) => (
+                  <motion.div
+                    key={contact.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1 * (index + 1) }}
+                    className="flex items-center gap-4 p-4 rounded-lg border bg-white/5 hover:bg-white/10 transition-all duration-200 cursor-pointer group"
+                    onClick={() => handleContactClick(contact)}
                   >
-                    {dayStatus.text}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  {businessHours.map((hours) => (
-                    <div
-                      key={hours.id}
-                      className="flex justify-between items-center text-sm"
-                    >
-                      <span
-                        className={`font-medium ${
-                          hours.day_of_week === new Date().getDay()
-                            ? "text-primary"
-                            : "text-foreground"
-                        }`}
-                      >
-                        {hours.day_name}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {hours.is_open
-                          ? `${hours.open_time} - ${hours.close_time} (${hours.timezone})`
-                          : "Closed"}
-                      </span>
+                    <div className="flex-shrink-0 p-3 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                      <div className="text-primary">
+                        {getIcon(contact.icon || "Mail")}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </motion.div>
+                    <div className="flex-1">
+                      <h3 className="font-medium flex items-center gap-2">
+                        {contact.label}
+                        {contact.is_primary && (
+                          <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                        )}
+                        {contact.is_whatsapp && (
+                          <Badge
+                            variant="secondary"
+                            className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                          >
+                            WhatsApp
+                          </Badge>
+                        )}
+                      </h3>
+                      <p className="text-muted-foreground text-sm group-hover:text-primary transition-colors">
+                        {contact.value}
+                      </p>
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </motion.div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Business Hours with Current Day Highlighting */}
+            {businessHours.length > 0 && (
+              <Card className="bg-card/60 backdrop-blur-sm border-white/10 hover:shadow-lg transition-all duration-300">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-primary" />
+                      Working Hours
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={`${dayStatus.color} text-white border-0 font-medium`}
+                    >
+                      {dayStatus.text}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {businessHours.map((hours) => {
+                      const isToday = hours.day_of_week === new Date().getDay();
+                      return (
+                        <div
+                          key={hours.id}
+                          className={`flex justify-between items-center text-sm p-3 rounded-lg transition-all duration-200 ${
+                            isToday
+                              ? "bg-primary/10 text-primary border border-primary/20 font-medium shadow-sm"
+                              : "hover:bg-white/5"
+                          }`}
+                        >
+                          <span
+                            className={`font-medium ${
+                              isToday ? "text-primary" : ""
+                            }`}
+                          >
+                            {hours.day_name}
+                            {isToday && (
+                              <Badge
+                                variant="secondary"
+                                className="ml-2 text-xs bg-primary/20 text-primary"
+                              >
+                                Today
+                              </Badge>
+                            )}
+                          </span>
+                          <span
+                            className={`${
+                              isToday
+                                ? "text-primary font-medium"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {hours.is_open
+                              ? `${hours.open_time} - ${hours.close_time}`
+                              : "Closed"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </motion.div>
 
           {/* Contact Form */}
-          {showForm && (
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <form
-                onSubmit={handleSubmit}
-                className="space-y-6 bg-card p-8 rounded-lg border shadow-sm"
-              >
-                <h2 className="text-xl font-semibold mb-6">
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+          >
+            <Card className="bg-card/60 backdrop-blur-sm border-white/10 hover:shadow-lg transition-all duration-300">
+              <CardHeader>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <Send className="w-5 h-5 text-primary" />
                   Send Me a Message
-                </h2>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label
-                      htmlFor="name"
-                      className="block text-sm font-medium mb-2"
-                    >
-                      Name *
-                    </label>
-                    <Input
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      required
-                      disabled={isSubmitting}
-                      placeholder="John Doe"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="email"
-                      className="block text-sm font-medium mb-2"
-                    >
-                      Email *
-                    </label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      required
-                      disabled={isSubmitting}
-                      placeholder="john@example.com"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="phone"
-                    className="block text-sm font-medium mb-2"
-                  >
-                    Phone Number (Optional)
-                  </label>
-                  <div className="flex gap-2">
-                    <Select
-                      value={selectedCountry.code}
-                      onValueChange={handleCountryChange}
-                      disabled={isSubmitting}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue>
-                          <div className="flex items-center gap-2">
-                            <span>{selectedCountry.flag}</span>
-                            <span className="text-xs">
-                              {selectedCountry.dialCode}
-                            </span>
-                          </div>
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {countries.map((country) => (
-                          <SelectItem key={country.code} value={country.code}>
-                            <div className="flex items-center gap-2">
-                              <span>{country.flag}</span>
-                              <span className="text-xs">
-                                {country.dialCode}
-                              </span>
-                              <span className="text-sm">{country.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="flex-1">
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Name and Email Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="name"
+                        className="text-sm font-medium flex items-center gap-2"
+                      >
+                        <User className="w-4 h-4 text-primary" />
+                        Name *
+                      </label>
                       <Input
-                        id="phone"
-                        name="phone"
-                        type="tel"
-                        value={formData.phone}
-                        onChange={handlePhoneChange}
+                        id="name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        required
                         disabled={isSubmitting}
-                        placeholder="1234567890"
-                        className={phoneError ? "border-red-500" : ""}
+                        placeholder="John Doe"
+                        className="bg-white/5 border-white/20 focus:border-primary/50 transition-colors"
                       />
-                      {phoneError && (
-                        <p className="text-xs text-red-500 mt-1">
-                          {phoneError}
-                        </p>
-                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="email"
+                        className="text-sm font-medium flex items-center gap-2"
+                      >
+                        <Mail className="w-4 h-4 text-primary" />
+                        Email *
+                      </label>
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                        disabled={isSubmitting}
+                        placeholder="john@example.com"
+                        className="bg-white/5 border-white/20 focus:border-primary/50 transition-colors"
+                      />
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Include your phone number for faster response
-                  </p>
-                </div>
 
-                <div>
-                  <label
-                    htmlFor="subject"
-                    className="block text-sm font-medium mb-2"
-                  >
-                    Subject *
-                  </label>
-                  <Input
-                    id="subject"
-                    name="subject"
-                    value={formData.subject}
-                    onChange={handleChange}
-                    required
-                    disabled={isSubmitting}
-                    placeholder="Project Inquiry"
-                  />
-                </div>
+                  {/* Phone Number */}
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="phone"
+                      className="text-sm font-medium flex items-center gap-2"
+                    >
+                      <Phone className="w-4 h-4 text-primary" />
+                      Phone Number (Optional)
+                    </label>
+                    <div className="flex gap-2">
+                      <Select
+                        value={selectedCountry.code}
+                        onValueChange={handleCountryChange}
+                        disabled={isSubmitting}
+                      >
+                        <SelectTrigger className="w-40 bg-white/5 border-white/20">
+                          <SelectValue>
+                            <div className="flex items-center gap-2">
+                              <span>{selectedCountry.flag}</span>
+                              <span className="text-xs">
+                                {selectedCountry.dialCode}
+                              </span>
+                            </div>
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {countries.slice(0, 10).map((country) => (
+                            <SelectItem key={country.code} value={country.code}>
+                              <div className="flex items-center gap-2">
+                                <span>{country.flag}</span>
+                                <span className="text-xs">
+                                  {country.dialCode}
+                                </span>
+                                <span className="text-sm">{country.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="flex-1">
+                        <Input
+                          id="phone"
+                          name="phone"
+                          type="tel"
+                          value={formData.phone}
+                          onChange={handlePhoneChange}
+                          disabled={isSubmitting}
+                          placeholder="1234567890"
+                          className={`bg-white/5 border-white/20 focus:border-primary/50 transition-colors ${
+                            phoneError ? "border-red-500" : ""
+                          }`}
+                        />
+                        {phoneError && (
+                          <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" />
+                            {phoneError}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-                <div>
-                  <label
-                    htmlFor="message"
-                    className="block text-sm font-medium mb-2"
-                  >
-                    Message *
-                  </label>
-                  <Textarea
-                    id="message"
-                    name="message"
-                    rows={5}
-                    value={formData.message}
-                    onChange={handleChange}
-                    required
-                    disabled={isSubmitting}
-                    placeholder="Tell me about your project or how I can help you..."
-                  />
-                </div>
+                  {/* Subject */}
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="subject"
+                      className="text-sm font-medium flex items-center gap-2"
+                    >
+                      <Briefcase className="w-4 h-4 text-primary" />
+                      Subject *
+                    </label>
+                    <Input
+                      id="subject"
+                      name="subject"
+                      value={formData.subject}
+                      onChange={handleChange}
+                      required
+                      disabled={isSubmitting}
+                      placeholder="Project Inquiry"
+                      className="bg-white/5 border-white/20 focus:border-primary/50 transition-colors"
+                    />
+                  </div>
 
-                <div>
+                  {/* Message */}
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="message"
+                      className="text-sm font-medium flex items-center gap-2"
+                    >
+                      <MessageCircle className="w-4 h-4 text-primary" />
+                      Message *
+                    </label>
+                    <Textarea
+                      id="message"
+                      name="message"
+                      rows={4}
+                      value={formData.message}
+                      onChange={handleChange}
+                      required
+                      disabled={isSubmitting}
+                      placeholder="Tell me about your project..."
+                      className="bg-white/5 border-white/20 focus:border-primary/50 transition-colors"
+                    />
+                  </div>
+
+                  {/* Submit Status */}
                   {submitStatus.message && (
-                    <div
-                      className={`text-sm mb-4 p-3 rounded-md border ${
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`p-4 rounded-lg border flex items-start gap-3 ${
                         submitStatus.success
-                          ? "text-green-600 bg-green-50 border-green-200"
-                          : "text-red-600 bg-red-50 border-red-200"
+                          ? "text-green-600 bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800"
+                          : "text-red-600 bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800"
                       }`}
                     >
-                      {submitStatus.message}
-                    </div>
+                      {submitStatus.success ? (
+                        <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                      )}
+                      <span className="text-sm">{submitStatus.message}</span>
+                    </motion.div>
                   )}
+
+                  {/* Submit Button */}
                   <Button
                     type="submit"
-                    className="w-full gap-2"
+                    size="lg"
+                    className="w-full gap-2 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 shadow-lg hover:shadow-xl transition-all duration-300"
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? "Sending..." : "Send Message"}
-                    <Send size={16} />
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        Send Message
+                      </>
+                    )}
                   </Button>
-                </div>
-              </form>
-            </motion.div>
-          )}
+                </form>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
+
+        {/* CTA Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.6 }}
+          className="text-center mt-16"
+        >
+          <div className="max-w-3xl mx-auto p-8 rounded-2xl bg-gradient-to-r from-primary/10 via-purple-500/10 to-blue-500/10 border border-white/20 backdrop-blur-sm">
+            <h3 className="text-2xl font-bold mb-4">
+              Let's Build Something Amazing Together
+            </h3>
+            <p className="text-muted-foreground mb-6">
+              Ready to turn your vision into reality? I'm here to help with your
+              next project.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button
+                asChild
+                size="lg"
+                className="gap-2 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 shadow-lg hover:shadow-xl transition-all duration-300"
+              >
+                <Link href="/contact">
+                  <MessageCircle className="w-5 h-5" />
+                  Full Contact Page
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </Button>
+
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="gap-2 border-primary/20 hover:bg-primary/10 shadow-lg hover:shadow-xl transition-all duration-300"
+              >
+                <Link href="/projects">
+                  <Briefcase className="w-5 h-5" />
+                  View My Work
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </motion.div>
       </div>
     </section>
   );

@@ -1,30 +1,25 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ANIMATIONS, GRADIENTS, SPACING } from "@/lib/design-constants";
+import { getProficiencyConfig, getSkillIcon } from "@/lib/skill-utils";
 import { motion } from "framer-motion";
 import {
-  Binary,
-  Boxes,
+  ArrowRight,
+  Award,
+  ChevronRight,
   Cloud,
-  Code2,
-  Cpu,
+  Code,
   Database,
-  FileCode,
-  GitBranch,
-  Globe,
-  Layers,
-  MonitorSpeaker,
-  Network,
   Palette,
-  Server,
-  Settings,
-  Shield,
-  Smartphone,
-  Terminal,
-  Wrench,
+  Sparkles,
+  Star,
+  TrendingUp,
   Zap,
 } from "lucide-react";
+import Link from "next/link";
 
-// Define the Skill interface directly
 interface Skill {
   id: number;
   name: string;
@@ -38,209 +33,38 @@ interface SkillsProps {
   skills: Skill[];
 }
 
-// Comprehensive icon mapping for skills based on your database
-const getSkillIcon = (skillName: string, iconString?: string) => {
-  const iconProps = { size: 24, className: "transition-all duration-300" };
-
-  // Database icon mapping - handles both current DB values and suggested Lucide icons
-  const iconMap: Record<string, JSX.Element> = {
-    // Current database icon values (from your CSV)
-    dotnet: <Server {...iconProps} />,
-    SiDotnet: <Server {...iconProps} />,
-    SiReact: <Code2 {...iconProps} />,
-    SiNextdotjs: <Globe {...iconProps} />,
-    SiJavascript: <FileCode {...iconProps} />,
-    SiMicrosoftsqlserver: <Database {...iconProps} />,
-    SiAzuredevops: <Settings {...iconProps} />,
-
-    // Recommended Lucide icon names for your database update
-    Server: <Server {...iconProps} />,
-    Code2: <Code2 {...iconProps} />,
-    Globe: <Globe {...iconProps} />,
-    FileCode: <FileCode {...iconProps} />,
-    Database: <Database {...iconProps} />,
-    Settings: <Settings {...iconProps} />,
-    Terminal: <Terminal {...iconProps} />,
-    Layers: <Layers {...iconProps} />,
-    Cloud: <Cloud {...iconProps} />,
-    Shield: <Shield {...iconProps} />,
-    GitBranch: <GitBranch {...iconProps} />,
-    Cpu: <Cpu {...iconProps} />,
-    Network: <Network {...iconProps} />,
-    Binary: <Binary {...iconProps} />,
-    Boxes: <Boxes {...iconProps} />,
-    MonitorSpeaker: <MonitorSpeaker {...iconProps} />,
-    Wrench: <Wrench {...iconProps} />,
-    Palette: <Palette {...iconProps} />,
-    Smartphone: <Smartphone {...iconProps} />,
-    Zap: <Zap {...iconProps} />,
+const getCategoryIcon = (category: string) => {
+  const icons = {
+    Frontend: <Code className="w-5 h-5" />,
+    Backend: <Database className="w-5 h-5" />,
+    Database: <Database className="w-5 h-5" />,
+    DevOps: <Cloud className="w-5 h-5" />,
+    Infrastructure: <Cloud className="w-5 h-5" />,
+    Mobile: <Code className="w-5 h-5" />,
+    Tools: <Zap className="w-5 h-5" />,
+    Design: <Palette className="w-5 h-5" />,
+    Other: <Star className="w-5 h-5" />,
   };
-
-  // First try to use the exact icon string from database
-  if (iconString && iconMap[iconString]) {
-    return iconMap[iconString];
-  }
-
-  // Fallback to skill name-based intelligent mapping
-  const name = skillName.toLowerCase();
-
-  // Frontend Technologies
-  if (name.includes("react")) return <Code2 {...iconProps} />;
-  if (name.includes("next.js") || name.includes("nextjs"))
-    return <Globe {...iconProps} />;
-  if (name.includes("javascript") || name.includes("js"))
-    return <FileCode {...iconProps} />;
-  if (name.includes("typescript") || name.includes("ts"))
-    return <FileCode {...iconProps} />;
-  if (name.includes("html") || name.includes("css"))
-    return <Globe {...iconProps} />;
-  if (name.includes("vue") || name.includes("angular"))
-    return <Code2 {...iconProps} />;
-  if (name.includes("tailwind") || name.includes("bootstrap"))
-    return <Palette {...iconProps} />;
-
-  // Backend Technologies
-  if (name.includes(".net") || name.includes("dotnet"))
-    return <Server {...iconProps} />;
-  if (name.includes("asp.net")) return <Server {...iconProps} />;
-  if (name.includes("node") || name.includes("express"))
-    return <Server {...iconProps} />;
-  if (
-    name.includes("python") ||
-    name.includes("django") ||
-    name.includes("flask")
-  )
-    return <Terminal {...iconProps} />;
-  if (name.includes("java") || name.includes("spring"))
-    return <Cpu {...iconProps} />;
-  if (name.includes("php") || name.includes("laravel"))
-    return <Server {...iconProps} />;
-
-  // Database Technologies
-  if (name.includes("sql server") || name.includes("mssql"))
-    return <Database {...iconProps} />;
-  if (
-    name.includes("mysql") ||
-    name.includes("postgresql") ||
-    name.includes("postgres")
-  )
-    return <Database {...iconProps} />;
-  if (name.includes("mongodb") || name.includes("nosql"))
-    return <Database {...iconProps} />;
-  if (name.includes("redis") || name.includes("cache"))
-    return <Binary {...iconProps} />;
-
-  // DevOps & Infrastructure
-  if (name.includes("devops") || name.includes("ci/cd"))
-    return <Settings {...iconProps} />;
-  if (name.includes("docker") || name.includes("kubernetes"))
-    return <Boxes {...iconProps} />;
-  if (name.includes("aws") || name.includes("azure") || name.includes("cloud"))
-    return <Cloud {...iconProps} />;
-  if (
-    name.includes("git") ||
-    name.includes("github") ||
-    name.includes("gitlab")
-  )
-    return <GitBranch {...iconProps} />;
-  if (
-    name.includes("linux") ||
-    name.includes("ubuntu") ||
-    name.includes("terminal")
-  )
-    return <Terminal {...iconProps} />;
-
-  // Mobile Development
-  if (
-    name.includes("mobile") ||
-    name.includes("android") ||
-    name.includes("ios")
-  )
-    return <Smartphone {...iconProps} />;
-  if (name.includes("flutter") || name.includes("react native"))
-    return <Smartphone {...iconProps} />;
-
-  // Security & Testing
-  if (name.includes("security") || name.includes("auth"))
-    return <Shield {...iconProps} />;
-  if (name.includes("testing") || name.includes("qa") || name.includes("jest"))
-    return <Wrench {...iconProps} />;
-
-  // Design & UI/UX
-  if (name.includes("design") || name.includes("ui") || name.includes("ux"))
-    return <Palette {...iconProps} />;
-  if (name.includes("figma") || name.includes("photoshop"))
-    return <Palette {...iconProps} />;
-
-  // Networks & APIs
-  if (name.includes("api") || name.includes("rest") || name.includes("graphql"))
-    return <Network {...iconProps} />;
-  if (name.includes("microservices")) return <Layers {...iconProps} />;
-
-  // Default icon for unknown skills
-  return <Code2 {...iconProps} />;
+  return icons[category as keyof typeof icons] || icons.Other;
 };
 
-// Get proficiency level styling
-const getProficiencyLevel = (proficiency?: number) => {
-  if (!proficiency)
-    return {
-      level: "Beginner",
-      color: "from-gray-400 to-gray-500",
-      textColor: "text-gray-600",
-    };
-
-  if (proficiency >= 90)
-    return {
-      level: "Expert",
-      color: "from-purple-500 to-pink-500",
-      textColor: "text-purple-600",
-    };
-  if (proficiency >= 75)
-    return {
-      level: "Advanced",
-      color: "from-green-500 to-emerald-500",
-      textColor: "text-green-600",
-    };
-  if (proficiency >= 50)
-    return {
-      level: "Intermediate",
-      color: "from-blue-500 to-cyan-500",
-      textColor: "text-blue-600",
-    };
-  return {
-    level: "Beginner",
-    color: "from-yellow-500 to-orange-500",
-    textColor: "text-yellow-600",
+const getCategoryGradient = (category: string) => {
+  const gradients = {
+    Frontend: "from-blue-500/20 to-cyan-500/20",
+    Backend: "from-green-500/20 to-emerald-500/20",
+    Database: "from-purple-500/20 to-pink-500/20",
+    DevOps: "from-orange-500/20 to-red-500/20",
+    Infrastructure: "from-orange-500/20 to-red-500/20",
+    Mobile: "from-indigo-500/20 to-purple-500/20",
+    Tools: "from-gray-500/20 to-slate-500/20",
+    Design: "from-pink-500/20 to-rose-500/20",
+    Other: "from-teal-500/20 to-cyan-500/20",
   };
-};
-
-// Get category styling based on your actual database categories
-const getCategoryColor = (category: string) => {
-  const colors: Record<string, string> = {
-    Frontend:
-      "bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-200 dark:border-blue-800",
-    Backend:
-      "bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-200 dark:border-green-800",
-    Database:
-      "bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-200 dark:border-purple-800",
-    Infrastructure:
-      "bg-gradient-to-br from-orange-500/10 to-red-500/10 border-orange-200 dark:border-orange-800",
-    DevOps:
-      "bg-gradient-to-br from-orange-500/10 to-red-500/10 border-orange-200 dark:border-orange-800",
-    Mobile:
-      "bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border-indigo-200 dark:border-indigo-800",
-    Tools:
-      "bg-gradient-to-br from-gray-500/10 to-slate-500/10 border-gray-200 dark:border-gray-800",
-    Other:
-      "bg-gradient-to-br from-teal-500/10 to-cyan-500/10 border-teal-200 dark:border-teal-800",
-  };
-
-  return colors[category] || colors["Other"];
+  return gradients[category as keyof typeof gradients] || gradients.Other;
 };
 
 export default function Skills({ skills }: SkillsProps) {
-  // Group skills by category with better handling
+  // Group skills by category
   const categoryMap: Record<string, Skill[]> = {};
   skills.forEach((skill) => {
     const category = skill.category || "Other";
@@ -250,140 +74,157 @@ export default function Skills({ skills }: SkillsProps) {
     categoryMap[category].push(skill);
   });
 
-  // Sort categories and skills
+  // Sort categories and get top skills for preview
   const sortedCategories = Object.keys(categoryMap).sort();
-  sortedCategories.forEach((category) => {
-    categoryMap[category].sort(
-      (a, b) => (b.proficiency || 0) - (a.proficiency || 0)
-    );
-  });
+  const topSkills = skills
+    .sort((a, b) => (b.proficiency || 0) - (a.proficiency || 0))
+    .slice(0, 8); // Show top 8 skills
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  };
-
-  const categoryVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-        staggerChildren: 0.05,
-      },
-    },
-  };
-
-  const skillVariants = {
-    hidden: { opacity: 0, scale: 0.95 },
-    visible: {
-      opacity: 1,
-      scale: 1,
-      transition: {
-        duration: 0.3,
-      },
-    },
-  };
+  const totalSkills = skills.length;
+  const averageProficiency = Math.round(
+    skills.reduce((sum, skill) => sum + (skill.proficiency || 0), 0) /
+      totalSkills
+  );
+  const expertSkills = skills.filter(
+    (skill) => (skill.proficiency || 0) >= 90
+  ).length;
 
   return (
-    <section className="py-20 bg-gradient-to-br from-background via-accent/30 to-background relative overflow-hidden">
-      {/* Background decorations */}
-      <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
-      <div className="absolute top-10 right-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-10 left-10 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
+    <section
+      className={`${SPACING.section} ${GRADIENTS.background} relative overflow-hidden`}
+    >
+      {/* Animated background elements */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-20 right-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-20 left-20 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-500/5 rounded-full blur-2xl animate-pulse delay-500"></div>
+      </div>
 
-      <div className="container mx-auto px-4 relative z-10">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-16"
-        >
-          <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-primary via-purple-600 to-blue-600 bg-clip-text text-transparent">
-            My Skills
+      <div className={`${SPACING.container} relative z-10`}>
+        {/* Section Header */}
+        <motion.div {...ANIMATIONS.fadeIn} className="text-center mb-16">
+          <h2
+            className={`text-4xl md:text-5xl font-bold mb-6 ${GRADIENTS.primaryText}`}
+          >
+            Skills & Expertise
           </h2>
-          <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            Technologies and tools I've mastered over my{" "}
-            <span className="text-primary font-semibold">6+ years</span> in
-            software development. Each skill represents countless hours of
-            learning, building, and problem-solving.
+          <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+            Mastering cutting-edge technologies to build exceptional digital
+            experiences.
+            <span className="block mt-2 text-primary font-semibold">
+              {totalSkills} skills across {sortedCategories.length} categories
+            </span>
           </p>
         </motion.div>
 
+        {/* Stats Cards */}
         <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          className="space-y-16"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 max-w-4xl mx-auto"
         >
-          {sortedCategories.map((category) => (
-            <motion.div key={category} variants={categoryVariants}>
-              <div className="mb-8">
-                <h3 className="text-2xl md:text-3xl font-bold mb-2 text-center">
-                  {category}
-                </h3>
-                <div className="w-24 h-1 bg-gradient-to-r from-primary to-purple-600 mx-auto rounded-full"></div>
-              </div>
+          <div className="text-center p-6 rounded-2xl bg-card/60 backdrop-blur-sm border border-white/10 hover:shadow-lg transition-all duration-300 group">
+            <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+              <Code className="w-8 h-8 text-primary" />
+            </div>
+            <div className="text-3xl font-bold text-primary mb-2">
+              {totalSkills}
+            </div>
+            <div className="text-muted-foreground">Total Skills</div>
+          </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {categoryMap[category].map((skill, index) => {
-                  const proficiencyInfo = getProficiencyLevel(
-                    skill.proficiency
-                  );
-                  const categoryColor = getCategoryColor(category);
+          <div className="text-center p-6 rounded-2xl bg-card/60 backdrop-blur-sm border border-white/10 hover:shadow-lg transition-all duration-300 group">
+            <div className="w-16 h-16 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+              <Award className="w-8 h-8 text-green-600" />
+            </div>
+            <div className="text-3xl font-bold text-green-600 mb-2">
+              {expertSkills}
+            </div>
+            <div className="text-muted-foreground">Expert Level</div>
+          </div>
 
-                  return (
-                    <motion.div
-                      key={skill.id}
-                      variants={skillVariants}
-                      whileHover={{
-                        scale: 1.05,
-                        y: -5,
-                        transition: { duration: 0.2 },
-                      }}
-                      className={`
-                        relative p-6 rounded-2xl border-2 backdrop-blur-sm
-                        hover:shadow-2xl hover:shadow-primary/25 transition-all duration-300
-                        group cursor-pointer ${categoryColor}
-                      `}
-                    >
-                      {/* Skill Icon */}
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center justify-center w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 group-hover:scale-110 transition-transform duration-300">
-                          <div className="text-primary group-hover:text-purple-600 transition-colors duration-300">
-                            {getSkillIcon(skill.name, skill.icon)}
-                          </div>
-                        </div>
+          <div className="text-center p-6 rounded-2xl bg-card/60 backdrop-blur-sm border border-white/10 hover:shadow-lg transition-all duration-300 group">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+              <TrendingUp className="w-8 h-8 text-blue-600" />
+            </div>
+            <div className="text-3xl font-bold text-blue-600 mb-2">
+              {averageProficiency}%
+            </div>
+            <div className="text-muted-foreground">Avg. Proficiency</div>
+          </div>
+        </motion.div>
 
-                        {/* Proficiency Badge */}
-                        <div
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${proficiencyInfo.textColor} bg-white/20 backdrop-blur-sm border border-white/30`}
-                        >
-                          {proficiencyInfo.level}
+        {/* Skills Preview Grid */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          className="mb-16"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {topSkills.map((skill, index) => {
+              const proficiencyConfig = getProficiencyConfig(skill.proficiency);
+              const categoryGradient = getCategoryGradient(
+                skill.category || "Other"
+              );
+
+              return (
+                <motion.div
+                  key={skill.id}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{
+                    duration: 0.5,
+                    delay: index * 0.1,
+                    type: "spring",
+                    stiffness: 100,
+                  }}
+                  whileHover={{
+                    scale: 1.05,
+                    y: -5,
+                    transition: { duration: 0.2 },
+                  }}
+                  className="group cursor-pointer"
+                >
+                  <div
+                    className={`h-full p-6 rounded-2xl border-2 border-white/10 backdrop-blur-sm bg-gradient-to-br ${categoryGradient} hover:shadow-2xl hover:shadow-primary/25 transition-all duration-300 relative overflow-hidden`}
+                  >
+                    {/* Skill Icon & Badge */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center justify-center w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 group-hover:scale-110 transition-transform duration-300">
+                        <div className="text-primary group-hover:text-purple-600 transition-colors duration-300 text-xl">
+                          {getSkillIcon(skill.name, skill.icon)}
                         </div>
                       </div>
 
-                      {/* Skill Name */}
-                      <h4 className="text-lg font-semibold mb-3 group-hover:text-primary transition-colors duration-300">
-                        {skill.name}
-                      </h4>
+                      <Badge
+                        variant="secondary"
+                        className={`${proficiencyConfig.textColor} bg-white/20 backdrop-blur-sm border border-white/30 font-semibold text-xs`}
+                      >
+                        <div className="flex items-center gap-1">
+                          {proficiencyConfig.icon}
+                          {proficiencyConfig.level}
+                        </div>
+                      </Badge>
+                    </div>
 
-                      {/* Proficiency Bar */}
-                      {skill.proficiency && (
+                    {/* Skill Name */}
+                    <h3 className="font-semibold mb-3 group-hover:text-primary transition-colors duration-300 text-lg">
+                      {skill.name}
+                    </h3>
+
+                    {/* Proficiency Bar */}
+                    {skill.proficiency !== null &&
+                      skill.proficiency !== undefined && (
                         <div className="space-y-2">
-                          <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted-foreground font-medium">
                               Proficiency
                             </span>
-                            <span className="font-semibold">
+                            <span className="font-bold">
                               {skill.proficiency}%
                             </span>
                           </div>
@@ -398,9 +239,9 @@ export default function Skills({ skills }: SkillsProps) {
                                 delay: index * 0.1,
                                 ease: "easeOut",
                               }}
-                              className={`h-full bg-gradient-to-r ${proficiencyInfo.color} rounded-full relative`}
+                              className={`h-full bg-gradient-to-r ${proficiencyConfig.color} rounded-full relative overflow-hidden`}
                             >
-                              {/* Animated shine effect */}
+                              {/* Shine effect */}
                               <motion.div
                                 animate={{
                                   x: ["-100%", "200%"],
@@ -408,39 +249,107 @@ export default function Skills({ skills }: SkillsProps) {
                                 transition={{
                                   duration: 2,
                                   repeat: Infinity,
-                                  repeatDelay: 3,
+                                  repeatDelay: 4,
                                   ease: "easeInOut",
                                 }}
-                                className="absolute top-0 left-0 h-full w-1/3 bg-white/30 transform skew-x-12"
+                                className="absolute top-0 left-0 h-full w-1/3 bg-white/40 transform skew-x-12"
                               />
                             </motion.div>
                           </div>
                         </div>
                       )}
 
-                      {/* Hover Glow Effect */}
-                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/0 via-primary/5 to-purple-600/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          ))}
+                    {/* Hover Glow Effect */}
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/0 via-primary/5 to-purple-600/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+
+        {/* Categories Overview */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="mb-12"
+        >
+          <h3 className="text-2xl font-bold text-center mb-8">
+            Skill Categories
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {sortedCategories.map((category, index) => (
+              <motion.div
+                key={category}
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1 }}
+                whileHover={{ scale: 1.05 }}
+                className="group"
+              >
+                <div
+                  className={`p-4 rounded-xl text-center bg-gradient-to-br ${getCategoryGradient(
+                    category
+                  )} border border-white/10 hover:shadow-lg transition-all duration-300 cursor-pointer`}
+                >
+                  <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-300">
+                    <div className="text-primary">
+                      {getCategoryIcon(category)}
+                    </div>
+                  </div>
+                  <h4 className="font-medium text-sm mb-1">{category}</h4>
+                  <p className="text-xs text-muted-foreground">
+                    {categoryMap[category].length} skills
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </motion.div>
 
         {/* Call to Action */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          className="text-center mt-16"
+          transition={{ duration: 0.6, delay: 0.6 }}
+          className="text-center"
         >
-          <div className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary/10 to-purple-600/10 border border-primary/20 rounded-full">
-            <Zap className="text-primary" size={20} />
-            <span className="text-sm font-medium">
+          <div className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-primary/10 to-purple-600/10 border border-primary/20 rounded-full backdrop-blur-sm mb-8">
+            <Sparkles className="text-primary w-5 h-5" />
+            <span className="font-medium">
               Always learning and expanding my skillset
             </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button
+              asChild
+              size="lg"
+              className="gap-2 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 shadow-lg hover:shadow-xl transition-all duration-300"
+            >
+              <Link href="/skills">
+                <Zap className="w-5 h-5" />
+                Explore All Skills
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </Button>
+
+            <Button
+              asChild
+              variant="outline"
+              size="lg"
+              className="gap-2 border-primary/20 hover:bg-primary/10 shadow-lg hover:shadow-xl transition-all duration-300"
+            >
+              <Link href="/projects">
+                <Code className="w-5 h-5" />
+                See Skills in Action
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            </Button>
           </div>
         </motion.div>
       </div>
