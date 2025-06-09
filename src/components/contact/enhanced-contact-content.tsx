@@ -469,25 +469,34 @@ export default function EnhancedContactContent({
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {businessHours.map((hours) => (
-                          <div
-                            key={hours.id}
-                            className={`flex justify-between items-center text-sm p-2 rounded ${
-                              hours.day_of_week === new Date().getDay()
-                                ? "bg-primary/10 text-primary border border-primary/20"
-                                : ""
-                            }`}
-                          >
-                            <span className="font-medium">
-                              {hours.day_name}
-                            </span>
-                            <span className="text-muted-foreground">
-                              {hours.is_open
-                                ? `${hours.open_time} - ${hours.close_time}`
-                                : "Closed"}
-                            </span>
-                          </div>
-                        ))}
+                        {businessHours.map((hours) => {
+                          const isToday =
+                            hours.day_of_week === new Date().getDay();
+                          return (
+                            <div
+                              key={hours.id}
+                              className={`flex justify-between items-center text-sm p-2 rounded ${
+                                isToday
+                                  ? "bg-primary/10 text-primary border border-primary/20"
+                                  : ""
+                              }`}
+                            >
+                              <span className="font-medium flex items-center gap-1">
+                                {hours.day_name}
+                                {isToday && (
+                                  <span className="text-xs font-semibold text-primary/80 ml-1">
+                                    (Today)
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-muted-foreground">
+                                {hours.is_open
+                                  ? `${hours.open_time} - ${hours.close_time}`
+                                  : "Closed"}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </CardContent>
                   </Card>
