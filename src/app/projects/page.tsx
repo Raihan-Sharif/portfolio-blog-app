@@ -7,7 +7,7 @@ export const revalidate = 3600; // Revalidate at most once per hour
 export default async function ProjectsPage() {
   const supabase = createServerSupabaseClient();
 
-  // Fetch all projects and categories
+  // Fetch all projects with categories, technologies, and awards
   const [projectsResponse, categoriesResponse] = await Promise.all([
     supabase
       .from("projects")
@@ -16,8 +16,12 @@ export default async function ProjectsPage() {
       *,
       category:project_categories(*),
       project_technologies(
-        technology:technologies(*)
-      )
+        technology:technologies(*),
+        proficiency_level,
+        is_primary,
+        display_order
+      ),
+      awards:project_awards(*)
     `
       )
       .eq("is_public", true)
@@ -42,6 +46,7 @@ export default async function ProjectsPage() {
           is_primary: pt.is_primary || false,
           proficiency_level: pt.proficiency_level,
         })) || [],
+      awards: project.awards || [],
     })) || [];
 
   return (

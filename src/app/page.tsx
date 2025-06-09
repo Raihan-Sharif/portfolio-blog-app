@@ -19,8 +19,7 @@ export const revalidate = 3600; // Revalidate at most once per hour
 export default async function HomePage() {
   const supabase = createServerSupabaseClient();
 
-  // Fetch featured projects
-  // Fetch featured projects with categories and technologies
+  // Fetch featured projects with categories, technologies, and awards
   const { data: featuredProjects } = await supabase
     .from("projects")
     .select(
@@ -28,8 +27,12 @@ export default async function HomePage() {
       *,
       category:project_categories(*),
       project_technologies(
-        technology:technologies(*)
-      )
+        technology:technologies(*),
+        proficiency_level,
+        is_primary,
+        display_order
+      ),
+      awards:project_awards(*)
     `
     )
     .eq("featured", true)
@@ -60,7 +63,7 @@ export default async function HomePage() {
     .order("proficiency", { ascending: false })
     .limit(10);
 
-  // Process projects to include technologies properly
+  // Process projects to include technologies and awards properly
   const processedProjects =
     featuredProjects?.map((project) => ({
       ...project,
@@ -70,6 +73,7 @@ export default async function HomePage() {
           is_primary: pt.is_primary || false,
           proficiency_level: pt.proficiency_level,
         })) || [],
+      awards: project.awards || [],
     })) || [];
 
   return (
