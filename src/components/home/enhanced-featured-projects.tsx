@@ -205,34 +205,34 @@ const ProjectAwardsDisplay = ({ awards }: { awards: ProjectAward[] }) => {
             delay: 0.2,
           }}
           className="relative group cursor-pointer"
-          whileHover={{ scale: 1.1, rotate: 5 }}
+          whileHover={{ scale: 1.05, rotate: 2 }}
         >
           {/* Main Award Container with Glass Effect */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-amber-400 via-yellow-500 to-orange-600 text-white px-4 py-3 rounded-2xl shadow-2xl border border-white/40 backdrop-blur-md">
+          <div className="relative overflow-hidden bg-gradient-to-br from-amber-400 via-yellow-500 to-orange-600 text-white px-3 py-2 rounded-xl shadow-xl border border-white/40 backdrop-blur-md max-w-[160px]">
             {/* Animated Background Pattern */}
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-pulse opacity-30" />
 
             {/* Content */}
-            <div className="relative flex items-center gap-3">
-              <div className="relative">
+            <div className="relative flex items-center gap-2">
+              <div className="relative flex-shrink-0">
                 <div className="p-1 bg-white/20 rounded-full backdrop-blur-sm">
-                  <Trophy className="w-4 h-4 text-white drop-shadow-sm" />
+                  <Trophy className="w-3 h-3 text-white drop-shadow-sm" />
                 </div>
                 {/* Pulsing Ring Effect */}
                 <div className="absolute inset-0 bg-white/30 rounded-full animate-ping" />
               </div>
 
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-black tracking-wider uppercase bg-white/20 px-2 py-0.5 rounded-full backdrop-blur-sm">
+              <div className="flex flex-col min-w-0 flex-1">
+                <div className="flex items-center gap-1 mb-1">
+                  <span className="text-[9px] font-black tracking-wider uppercase bg-white/20 px-1.5 py-0.5 rounded-full backdrop-blur-sm">
                     🏆 Winner
                   </span>
                 </div>
-                <span className="text-xs font-bold text-white/95 truncate mt-1 max-w-[120px]">
+                <span className="text-[11px] font-bold text-white/95 truncate leading-tight">
                   {topAward.title}
                 </span>
                 {topAward.awarded_by && (
-                  <span className="text-[10px] text-white/80 truncate max-w-[120px]">
+                  <span className="text-[9px] text-white/80 truncate leading-tight">
                     by {topAward.awarded_by}
                   </span>
                 )}
@@ -246,25 +246,25 @@ const ProjectAwardsDisplay = ({ awards }: { awards: ProjectAward[] }) => {
           {/* Floating Elements */}
           <motion.div
             animate={{
-              y: [0, -8, 0],
-              rotate: [0, 10, 0],
+              y: [0, -6, 0],
+              rotate: [0, 8, 0],
             }}
             transition={{
               duration: 2,
               repeat: Infinity,
               ease: "easeInOut",
             }}
-            className="absolute -top-2 -right-2"
+            className="absolute -top-1 -right-1"
           >
-            <div className="w-6 h-6 bg-gradient-to-br from-yellow-300 to-orange-400 rounded-full flex items-center justify-center shadow-lg">
-              <Star className="w-3 h-3 text-white fill-current" />
+            <div className="w-5 h-5 bg-gradient-to-br from-yellow-300 to-orange-400 rounded-full flex items-center justify-center shadow-lg">
+              <Star className="w-2.5 h-2.5 text-white fill-current" />
             </div>
           </motion.div>
 
           <motion.div
             animate={{
-              y: [0, 6, 0],
-              x: [0, -4, 0],
+              y: [0, 4, 0],
+              x: [0, -3, 0],
             }}
             transition={{
               duration: 2.5,
@@ -272,10 +272,10 @@ const ProjectAwardsDisplay = ({ awards }: { awards: ProjectAward[] }) => {
               ease: "easeInOut",
               delay: 0.5,
             }}
-            className="absolute -bottom-1 -left-1"
+            className="absolute -bottom-0.5 -left-0.5"
           >
-            <div className="w-5 h-5 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center shadow-md">
-              <Medal className="w-2.5 h-2.5 text-white" />
+            <div className="w-4 h-4 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center shadow-md">
+              <Medal className="w-2 h-2 text-white" />
             </div>
           </motion.div>
         </motion.div>
@@ -292,28 +292,28 @@ const ProjectAwardsDisplay = ({ awards }: { awards: ProjectAward[] }) => {
             }}
             className="relative"
           >
-            <div className="bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 text-white px-3 py-2 rounded-xl shadow-lg border border-white/30 backdrop-blur-sm">
-              <div className="flex items-center gap-2">
-                <div className="flex -space-x-1">
-                  <div className="w-4 h-4 bg-yellow-400 rounded-full border border-white/50 flex items-center justify-center">
-                    <Award className="w-2 h-2 text-white" />
+            <div className="bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 text-white px-2 py-1.5 rounded-lg shadow-lg border border-white/30 backdrop-blur-sm">
+              <div className="flex items-center gap-1.5">
+                <div className="flex -space-x-0.5">
+                  <div className="w-3 h-3 bg-yellow-400 rounded-full border border-white/50 flex items-center justify-center">
+                    <Award className="w-1.5 h-1.5 text-white" />
                   </div>
-                  <div className="w-4 h-4 bg-orange-400 rounded-full border border-white/50 flex items-center justify-center">
-                    <Medal className="w-2 h-2 text-white" />
+                  <div className="w-3 h-3 bg-orange-400 rounded-full border border-white/50 flex items-center justify-center">
+                    <Medal className="w-1.5 h-1.5 text-white" />
                   </div>
                   {additionalAwardsCount > 2 && (
-                    <div className="w-4 h-4 bg-red-400 rounded-full border border-white/50 flex items-center justify-center">
-                      <Crown className="w-2 h-2 text-white" />
+                    <div className="w-3 h-3 bg-red-400 rounded-full border border-white/50 flex items-center justify-center">
+                      <Crown className="w-1.5 h-1.5 text-white" />
                     </div>
                   )}
                 </div>
-                <span className="text-[10px] font-bold">
+                <span className="text-[9px] font-bold">
                   +{additionalAwardsCount} MORE
                 </span>
               </div>
             </div>
             {/* Subtle glow effect */}
-            <div className="absolute inset-0 bg-purple-400/30 rounded-xl blur-md -z-10" />
+            <div className="absolute inset-0 bg-purple-400/30 rounded-lg blur-md -z-10" />
           </motion.div>
         )}
 
@@ -325,8 +325,8 @@ const ProjectAwardsDisplay = ({ awards }: { awards: ProjectAward[] }) => {
             transition={{ delay: 0.8 }}
             className="bg-black/60 backdrop-blur-md text-white px-2 py-1 rounded-lg border border-white/20"
           >
-            <div className="text-[9px] font-medium text-center">
-              <Calendar className="w-2.5 h-2.5 inline mr-1" />
+            <div className="text-[8px] font-medium text-center">
+              <Calendar className="w-2 h-2 inline mr-1" />
               {new Date(topAward.award_date).toLocaleDateString("en-US", {
                 year: "numeric",
                 month: "short",
@@ -1170,9 +1170,14 @@ export default function EnhancedFeaturedProjects({
                           >
                             <option value="">All Platforms</option>
                             {uniquePlatforms.map((platform) => (
-                              <option key={platform} value={platform}>
-                                {platform?.charAt(0).toUpperCase() +
-                                  platform?.slice(1)}
+                              <option
+                                key={platform ?? "unknown"}
+                                value={platform ?? ""}
+                              >
+                                {platform
+                                  ? platform.charAt(0).toUpperCase() +
+                                    platform.slice(1)
+                                  : "Unknown"}
                               </option>
                             ))}
                           </select>
@@ -1192,9 +1197,14 @@ export default function EnhancedFeaturedProjects({
                           >
                             <option value="">All Statuses</option>
                             {uniqueStatuses.map((status) => (
-                              <option key={status} value={status}>
-                                {status?.charAt(0).toUpperCase() +
-                                  status?.slice(1)}
+                              <option
+                                key={status ?? "unknown"}
+                                value={status ?? "unknown"}
+                              >
+                                {status
+                                  ? status.charAt(0).toUpperCase() +
+                                    status.slice(1)
+                                  : "Unknown"}
                               </option>
                             ))}
                           </select>

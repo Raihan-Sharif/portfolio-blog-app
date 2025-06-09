@@ -61,6 +61,15 @@ interface ProjectCategory {
   color?: string;
 }
 
+interface ProjectTechnology {
+  technology_id: number;
+  category: string;
+  proficiency_level?: string;
+  is_primary: boolean;
+  display_order: number;
+  technology: Technology;
+}
+
 interface Project {
   id: number;
   title: string;
@@ -77,6 +86,7 @@ interface Project {
   platform?: string;
   team_size?: number;
   technologies?: Technology[];
+  project_technologies?: ProjectTechnology[];
   featured: boolean;
   priority: number;
   view_count: number;
@@ -196,12 +206,14 @@ export default function AdminProjectsList() {
 
       if (categoriesError) throw categoriesError;
 
-      // Process projects data
+      // Process projects data with proper typing
       const processedProjects =
         projectsData?.map((project) => ({
           ...project,
           technologies:
-            project.project_technologies?.map((pt) => pt.technology) || [],
+            project.project_technologies?.map(
+              (pt: ProjectTechnology) => pt.technology
+            ) || [],
         })) || [];
 
       setProjects(processedProjects);
@@ -472,10 +484,12 @@ export default function AdminProjectsList() {
               />
             </div>
 
-            {/* Category Filter - FIXED: Added placeholder SelectItem */}
+            {/* Category Filter */}
             <Select
               value={selectedCategory}
-              onValueChange={(value) => setSelectedCategory(value)}
+              onValueChange={(value) =>
+                setSelectedCategory(value === "all" ? "" : value)
+              }
             >
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="All Categories" />
@@ -490,10 +504,12 @@ export default function AdminProjectsList() {
               </SelectContent>
             </Select>
 
-            {/* Status Filter - FIXED: Added placeholder SelectItem */}
+            {/* Status Filter */}
             <Select
               value={selectedStatus}
-              onValueChange={(value) => setSelectedStatus(value)}
+              onValueChange={(value) =>
+                setSelectedStatus(value === "all" ? "" : value)
+              }
             >
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="All Statuses" />
@@ -508,10 +524,12 @@ export default function AdminProjectsList() {
               </SelectContent>
             </Select>
 
-            {/* Visibility Filter - FIXED: Added placeholder SelectItem */}
+            {/* Visibility Filter */}
             <Select
               value={selectedVisibility}
-              onValueChange={(value) => setSelectedVisibility(value)}
+              onValueChange={(value) =>
+                setSelectedVisibility(value === "all" ? "" : value)
+              }
             >
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="All Visibility" />
@@ -523,7 +541,7 @@ export default function AdminProjectsList() {
               </SelectContent>
             </Select>
 
-            {/* Sort - FIXED: Using proper values */}
+            {/* Sort */}
             <Select value={sortBy} onValueChange={(value) => setSortBy(value)}>
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue />
@@ -671,8 +689,10 @@ export default function AdminProjectsList() {
                               getStatusColor(project.status)
                             )}
                           >
-                            {project.status?.charAt(0).toUpperCase() +
-                              project.status?.slice(1)}
+                            {project.status
+                              ? project.status.charAt(0).toUpperCase() +
+                                project.status.slice(1)
+                              : "Unknown"}
                           </Badge>
                         </div>
                       </div>
