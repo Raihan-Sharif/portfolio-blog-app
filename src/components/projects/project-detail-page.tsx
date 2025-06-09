@@ -328,7 +328,8 @@ export default function ProjectDetailPage({
                   <div className="absolute top-4 right-4">
                     <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0">
                       <Trophy className="w-3 h-3 mr-1" />
-                      {project.awards.length} Award{project.awards.length > 1 ? 's' : ''}
+                      {project.awards.length} Award
+                      {project.awards.length > 1 ? "s" : ""}
                     </Badge>
                   </div>
                 )}
@@ -468,7 +469,7 @@ export default function ProjectDetailPage({
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-4">
                 {project.demo_url && (
-                  
+                  <a
                     href={project.demo_url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -484,7 +485,7 @@ export default function ProjectDetailPage({
                 )}
 
                 {project.github_url && (
-                  
+                  <a
                     href={project.github_url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -497,7 +498,7 @@ export default function ProjectDetailPage({
                 )}
 
                 {project.case_study_url && (
-                  
+                  <a
                     href={project.case_study_url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -510,7 +511,7 @@ export default function ProjectDetailPage({
                 )}
 
                 {project.documentation_url && (
-                  
+                  <a
                     href={project.documentation_url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -562,36 +563,38 @@ export default function ProjectDetailPage({
                                 />
                               </div>
                             )}
-                            
+
                             {/* Award Content */}
                             <div className="text-center">
                               <h4 className="font-bold text-lg mb-2 text-yellow-800 dark:text-yellow-200">
                                 {award.title}
                               </h4>
-                              
+
                               {award.awarded_by && (
                                 <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300 mb-2">
                                   by {award.awarded_by}
                                 </p>
                               )}
-                              
+
                               {award.award_date && (
                                 <p className="text-xs text-yellow-600 dark:text-yellow-400 mb-3">
-                                  {new Date(award.award_date).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'long'
+                                  {new Date(
+                                    award.award_date
+                                  ).toLocaleDateString("en-US", {
+                                    year: "numeric",
+                                    month: "long",
                                   })}
                                 </p>
                               )}
-                              
+
                               {award.description && (
                                 <p className="text-sm text-muted-foreground mb-4">
                                   {award.description}
                                 </p>
                               )}
-                              
+
                               {award.award_url && (
-                                
+                                <a
                                   href={award.award_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
@@ -683,7 +686,7 @@ export default function ProjectDetailPage({
                               {techs.map((tech) => (
                                 <div key={tech.id} className="group">
                                   {tech.official_url ? (
-                                    
+                                    <a
                                       href={tech.official_url}
                                       target="_blank"
                                       rel="noopener noreferrer"
@@ -751,7 +754,6 @@ export default function ProjectDetailPage({
                               {challenge.solution && (
                                 <>
                                   <h5 className="font-semibold mb-2 text-green-600 dark:text-green-400">
-                                    <h5 className="font-semibold mb-2 text-green-600 dark:text-green-400">
                                     Solution:
                                   </h5>
                                   <p className="text-muted-foreground">
@@ -840,7 +842,7 @@ export default function ProjectDetailPage({
                         </div>
                         <div>
                           {project.client_url ? (
-                            
+                            <a
                               href={project.client_url}
                               target="_blank"
                               rel="noopener noreferrer"
