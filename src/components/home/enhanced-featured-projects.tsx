@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Clock,
   Code2,
+  Crown,
   ExternalLink,
   Eye,
   Filter,
@@ -19,6 +20,7 @@ import {
   Globe,
   Heart,
   Layers,
+  Medal,
   Monitor,
   Play,
   Search,
@@ -180,6 +182,420 @@ const getProjectTypeIcon = (type?: string) => {
   }
 };
 
+// Enhanced Awards Display Component
+const ProjectAwardsDisplay = ({ awards }: { awards: ProjectAward[] }) => {
+  if (!awards || awards.length === 0) return null;
+
+  const topAward = awards[0]; // Most important award (sorted by display_order)
+  const additionalAwardsCount = awards.length - 1;
+
+  return (
+    <div className="absolute top-3 left-3 z-10">
+      <div className="flex flex-col gap-2">
+        {/* Main Award Badge */}
+        <motion.div
+          initial={{ scale: 0, rotate: -10 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{
+            type: "spring",
+            stiffness: 260,
+            damping: 20,
+            delay: 0.1,
+          }}
+          className="relative"
+        >
+          <div className="bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-500 text-white px-3 py-1.5 rounded-full shadow-lg border-2 border-white/20 backdrop-blur-sm">
+            <div className="flex items-center gap-1.5">
+              <div className="relative">
+                <Trophy className="w-4 h-4" />
+                <div className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full animate-pulse" />
+              </div>
+              <span className="text-xs font-bold tracking-wide">
+                AWARD WINNER
+              </span>
+            </div>
+          </div>
+
+          {/* Sparkle Effect */}
+          <div className="absolute -top-1 -right-1">
+            <Star
+              className="w-3 h-3 text-yellow-300 animate-pulse"
+              fill="currentColor"
+            />
+          </div>
+        </motion.div>
+
+        {/* Award Details */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-black/70 backdrop-blur-md text-white px-2.5 py-1 rounded-lg text-xs max-w-[200px]"
+        >
+          <div className="font-semibold truncate">{topAward.title}</div>
+          {topAward.awarded_by && (
+            <div className="text-yellow-200 truncate text-[10px] opacity-90">
+              {topAward.awarded_by}
+            </div>
+          )}
+        </motion.div>
+
+        {/* Additional Awards Indicator */}
+        {additionalAwardsCount > 0 && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.5 }}
+            className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit"
+          >
+            <Medal className="w-3 h-3" />+{additionalAwardsCount} MORE
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Enhanced Project Card Component
+const EnhancedProjectCard = ({
+  project,
+  index,
+}: {
+  project: Project;
+  index: number;
+}) => {
+  const router = useRouter();
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleProjectClick = async () => {
+    try {
+      await supabase.rpc("increment_project_view", {
+        project_id_param: project.id,
+      });
+      router.push(`/projects/${project.slug}`);
+    } catch (error) {
+      console.error("Error tracking project view:", error);
+      router.push(`/projects/${project.slug}`);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: index * 0.1 }}
+      className="group relative bg-card/50 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden hover:shadow-2xl hover:shadow-primary/10 transition-all duration-700 hover:-translate-y-2 cursor-pointer"
+      onClick={handleProjectClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Project Image */}
+      <div className="relative aspect-video overflow-hidden">
+        {project.featured_image_url || project.hero_image_url ? (
+          <Image
+            src={project.featured_image_url || project.hero_image_url || ""}
+            alt={project.title}
+            fill
+            className="object-cover transition-transform duration-700 group-hover:scale-110"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
+            {getProjectTypeIcon(project.project_type)}
+          </div>
+        )}
+
+        {/* Awards Display */}
+        <ProjectAwardsDisplay awards={project.awards || []} />
+
+        {/* Status and Featured Badges */}
+        <div className="absolute top-3 right-3 flex flex-col gap-2">
+          {project.featured && (
+            <motion.div
+              initial={{ scale: 0, rotate: 20 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0 shadow-lg">
+                <Crown className="w-3 h-3 mr-1" />
+                Featured
+              </Badge>
+            </motion.div>
+          )}
+
+          {project.status && (
+            <Badge className={cn("text-xs", getStatusColor(project.status))}>
+              {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
+            </Badge>
+          )}
+        </div>
+
+        {/* Overlay with Action Buttons */}
+        <AnimatePresence>
+          {isHovered && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"
+            >
+              <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
+                <div className="flex gap-2">
+                  {project.demo_url && (
+                    <motion.a
+                      initial={{ scale: 0, y: 20 }}
+                      animate={{ scale: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                      href={project.demo_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Button
+                        size="sm"
+                        className="bg-white/20 backdrop-blur-sm hover:bg-white/30 border border-white/30 text-white"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                    </motion.a>
+                  )}
+                  {project.github_url && (
+                    <motion.a
+                      initial={{ scale: 0, y: 20 }}
+                      animate={{ scale: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                      href={project.github_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-white/20 backdrop-blur-sm hover:bg-white/30 border border-white/30 text-white"
+                      >
+                        <Github className="w-4 h-4" />
+                      </Button>
+                    </motion.a>
+                  )}
+                  {project.demo_video_url && (
+                    <motion.a
+                      initial={{ scale: 0, y: 20 }}
+                      animate={{ scale: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      href={project.demo_video_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-white/20 backdrop-blur-sm hover:bg-white/30 border border-white/30 text-white"
+                      >
+                        <Play className="w-4 h-4" />
+                      </Button>
+                    </motion.a>
+                  )}
+                </div>
+
+                {/* Stats */}
+                <div className="flex gap-2">
+                  <div className="bg-black/40 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
+                    <Eye className="w-3 h-3 text-white" />
+                    <span className="text-white text-xs">
+                      {project.view_count || 0}
+                    </span>
+                  </div>
+                  {project.like_count > 0 && (
+                    <div className="bg-black/40 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
+                      <Heart className="w-3 h-3 text-red-400" />
+                      <span className="text-white text-xs">
+                        {project.like_count}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Project Details */}
+      <div className="p-6">
+        {/* Category and Platform */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            {project.category && (
+              <Badge
+                variant="outline"
+                style={{ borderColor: project.category.color }}
+                className="text-xs"
+              >
+                {project.category.name}
+              </Badge>
+            )}
+            <div className="flex items-center gap-1">
+              {getPlatformIcon(project.platform)}
+              <span className="text-xs text-muted-foreground capitalize">
+                {project.platform || "Web"}
+              </span>
+            </div>
+          </div>
+
+          {project.start_date && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Calendar className="w-3 h-3" />
+              {new Date(project.start_date).getFullYear()}
+            </div>
+          )}
+        </div>
+
+        {/* Title and Subtitle */}
+        <div className="mb-4">
+          <h3 className="text-xl font-bold mb-1 group-hover:text-primary transition-colors line-clamp-2">
+            {project.title}
+          </h3>
+          {project.subtitle && (
+            <p className="text-sm text-muted-foreground font-medium line-clamp-1">
+              {project.subtitle}
+            </p>
+          )}
+        </div>
+
+        {/* Description */}
+        <p className="text-muted-foreground text-sm mb-4 line-clamp-3">
+          {project.description}
+        </p>
+
+        {/* Awards Summary - Enhanced */}
+        {project.awards && project.awards.length > 0 && (
+          <div className="mb-4 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 rounded-lg border border-yellow-200/50 dark:border-yellow-800/50">
+            <div className="flex items-start gap-2">
+              <div className="p-1 bg-yellow-400 rounded-full">
+                <Trophy className="w-3 h-3 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-yellow-800 dark:text-yellow-200 mb-1">
+                  {project.awards.length === 1
+                    ? "Award Winner"
+                    : `${project.awards.length} Awards Won`}
+                </p>
+                <p className="text-xs text-yellow-700 dark:text-yellow-300 line-clamp-1">
+                  {project.awards[0].title}
+                  {project.awards[0].awarded_by &&
+                    ` by ${project.awards[0].awarded_by}`}
+                </p>
+                {project.awards.length > 1 && (
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                    +{project.awards.length - 1} more award
+                    {project.awards.length > 2 ? "s" : ""}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Technologies */}
+        {project.technologies && project.technologies.length > 0 && (
+          <div className="mb-4">
+            <div className="flex flex-wrap gap-1">
+              {project.technologies
+                .filter((tech) => tech.is_primary)
+                .slice(0, 4)
+                .map((tech) => (
+                  <Badge
+                    key={tech.id}
+                    variant="outline"
+                    className="text-xs"
+                    style={{ borderColor: tech.color }}
+                  >
+                    {tech.name}
+                  </Badge>
+                ))}
+              {project.technologies.filter((tech) => tech.is_primary).length >
+                4 && (
+                <Badge variant="outline" className="text-xs">
+                  +
+                  {project.technologies.filter((tech) => tech.is_primary)
+                    .length - 4}
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Metrics */}
+        <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
+          {project.duration_months && (
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              <span>{project.duration_months}mo</span>
+            </div>
+          )}
+          {project.team_size && (
+            <div className="flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              <span>{project.team_size}</span>
+            </div>
+          )}
+          {project.client_name && (
+            <div className="flex items-center gap-1">
+              <Award className="w-3 h-3" />
+              <span>Client</span>
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap gap-2">
+          {project.demo_url && (
+            <a
+              href={project.demo_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Button size="sm" className="gap-1">
+                <ExternalLink className="w-3 h-3" />
+                Demo
+              </Button>
+            </a>
+          )}
+          {project.github_url && (
+            <a
+              href={project.github_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Button size="sm" variant="outline" className="gap-1">
+                <Github className="w-3 h-3" />
+                Code
+              </Button>
+            </a>
+          )}
+          {project.case_study_url && (
+            <a
+              href={project.case_study_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Button size="sm" variant="outline" className="gap-1">
+                <Star className="w-3 h-3" />
+                Case Study
+              </Button>
+            </a>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
 export default function EnhancedFeaturedProjects({
   projects,
   categories,
@@ -189,7 +605,6 @@ export default function EnhancedFeaturedProjects({
   title = "My Projects",
   subtitle,
 }: EnhancedProjectsPageProps) {
-  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
@@ -210,23 +625,6 @@ export default function EnhancedFeaturedProjects({
     const statuses = projects.map((p) => p.status).filter(Boolean);
     return [...new Set(statuses)];
   }, [projects]);
-
-  // Handle project click with view tracking
-  const handleProjectClick = async (project: Project) => {
-    try {
-      // Increment view count in database
-      await supabase.rpc("increment_project_view", {
-        project_id_param: project.id,
-      });
-
-      // Navigate to project detail page
-      router.push(`/projects/${project.slug}`);
-    } catch (error) {
-      console.error("Error tracking project view:", error);
-      // Still navigate even if tracking fails
-      router.push(`/projects/${project.slug}`);
-    }
-  };
 
   // Filter and sort projects
   const filteredAndSortedProjects = useMemo(() => {
@@ -330,7 +728,7 @@ export default function EnhancedFeaturedProjects({
             </p>
           </motion.div>
 
-          {/* Search and Filters - Only show if showFilters is true */}
+          {/* Search and Filters */}
           {showFilters && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -558,7 +956,7 @@ export default function EnhancedFeaturedProjects({
             </div>
           )}
 
-          {/* Projects Grid/List */}
+          {/* Projects Grid */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -580,314 +978,13 @@ export default function EnhancedFeaturedProjects({
                 )}
               </div>
             ) : (
-              <div
-                className={cn(
-                  "grid gap-8",
-                  viewMode === "grid"
-                    ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-                    : "grid-cols-1"
-                )}
-              >
+              <div className="grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                 {filteredAndSortedProjects.map((project, index) => (
-                  <motion.div
+                  <EnhancedProjectCard
                     key={project.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: index * 0.1 }}
-                    className={cn(
-                      "group bg-card/50 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2 cursor-pointer",
-                      viewMode === "list" && "flex flex-col md:flex-row"
-                    )}
-                    onClick={() => handleProjectClick(project)}
-                  >
-                    {/* Project Image */}
-                    <div
-                      className={cn(
-                        "relative overflow-hidden",
-                        viewMode === "grid"
-                          ? "aspect-video"
-                          : "md:w-80 aspect-video md:aspect-square"
-                      )}
-                    >
-                      {project.featured_image_url || project.hero_image_url ? (
-                        <Image
-                          src={
-                            project.featured_image_url ||
-                            project.hero_image_url ||
-                            ""
-                          }
-                          alt={project.title}
-                          fill
-                          className="object-cover transition-transform duration-700 group-hover:scale-110"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
-                          {getProjectTypeIcon(project.project_type)}
-                        </div>
-                      )}
-
-                      {/* Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-                      {/* Quick Action Buttons */}
-                      <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        {project.demo_url && (
-                          <a
-                            href={project.demo_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Button
-                              size="sm"
-                              className="bg-white/20 backdrop-blur-sm hover:bg-white/30 border border-white/30"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </Button>
-                          </a>
-                        )}
-                        {project.github_url && (
-                          <a
-                            href={project.github_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-white/20 backdrop-blur-sm hover:bg-white/30 border border-white/30"
-                            >
-                              <Github className="w-4 h-4" />
-                            </Button>
-                          </a>
-                        )}
-                        {project.demo_video_url && (
-                          <a
-                            href={project.demo_video_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-white/20 backdrop-blur-sm hover:bg-white/30 border border-white/30"
-                            >
-                              <Play className="w-4 h-4" />
-                            </Button>
-                          </a>
-                        )}
-                      </div>
-
-                      {/* Badges */}
-                      <div className="absolute top-4 left-4 flex flex-col gap-2">
-                        {project.featured && (
-                          <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0">
-                            <Star className="w-3 h-3 mr-1" />
-                            Featured
-                          </Badge>
-                        )}
-                        {project.status && (
-                          <Badge className={getStatusColor(project.status)}>
-                            {project.status.charAt(0).toUpperCase() +
-                              project.status.slice(1)}
-                          </Badge>
-                        )}
-                        {project.awards && project.awards.length > 0 && (
-                          <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0">
-                            <Trophy className="w-3 h-3 mr-1" />
-                            {project.awards.length} Award
-                            {project.awards.length > 1 ? "s" : ""}
-                          </Badge>
-                        )}
-                      </div>
-
-                      {/* Stats */}
-                      <div className="absolute bottom-4 right-4 flex gap-2">
-                        <div className="bg-black/40 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
-                          <Eye className="w-3 h-3 text-white" />
-                          <span className="text-white text-xs">
-                            {project.view_count || 0}
-                          </span>
-                        </div>
-                        {project.like_count > 0 && (
-                          <div className="bg-black/40 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
-                            <Heart className="w-3 h-3 text-red-400" />
-                            <span className="text-white text-xs">
-                              {project.like_count}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Project Details */}
-                    <div className="p-6 flex-1">
-                      {/* Category and Platform */}
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                          {project.category && (
-                            <Badge
-                              variant="outline"
-                              style={{ borderColor: project.category.color }}
-                            >
-                              {project.category.name}
-                            </Badge>
-                          )}
-                          <div className="flex items-center gap-1">
-                            {getPlatformIcon(project.platform)}
-                            <span className="text-xs text-muted-foreground capitalize">
-                              {project.platform || "Web"}
-                            </span>
-                          </div>
-                        </div>
-
-                        {project.start_date && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Calendar className="w-3 h-3" />
-                            {new Date(project.start_date).getFullYear()}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Title and Subtitle */}
-                      <div className="mb-4">
-                        <h3 className="text-xl font-bold mb-1 group-hover:text-primary transition-colors">
-                          {project.title}
-                        </h3>
-                        {project.subtitle && (
-                          <p className="text-sm text-muted-foreground font-medium">
-                            {project.subtitle}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Description */}
-                      <p className="text-muted-foreground text-sm mb-4 line-clamp-3">
-                        {project.description}
-                      </p>
-
-                      {/* Awards Display */}
-                      {project.awards && project.awards.length > 0 && (
-                        <div className="mb-4">
-                          <div className="flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-400">
-                            <Trophy className="w-3 h-3" />
-                            <span className="font-medium">
-                              {project.awards.length === 1
-                                ? project.awards[0].title
-                                : `${project.awards.length} Awards Including ${project.awards[0].title}`}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Technologies */}
-                      {project.technologies &&
-                        project.technologies.length > 0 && (
-                          <div className="mb-4">
-                            <div className="flex flex-wrap gap-1">
-                              {project.technologies
-                                .filter((tech) => tech.is_primary)
-                                .slice(0, 4)
-                                .map((tech) => (
-                                  <Badge
-                                    key={tech.id}
-                                    variant="outline"
-                                    className="text-xs"
-                                    style={{ borderColor: tech.color }}
-                                  >
-                                    {tech.name}
-                                  </Badge>
-                                ))}
-                              {project.technologies.filter(
-                                (tech) => tech.is_primary
-                              ).length > 4 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +
-                                  {project.technologies.filter(
-                                    (tech) => tech.is_primary
-                                  ).length - 4}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                      {/* Metrics */}
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
-                        {project.duration_months && (
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            <span>{project.duration_months}mo</span>
-                          </div>
-                        )}
-                        {project.team_size && (
-                          <div className="flex items-center gap-1">
-                            <Users className="w-3 h-3" />
-                            <span>{project.team_size}</span>
-                          </div>
-                        )}
-                        {project.client_name && (
-                          <div className="flex items-center gap-1">
-                            <Award className="w-3 h-3" />
-                            <span>Client Project</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex flex-wrap gap-2">
-                        {project.demo_url && (
-                          <a
-                            href={project.demo_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Button size="sm" className="gap-1">
-                              <ExternalLink className="w-3 h-3" />
-                              Demo
-                            </Button>
-                          </a>
-                        )}
-                        {project.github_url && (
-                          <a
-                            href={project.github_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-1"
-                            >
-                              <Github className="w-3 h-3" />
-                              Code
-                            </Button>
-                          </a>
-                        )}
-                        {project.case_study_url && (
-                          <a
-                            href={project.case_study_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-1"
-                            >
-                              <Star className="w-3 h-3" />
-                              Case Study
-                            </Button>
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
+                    project={project}
+                    index={index}
+                  />
                 ))}
               </div>
             )}

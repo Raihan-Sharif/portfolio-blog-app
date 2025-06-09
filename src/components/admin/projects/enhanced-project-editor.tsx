@@ -166,7 +166,7 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
   // Dropdown data
   const [categories, setCategories] = useState<ProjectCategory[]>([]);
   const [technologies, setTechnologies] = useState<Technology[]>([]);
-  const [selectedTechnologies, setSelectedTechnologies] = useState
+  const [selectedTechnologies, setSelectedTechnologies] = useState<
     ProjectTechnology[]
   >([]);
   const [projectAwards, setProjectAwards] = useState<ProjectAward[]>([]);
@@ -327,7 +327,11 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
     ]);
   };
 
-  const updateAward = (index: number, field: string, value: string | number) => {
+  const updateAward = (
+    index: number,
+    field: string,
+    value: string | number
+  ) => {
     setProjectAwards((prev) =>
       prev.map((award, i) =>
         i === index ? { ...award, [field]: value } : award
@@ -900,7 +904,7 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
                           <X className="w-4 h-4" />
                         </Button>
                       </div>
-                      
+
                       {/* Image Upload */}
                       <div className="mb-4">
                         <Label>Upload Image</Label>
@@ -913,7 +917,7 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
                           folderPath="projects/gallery"
                         />
                       </div>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <Label>Caption</Label>
@@ -1501,7 +1505,9 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
                 {projectAwards.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Award className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>No awards added yet. Click "Add Award" to get started.</p>
+                    <p>
+                      No awards added yet. Click "Add Award" to get started.
+                    </p>
                   </div>
                 ) : (
                   projectAwards.map((award, index) => (
