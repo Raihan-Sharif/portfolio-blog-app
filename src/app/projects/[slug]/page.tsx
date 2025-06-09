@@ -137,31 +137,71 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       notFound();
     }
 
-    // Fetch related projects from the same category
-    const { data: relatedProjects } = await supabase
+    // First, get the category information to find related projects
+    const { data: projectWithCategory } = await supabase
       .from("projects")
-      .select(
+      .select("category_id")
+      .eq("slug", params.slug)
+      .single();
+
+    // Fetch related projects from the same category (if category exists)
+    let relatedProjects: any[] = [];
+    if (projectWithCategory?.category_id) {
+      const { data: related } = await supabase
+        .from("projects")
+        .select(
+          `
+          id,
+          title,
+          slug,
+          subtitle,
+          description,
+          featured_image_url,
+          category:project_categories(name, color),
+          platform,
+          view_count,
+          like_count,
+          featured
         `
-        id,
-        title,
-        slug,
-        subtitle,
-        description,
-        featured_image_url,
-        category:project_categories(name, color),
-        platform,
-        view_count,
-        like_count,
-        featured
-      `
-      )
-      .eq("category_id", projectData.category_id)
-      .neq("id", projectData.id)
-      .eq("is_public", true)
-      .eq("is_active", true)
-      .order("featured", { ascending: false })
-      .order("view_count", { ascending: false })
-      .limit(4);
+        )
+        .eq("category_id", projectWithCategory.category_id)
+        .neq("id", projectData.id)
+        .eq("is_public", true)
+        .eq("is_active", true)
+        .order("featured", { ascending: false })
+        .order("view_count", { ascending: false })
+        .limit(4);
+
+      relatedProjects = related || [];
+    }
+
+    // If no related projects found or no category, get recent projects
+    if (relatedProjects.length === 0) {
+      const { data: recent } = await supabase
+        .from("projects")
+        .select(
+          `
+          id,
+          title,
+          slug,
+          subtitle,
+          description,
+          featured_image_url,
+          category:project_categories(name, color),
+          platform,
+          view_count,
+          like_count,
+          featured
+        `
+        )
+        .neq("id", projectData.id)
+        .eq("is_public", true)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(4);
+
+      relatedProjects = recent || [];
+    }
 
     // Process the project data to ensure technologies and awards are properly formatted
     const processedProject = {

@@ -184,7 +184,7 @@ const getProjectTypeIcon = (type?: string) => {
   }
 };
 
-// Enhanced Awards Display Component
+// Enhanced Awards Display Component with Multiple Styles
 const ProjectAwardsDisplay = ({ awards }: { awards: ProjectAward[] }) => {
   if (!awards || awards.length === 0) return null;
 
@@ -192,87 +192,146 @@ const ProjectAwardsDisplay = ({ awards }: { awards: ProjectAward[] }) => {
   const additionalAwardsCount = awards.length - 1;
 
   return (
-    <div className="absolute top-3 left-3 z-10">
+    <div className="absolute top-3 left-3 z-20">
       <div className="flex flex-col gap-2">
-        {/* Main Award Badge */}
+        {/* Premium Award Badge with Enhanced Animations */}
         <motion.div
-          initial={{ scale: 0, rotate: -10 }}
-          animate={{ scale: 1, rotate: 0 }}
+          initial={{ scale: 0, rotate: -15, y: -20 }}
+          animate={{ scale: 1, rotate: 0, y: 0 }}
           transition={{
             type: "spring",
-            stiffness: 260,
-            damping: 20,
-            delay: 0.1,
+            stiffness: 300,
+            damping: 15,
+            delay: 0.2,
           }}
-          className="relative group"
+          className="relative group cursor-pointer"
+          whileHover={{ scale: 1.1, rotate: 5 }}
         >
-          <div className="bg-gradient-to-br from-yellow-400 via-yellow-500 to-orange-500 text-white px-3 py-2 rounded-xl shadow-xl border-2 border-white/30 backdrop-blur-sm transform hover:scale-105 transition-all duration-300">
-            <div className="flex items-center gap-2">
+          {/* Main Award Container with Glass Effect */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-amber-400 via-yellow-500 to-orange-600 text-white px-4 py-3 rounded-2xl shadow-2xl border border-white/40 backdrop-blur-md">
+            {/* Animated Background Pattern */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-pulse opacity-30" />
+
+            {/* Content */}
+            <div className="relative flex items-center gap-3">
               <div className="relative">
-                <Trophy className="w-4 h-4" />
-                <div className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full animate-pulse" />
+                <div className="p-1 bg-white/20 rounded-full backdrop-blur-sm">
+                  <Trophy className="w-4 h-4 text-white drop-shadow-sm" />
+                </div>
+                {/* Pulsing Ring Effect */}
+                <div className="absolute inset-0 bg-white/30 rounded-full animate-ping" />
               </div>
-              <div className="flex flex-col">
-                <span className="text-xs font-bold tracking-wide">
-                  AWARD WINNER
-                </span>
-                <span className="text-[10px] opacity-90 font-medium">
+
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black tracking-wider uppercase bg-white/20 px-2 py-0.5 rounded-full backdrop-blur-sm">
+                    🏆 Winner
+                  </span>
+                </div>
+                <span className="text-xs font-bold text-white/95 truncate mt-1 max-w-[120px]">
                   {topAward.title}
                 </span>
+                {topAward.awarded_by && (
+                  <span className="text-[10px] text-white/80 truncate max-w-[120px]">
+                    by {topAward.awarded_by}
+                  </span>
+                )}
               </div>
             </div>
+
+            {/* Shine Effect on Hover */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out" />
           </div>
 
-          {/* Enhanced Sparkle Effects */}
-          <div className="absolute -top-1 -right-1">
-            <Star
-              className="w-3 h-3 text-yellow-300 animate-pulse"
-              fill="currentColor"
-            />
-          </div>
-          <div className="absolute -bottom-1 -left-1">
-            <Medal
-              className="w-3 h-3 text-orange-300 animate-bounce"
-              style={{ animationDelay: "0.5s" }}
-            />
-          </div>
+          {/* Floating Elements */}
+          <motion.div
+            animate={{
+              y: [0, -8, 0],
+              rotate: [0, 10, 0],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="absolute -top-2 -right-2"
+          >
+            <div className="w-6 h-6 bg-gradient-to-br from-yellow-300 to-orange-400 rounded-full flex items-center justify-center shadow-lg">
+              <Star className="w-3 h-3 text-white fill-current" />
+            </div>
+          </motion.div>
+
+          <motion.div
+            animate={{
+              y: [0, 6, 0],
+              x: [0, -4, 0],
+            }}
+            transition={{
+              duration: 2.5,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: 0.5,
+            }}
+            className="absolute -bottom-1 -left-1"
+          >
+            <div className="w-5 h-5 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center shadow-md">
+              <Medal className="w-2.5 h-2.5 text-white" />
+            </div>
+          </motion.div>
         </motion.div>
 
-        {/* Award Details Tooltip */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="bg-black/80 backdrop-blur-md text-white px-3 py-2 rounded-lg text-xs max-w-[200px] shadow-lg"
-        >
-          <div className="font-semibold text-yellow-200 mb-1">
-            {topAward.title}
-          </div>
-          {topAward.awarded_by && (
-            <div className="text-yellow-300 text-[10px] opacity-90 mb-1">
-              by {topAward.awarded_by}
+        {/* Additional Awards Counter with Premium Design */}
+        {additionalAwardsCount > 0 && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{
+              delay: 0.6,
+              type: "spring",
+              stiffness: 200,
+            }}
+            className="relative"
+          >
+            <div className="bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 text-white px-3 py-2 rounded-xl shadow-lg border border-white/30 backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <div className="flex -space-x-1">
+                  <div className="w-4 h-4 bg-yellow-400 rounded-full border border-white/50 flex items-center justify-center">
+                    <Award className="w-2 h-2 text-white" />
+                  </div>
+                  <div className="w-4 h-4 bg-orange-400 rounded-full border border-white/50 flex items-center justify-center">
+                    <Medal className="w-2 h-2 text-white" />
+                  </div>
+                  {additionalAwardsCount > 2 && (
+                    <div className="w-4 h-4 bg-red-400 rounded-full border border-white/50 flex items-center justify-center">
+                      <Crown className="w-2 h-2 text-white" />
+                    </div>
+                  )}
+                </div>
+                <span className="text-[10px] font-bold">
+                  +{additionalAwardsCount} MORE
+                </span>
+              </div>
             </div>
-          )}
-          {topAward.award_date && (
-            <div className="text-white/70 text-[10px]">
+            {/* Subtle glow effect */}
+            <div className="absolute inset-0 bg-purple-400/30 rounded-xl blur-md -z-10" />
+          </motion.div>
+        )}
+
+        {/* Floating Award Date Badge */}
+        {topAward.award_date && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.8 }}
+            className="bg-black/60 backdrop-blur-md text-white px-2 py-1 rounded-lg border border-white/20"
+          >
+            <div className="text-[9px] font-medium text-center">
+              <Calendar className="w-2.5 h-2.5 inline mr-1" />
               {new Date(topAward.award_date).toLocaleDateString("en-US", {
                 year: "numeric",
                 month: "short",
               })}
             </div>
-          )}
-        </motion.div>
-
-        {/* Additional Awards Indicator */}
-        {additionalAwardsCount > 0 && (
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.5 }}
-            className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit shadow-lg"
-          >
-            <Medal className="w-3 h-3" />
-            <span>+{additionalAwardsCount} MORE</span>
           </motion.div>
         )}
       </div>
