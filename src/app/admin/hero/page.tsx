@@ -10,7 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase/client";
-import { AlertCircle, Eye, Palette, Save } from "lucide-react";
+import { motion } from "framer-motion";
+import { AlertCircle, Eye, Palette, Save, Sparkles } from "lucide-react";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 interface HeroSettings {
@@ -410,8 +412,9 @@ export default function AdminHeroPage() {
                     folderPath="hero/backgrounds"
                   />
                   <p className="text-xs text-muted-foreground mt-2">
-                    Upload an SVG or image for background effects behind your
-                    photo
+                    Upload an SVG or image for background effects. The design
+                    will be integrated with animated overlays and blend modes
+                    for best visual impact.
                   </p>
                 </div>
 
@@ -439,7 +442,7 @@ export default function AdminHeroPage() {
   );
 }
 
-// Preview Component
+// Enhanced Preview Component that matches the actual hero
 function HeroPreview({ formState }: { formState: any }) {
   const highlightWords = formState.highlight_words
     ? formState.highlight_words.split(",").map((word: string) => word.trim())
@@ -454,7 +457,7 @@ function HeroPreview({ formState }: { formState: any }) {
         const regex = new RegExp(`(${word})`, "gi");
         highlightedText = highlightedText.replace(
           regex,
-          '<span style="color: hsl(var(--primary))">$1</span>'
+          '<span style="background: linear-gradient(to right, hsl(var(--primary)), #8b5cf6, #3b82f6); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: bold;">$1</span>'
         );
       }
     });
@@ -464,15 +467,132 @@ function HeroPreview({ formState }: { formState: any }) {
 
   return (
     <div className="bg-card rounded-lg border p-8">
-      <h3 className="text-lg font-semibold mb-6">Preview</h3>
+      <h3 className="text-lg font-semibold mb-6">Live Preview</h3>
 
-      <div className="relative min-h-[400px] bg-gradient-to-br from-background via-accent/30 to-background rounded-lg overflow-hidden">
-        <div className="container mx-auto px-4 py-16">
+      <div className="relative min-h-[600px] bg-gradient-to-br from-background via-accent/30 to-background rounded-lg overflow-hidden">
+        {/* Advanced Background System Preview */}
+        <div className="absolute inset-0">
+          {/* Base gradient */}
+          <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-accent/20"></div>
+
+          {/* Animated mesh gradient */}
+          <div className="absolute inset-0 opacity-30">
+            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/20 via-transparent to-purple-500/20"></div>
+            <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-bl from-blue-500/20 via-transparent to-cyan-500/20"></div>
+          </div>
+
+          {/* Dynamic floating elements */}
+          <div className="absolute inset-0">
+            <motion.div
+              animate={{
+                x: [0, 50, 0],
+                y: [0, -25, 0],
+                scale: [1, 1.05, 1],
+              }}
+              transition={{
+                duration: 10,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              className="absolute top-10 right-10 w-48 h-48 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-full blur-3xl"
+            />
+            <motion.div
+              animate={{
+                x: [0, -40, 0],
+                y: [0, 15, 0],
+                scale: [1, 0.9, 1],
+              }}
+              transition={{
+                duration: 12,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 1,
+              }}
+              className="absolute bottom-10 left-10 w-40 h-40 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl"
+            />
+
+            {/* Small sparkle effects */}
+            {[...Array(3)].map((_, i) => (
+              <motion.div
+                key={i}
+                animate={{
+                  scale: [0, 1, 0],
+                  opacity: [0, 1, 0],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  delay: i * 0.5,
+                  ease: "easeInOut",
+                }}
+                className="absolute w-2 h-2 bg-primary rounded-full"
+                style={{
+                  top: `${30 + i * 20}%`,
+                  left: `${15 + i * 15}%`,
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Custom SVG Background Integration */}
+          {formState.background_svg_url && (
+            <div className="absolute inset-0">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 0.15, scale: 1 }}
+                transition={{ duration: 2, ease: "easeOut" }}
+                className="absolute inset-0 flex items-center justify-center"
+              >
+                <div className="relative w-full h-full max-w-md max-h-md">
+                  <Image
+                    src={formState.background_svg_url}
+                    alt="Background design"
+                    fill
+                    className="object-contain"
+                    style={{ filter: "hue-rotate(45deg) saturate(0.7)" }}
+                  />
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, scale: 1.1 }}
+                animate={{ opacity: 0.08, scale: 1 }}
+                transition={{ duration: 3, ease: "easeOut", delay: 0.5 }}
+                className="absolute inset-0 flex items-center justify-center"
+              >
+                <div className="relative w-full h-full max-w-lg max-h-lg">
+                  <Image
+                    src={formState.background_svg_url}
+                    alt="Background design overlay"
+                    fill
+                    className="object-contain"
+                    style={{
+                      filter: "hue-rotate(120deg) saturate(0.5) blur(1px)",
+                      transform: "rotate(10deg)",
+                    }}
+                  />
+                </div>
+              </motion.div>
+            </div>
+          )}
+
+          {/* Gradient overlays */}
+          <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-background/60"></div>
+        </div>
+
+        {/* Content */}
+        <div className="relative z-10 container mx-auto px-4 py-16">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             {/* Content */}
-            <div>
+            <div className="space-y-6">
+              {/* Badge */}
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 backdrop-blur-sm border border-primary/20 rounded-full text-sm font-medium">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span>Available for freelance projects</span>
+              </div>
+
               <h1
-                className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4"
+                className="text-3xl md:text-4xl font-bold mb-4"
                 dangerouslySetInnerHTML={{
                   __html: getHighlightedText(formState.title),
                 }}
@@ -492,12 +612,19 @@ function HeroPreview({ formState }: { formState: any }) {
               )}
               <div className="flex flex-wrap gap-4">
                 {formState.cta_primary_text && (
-                  <Button size="lg" className="rounded-full">
+                  <Button
+                    size="lg"
+                    className="gap-2 bg-gradient-to-r from-primary to-purple-600 rounded-full px-8"
+                  >
                     {formState.cta_primary_text}
                   </Button>
                 )}
                 {formState.cta_secondary_text && (
-                  <Button size="lg" variant="outline" className="rounded-full">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="rounded-full px-8"
+                  >
                     {formState.cta_secondary_text}
                   </Button>
                 )}
@@ -506,24 +633,76 @@ function HeroPreview({ formState }: { formState: any }) {
 
             {/* Image */}
             <div className="relative">
-              {formState.background_svg_url && (
-                <div className="absolute inset-0 opacity-20">
-                  <img
-                    src={formState.background_svg_url}
-                    alt="Background"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-              )}
-              {formState.hero_image_url && (
-                <div className="relative z-10">
-                  <img
-                    src={formState.hero_image_url}
-                    alt="Hero"
-                    className="w-full max-w-md mx-auto rounded-lg shadow-2xl"
-                  />
-                </div>
-              )}
+              <div className="relative aspect-square max-w-md mx-auto">
+                {/* Animated rings */}
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{
+                    duration: 20,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                  className="absolute inset-0 rounded-full bg-gradient-to-r from-primary/20 via-purple-500/20 to-blue-500/20 p-2"
+                >
+                  <div className="w-full h-full rounded-full border border-white/10"></div>
+                </motion.div>
+
+                <motion.div
+                  animate={{ rotate: -360 }}
+                  transition={{
+                    duration: 15,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                  className="absolute inset-1 rounded-full bg-gradient-to-l from-cyan-500/20 via-emerald-500/20 to-teal-500/20 p-2"
+                >
+                  <div className="w-full h-full rounded-full border border-white/10"></div>
+                </motion.div>
+
+                {formState.hero_image_url && (
+                  <div className="relative w-full h-full p-6">
+                    <div className="relative w-full h-full rounded-full overflow-hidden shadow-2xl">
+                      <Image
+                        src={formState.hero_image_url}
+                        alt="Hero"
+                        fill
+                        className="object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-primary/10 via-transparent to-transparent"></div>
+                    </div>
+
+                    {/* Floating elements */}
+                    <motion.div
+                      animate={{
+                        y: [0, -8, 0],
+                        x: [0, 4, 0],
+                      }}
+                      transition={{
+                        duration: 3,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                      className="absolute -top-2 -right-2 w-12 h-12 bg-gradient-to-r from-primary to-purple-600 rounded-full flex items-center justify-center shadow-lg"
+                    >
+                      <Sparkles className="w-6 h-6 text-white" />
+                    </motion.div>
+
+                    <motion.div
+                      animate={{
+                        y: [0, 6, 0],
+                        x: [0, -2, 0],
+                      }}
+                      transition={{
+                        duration: 4,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        delay: 0.5,
+                      }}
+                      className="absolute -bottom-2 -left-2 w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full shadow-lg"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
