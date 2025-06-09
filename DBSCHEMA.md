@@ -1373,59 +1373,101 @@ END;
 
 $$
 LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION get_project_with_details(project_slug TEXT)
-RETURNS TABLE (
-  id INTEGER,
-  title TEXT,
-  slug TEXT,
-  subtitle TEXT,
-  description TEXT,
-  content JSONB,
-  featured_image_url TEXT,
-  hero_image_url TEXT,
-  gallery_images JSONB,
-  video_url TEXT,
-  demo_video_url TEXT,
-  github_url TEXT,
-  demo_url TEXT,
-  case_study_url TEXT,
-  documentation_url TEXT,
-  api_docs_url TEXT,
-  category_name TEXT,
-  category_slug TEXT,
-  category_color TEXT,
-  project_type TEXT,
-  status TEXT,
-  start_date DATE,
-  end_date DATE,
-  duration_months INTEGER,
-  client_name TEXT,
-  client_url TEXT,
-  team_size INTEGER,
-  my_role TEXT,
-  platform TEXT,
-  target_audience TEXT,
-  key_features JSONB,
-  challenges_faced JSONB,
-  solutions_implemented JSONB,
-  results_achieved JSONB,
-  user_feedback JSONB,
-  development_methodology TEXT,
-  version_control TEXT,
-  deployment_platform TEXT,
-  hosting_provider TEXT,
-  featured BOOLEAN,
-  priority INTEGER,
-  view_count INTEGER,
-  like_count INTEGER,
-  share_count INTEGER,
-  technologies JSONB,
-  created_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ
-) AS
+----------
 $$
 
+-- Project Awards Table
+CREATE TABLE project_awards (
+id SERIAL PRIMARY KEY,
+project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+title TEXT NOT NULL,
+description TEXT,
+award_image_url TEXT,
+awarded_by TEXT,
+award_date DATE,
+award_url TEXT,
+display_order INTEGER DEFAULT 0,
+is_active BOOLEAN DEFAULT true,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS on project_awards
+ALTER TABLE project_awards ENABLE ROW LEVEL SECURITY;
+
+-- Public can read active awards for public projects
+CREATE POLICY "Active project awards are viewable by everyone"
+ON project_awards FOR SELECT
+USING (
+is_active = true AND EXISTS (
+SELECT 1 FROM projects p
+WHERE p.id = project_id AND p.is_public = true AND p.is_active = true
+)
+);
+
+-- Admin can manage project awards
+CREATE POLICY "Admin can manage project awards"
+ON project_awards FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+-- Update the get_project_with_details function to include awards
+CREATE OR REPLACE FUNCTION get_project_with_details(project_slug TEXT)
+RETURNS TABLE (
+id INTEGER,
+title TEXT,
+slug TEXT,
+subtitle TEXT,
+description TEXT,
+content JSONB,
+featured_image_url TEXT,
+hero_image_url TEXT,
+gallery_images JSONB,
+video_url TEXT,
+demo_video_url TEXT,
+github_url TEXT,
+demo_url TEXT,
+case_study_url TEXT,
+documentation_url TEXT,
+api_docs_url TEXT,
+category_name TEXT,
+category_slug TEXT,
+category_color TEXT,
+project_type TEXT,
+status TEXT,
+start_date DATE,
+end_date DATE,
+duration_months INTEGER,
+client_name TEXT,
+client_url TEXT,
+team_size INTEGER,
+my_role TEXT,
+platform TEXT,
+target_audience TEXT,
+key_features JSONB,
+challenges_faced JSONB,
+solutions_implemented JSONB,
+results_achieved JSONB,
+user_feedback JSONB,
+development_methodology TEXT,
+version_control TEXT,
+deployment_platform TEXT,
+hosting_provider TEXT,
+featured BOOLEAN,
+priority INTEGER,
+view_count INTEGER,
+like_count INTEGER,
+share_count INTEGER,
+technologies JSONB,
+awards JSONB,
+created_at TIMESTAMPTZ,
+updated_at TIMESTAMPTZ
+) AS $$
 BEGIN
 RETURN QUERY
 SELECT
@@ -1494,6 +1536,25 @@ WHERE pt.project_id = p.id AND t.is_active = true
 ),
 '[]'::jsonb
 ) as technologies,
+COALESCE(
+(
+SELECT jsonb_agg(
+jsonb_build_object(
+'id', pa.id,
+'title', pa.title,
+'description', pa.description,
+'award_image_url', pa.award_image_url,
+'awarded_by', pa.awarded_by,
+'award_date', pa.award_date,
+'award_url', pa.award_url,
+'display_order', pa.display_order
+) ORDER BY pa.display_order, pa.award_date DESC
+)
+FROM project_awards pa
+WHERE pa.project_id = p.id AND pa.is_active = true
+),
+'[]'::jsonb
+) as awards,
 p.created_at,
 p.updated_at
 FROM projects p
@@ -1505,6 +1566,4 @@ END;
 
 $$
 LANGUAGE plpgsql;
-
-----------
 $$

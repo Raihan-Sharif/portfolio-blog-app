@@ -26,6 +26,7 @@ import {
   Smartphone,
   Star,
   Target,
+  Trophy,
   Users,
   X,
 } from "lucide-react";
@@ -53,6 +54,17 @@ interface ProjectCategory {
   slug: string;
   color?: string;
   icon?: string;
+}
+
+interface ProjectAward {
+  id: number;
+  title: string;
+  description?: string;
+  award_image_url?: string;
+  awarded_by?: string;
+  award_date?: string;
+  award_url?: string;
+  display_order: number;
 }
 
 interface Project {
@@ -95,6 +107,7 @@ interface Project {
     description?: string;
   }>;
   technologies?: Technology[];
+  awards?: ProjectAward[];
   featured: boolean;
   priority: number;
   view_count: number;
@@ -681,6 +694,13 @@ export default function EnhancedFeaturedProjects({
                               project.status.slice(1)}
                           </Badge>
                         )}
+                        {project.awards && project.awards.length > 0 && (
+                          <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0">
+                            <Trophy className="w-3 h-3 mr-1" />
+                            {project.awards.length} Award
+                            {project.awards.length > 1 ? "s" : ""}
+                          </Badge>
+                        )}
                       </div>
 
                       {/* Stats */}
@@ -747,6 +767,20 @@ export default function EnhancedFeaturedProjects({
                       <p className="text-muted-foreground text-sm mb-4 line-clamp-3">
                         {project.description}
                       </p>
+
+                      {/* Awards Display */}
+                      {project.awards && project.awards.length > 0 && (
+                        <div className="mb-4">
+                          <div className="flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-400">
+                            <Trophy className="w-3 h-3" />
+                            <span className="font-medium">
+                              {project.awards.length === 1
+                                ? project.awards[0].title
+                                : `${project.awards.length} Awards Including ${project.awards[0].title}`}
+                            </span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Technologies */}
                       {project.technologies &&

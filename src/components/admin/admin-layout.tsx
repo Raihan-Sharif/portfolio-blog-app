@@ -115,7 +115,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         isCheckingAdmin.current = false;
       }
     },
-    [user?.role]
+    [user?.role, CACHE_DURATION] // Add CACHE_DURATION dependency
   );
 
   // Initialize admin status only once

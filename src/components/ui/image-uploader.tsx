@@ -147,7 +147,7 @@ export function ImageUploader({
       const filePath = `${folderPath}/${fileName}`;
 
       // Upload to Supabase
-      const { data, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage // Remove 'data' variable
         .from(bucketName)
         .upload(filePath, imageFile, {
           cacheControl: "3600",
