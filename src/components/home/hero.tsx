@@ -119,7 +119,7 @@ export default function Hero() {
         const regex = new RegExp(`(${word})`, "gi");
         highlightedText = highlightedText.replace(
           regex,
-          '<span class="text-primary bg-primary/10 px-2 py-1 rounded-md">$1</span>'
+          '<span class="bg-gradient-to-r from-primary via-purple-600 to-blue-600 bg-clip-text text-transparent font-bold">$1</span>'
         );
       }
     });

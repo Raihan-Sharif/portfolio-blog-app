@@ -93,7 +93,9 @@ export default function LatestBlogPosts({ posts }: LatestBlogPostsProps) {
     <section className="py-20 bg-background">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
-          <h2 className="text-3xl font-bold mb-4">Latest Blog Posts</h2>
+          <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-primary via-purple-600 to-blue-600 bg-clip-text text-transparent">
+            Latest Blog Posts
+          </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             I write about web development, technology trends, and best practices
             in software engineering.
