@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
@@ -13,6 +13,8 @@ import {
   BookOpen,
   Calendar,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Code2,
   ExternalLink,
@@ -32,7 +34,9 @@ import {
   TrendingUp,
   Trophy,
   Users,
+  X,
   Zap,
+  ZoomIn,
 } from "lucide-react";
 import Image from "next/image";
 import NextLink from "next/link";
@@ -209,11 +213,142 @@ const getFeatureIcon = (iconName?: string) => {
   }
 };
 
+// Gallery Modal Component
+const GalleryModal = ({
+  images,
+  isOpen,
+  onClose,
+  initialIndex = 0,
+}: {
+  images: GalleryImage[];
+  isOpen: boolean;
+  onClose: () => void;
+  initialIndex?: number;
+}) => {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+
+  const nextImage = () => {
+    setCurrentIndex((prev) => (prev + 1) % images.length);
+  };
+
+  const prevImage = () => {
+    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+  };
+
+  if (!isOpen || images.length === 0) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.8, opacity: 0 }}
+          className="relative max-w-7xl max-h-[90vh] w-full h-full flex items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Close Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4 z-10 bg-black/50 hover:bg-black/70 text-white"
+            onClick={onClose}
+          >
+            <X className="w-6 h-6" />
+          </Button>
+
+          {/* Navigation Buttons */}
+          {images.length > 1 && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white"
+                onClick={prevImage}
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white"
+                onClick={nextImage}
+              >
+                <ChevronRight className="w-6 h-6" />
+              </Button>
+            </>
+          )}
+
+          {/* Image */}
+          <div className="relative w-full h-full flex items-center justify-center">
+            <Image
+              src={images[currentIndex].url}
+              alt={
+                images[currentIndex].alt || `Gallery image ${currentIndex + 1}`
+              }
+              fill
+              className="object-contain"
+              sizes="100vw"
+              priority
+            />
+          </div>
+
+          {/* Image Info */}
+          {images[currentIndex].caption && (
+            <div className="absolute bottom-4 left-4 right-4 bg-black/70 backdrop-blur-sm text-white p-4 rounded-lg">
+              <p className="text-center">{images[currentIndex].caption}</p>
+            </div>
+          )}
+
+          {/* Image Counter */}
+          {images.length > 1 && (
+            <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-sm text-white px-3 py-1 rounded-full text-sm">
+              {currentIndex + 1} / {images.length}
+            </div>
+          )}
+
+          {/* Thumbnail Navigation */}
+          {images.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 max-w-full overflow-x-auto p-2">
+              {images.map((image, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentIndex(index)}
+                  className={cn(
+                    "relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all",
+                    currentIndex === index
+                      ? "border-white"
+                      : "border-transparent hover:border-white/50"
+                  )}
+                >
+                  <Image
+                    src={image.url}
+                    alt={image.alt || `Thumbnail ${index + 1}`}
+                    fill
+                    className="object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
 export default function ProjectDetailPage({
   project,
   relatedProjects = [],
 }: ProjectDetailPageProps) {
   const [selectedGalleryImage, setSelectedGalleryImage] = useState(0);
+  const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
   const [liked, setLiked] = useState(false);
 
   const handleShare = async () => {
@@ -232,6 +367,11 @@ export default function ProjectDetailPage({
       navigator.clipboard.writeText(window.location.href);
       alert("Link copied to clipboard!");
     }
+  };
+
+  const handleGalleryImageClick = (index: number) => {
+    setSelectedGalleryImage(index);
+    setIsGalleryModalOpen(true);
   };
 
   const technologiesByCategory =
@@ -291,17 +431,29 @@ export default function ProjectDetailPage({
           >
             {/* Project Image */}
             <div className="space-y-4">
-              <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl">
+              <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl group cursor-pointer">
                 {project.hero_image_url || project.featured_image_url ? (
-                  <Image
-                    src={
-                      project.hero_image_url || project.featured_image_url || ""
-                    }
-                    alt={project.title}
-                    fill
-                    className="object-cover"
-                    priority
-                  />
+                  <>
+                    <Image
+                      src={
+                        project.hero_image_url ||
+                        project.featured_image_url ||
+                        ""
+                      }
+                      alt={project.title}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                      priority
+                    />
+                    {/* Zoom Overlay */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+                          <ZoomIn className="w-6 h-6 text-white" />
+                        </div>
+                      </div>
+                    </div>
+                  </>
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
                     {getPlatformIcon(project.platform, "w-16 h-16")}
@@ -353,28 +505,32 @@ export default function ProjectDetailPage({
                 </div>
               </div>
 
-              {/* Gallery Thumbnails */}
+              {/* Enhanced Gallery Thumbnails */}
               {project.gallery_images && project.gallery_images.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto">
-                  {project.gallery_images.map((image, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setSelectedGalleryImage(idx)}
-                      className={cn(
-                        "relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all",
-                        selectedGalleryImage === idx
-                          ? "border-primary"
-                          : "border-transparent hover:border-gray-300"
-                      )}
-                    >
-                      <Image
-                        src={image.url}
-                        alt={image.alt || `Gallery ${idx + 1}`}
-                        fill
-                        className="object-cover"
-                      />
-                    </button>
-                  ))}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">
+                    Project Gallery ({project.gallery_images.length})
+                  </h4>
+                  <div className="flex gap-2 overflow-x-auto pb-2">
+                    {project.gallery_images.map((image, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleGalleryImageClick(idx)}
+                        className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 border-transparent hover:border-primary transition-all duration-300 group"
+                      >
+                        <Image
+                          src={image.url}
+                          alt={image.alt || `Gallery ${idx + 1}`}
+                          fill
+                          className="object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                        {/* Hover Overlay */}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-center justify-center">
+                          <ZoomIn className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -962,6 +1118,14 @@ export default function ProjectDetailPage({
           </div>
         </div>
       </div>
+
+      {/* Gallery Modal */}
+      <GalleryModal
+        images={project.gallery_images || []}
+        isOpen={isGalleryModalOpen}
+        onClose={() => setIsGalleryModalOpen(false)}
+        initialIndex={selectedGalleryImage}
+      />
     </div>
   );
 }

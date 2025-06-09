@@ -18,8 +18,10 @@ import {
   Filter,
   Github,
   Globe,
+  Grid3X3,
   Heart,
   Layers,
+  List,
   Medal,
   Monitor,
   Play,
@@ -202,40 +204,61 @@ const ProjectAwardsDisplay = ({ awards }: { awards: ProjectAward[] }) => {
             damping: 20,
             delay: 0.1,
           }}
-          className="relative"
+          className="relative group"
         >
-          <div className="bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-500 text-white px-3 py-1.5 rounded-full shadow-lg border-2 border-white/20 backdrop-blur-sm">
-            <div className="flex items-center gap-1.5">
+          <div className="bg-gradient-to-br from-yellow-400 via-yellow-500 to-orange-500 text-white px-3 py-2 rounded-xl shadow-xl border-2 border-white/30 backdrop-blur-sm transform hover:scale-105 transition-all duration-300">
+            <div className="flex items-center gap-2">
               <div className="relative">
                 <Trophy className="w-4 h-4" />
                 <div className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full animate-pulse" />
               </div>
-              <span className="text-xs font-bold tracking-wide">
-                AWARD WINNER
-              </span>
+              <div className="flex flex-col">
+                <span className="text-xs font-bold tracking-wide">
+                  AWARD WINNER
+                </span>
+                <span className="text-[10px] opacity-90 font-medium">
+                  {topAward.title}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Sparkle Effect */}
+          {/* Enhanced Sparkle Effects */}
           <div className="absolute -top-1 -right-1">
             <Star
               className="w-3 h-3 text-yellow-300 animate-pulse"
               fill="currentColor"
             />
           </div>
+          <div className="absolute -bottom-1 -left-1">
+            <Medal
+              className="w-3 h-3 text-orange-300 animate-bounce"
+              style={{ animationDelay: "0.5s" }}
+            />
+          </div>
         </motion.div>
 
-        {/* Award Details */}
+        {/* Award Details Tooltip */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-black/70 backdrop-blur-md text-white px-2.5 py-1 rounded-lg text-xs max-w-[200px]"
+          className="bg-black/80 backdrop-blur-md text-white px-3 py-2 rounded-lg text-xs max-w-[200px] shadow-lg"
         >
-          <div className="font-semibold truncate">{topAward.title}</div>
+          <div className="font-semibold text-yellow-200 mb-1">
+            {topAward.title}
+          </div>
           {topAward.awarded_by && (
-            <div className="text-yellow-200 truncate text-[10px] opacity-90">
-              {topAward.awarded_by}
+            <div className="text-yellow-300 text-[10px] opacity-90 mb-1">
+              by {topAward.awarded_by}
+            </div>
+          )}
+          {topAward.award_date && (
+            <div className="text-white/70 text-[10px]">
+              {new Date(topAward.award_date).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "short",
+              })}
             </div>
           )}
         </motion.div>
@@ -246,9 +269,10 @@ const ProjectAwardsDisplay = ({ awards }: { awards: ProjectAward[] }) => {
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.5 }}
-            className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit"
+            className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit shadow-lg"
           >
-            <Medal className="w-3 h-3" />+{additionalAwardsCount} MORE
+            <Medal className="w-3 h-3" />
+            <span>+{additionalAwardsCount} MORE</span>
           </motion.div>
         )}
       </div>
@@ -596,6 +620,239 @@ const EnhancedProjectCard = ({
   );
 };
 
+// List View Component
+const EnhancedProjectListItem = ({
+  project,
+  index,
+}: {
+  project: Project;
+  index: number;
+}) => {
+  const router = useRouter();
+
+  const handleProjectClick = async () => {
+    try {
+      await supabase.rpc("increment_project_view", {
+        project_id_param: project.id,
+      });
+      router.push(`/projects/${project.slug}`);
+    } catch (error) {
+      console.error("Error tracking project view:", error);
+      router.push(`/projects/${project.slug}`);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.5, delay: index * 0.05 }}
+      className="group flex gap-6 p-6 bg-card/50 backdrop-blur-sm rounded-xl border border-white/10 hover:shadow-lg hover:shadow-primary/10 transition-all duration-500 cursor-pointer"
+      onClick={handleProjectClick}
+    >
+      {/* Project Image */}
+      <div className="relative w-48 h-32 flex-shrink-0 rounded-lg overflow-hidden">
+        {project.featured_image_url || project.hero_image_url ? (
+          <Image
+            src={project.featured_image_url || project.hero_image_url || ""}
+            alt={project.title}
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-110"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
+            {getProjectTypeIcon(project.project_type)}
+          </div>
+        )}
+
+        {/* Awards Badge for List View */}
+        {project.awards && project.awards.length > 0 && (
+          <div className="absolute top-2 left-2">
+            <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0 text-xs">
+              <Trophy className="w-3 h-3 mr-1" />
+              {project.awards.length} Award
+              {project.awards.length > 1 ? "s" : ""}
+            </Badge>
+          </div>
+        )}
+
+        {/* Featured Badge */}
+        {project.featured && (
+          <div className="absolute top-2 right-2">
+            <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0 text-xs">
+              <Crown className="w-3 h-3 mr-1" />
+              Featured
+            </Badge>
+          </div>
+        )}
+      </div>
+
+      {/* Project Details */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              {project.category && (
+                <Badge
+                  variant="outline"
+                  style={{ borderColor: project.category.color }}
+                  className="text-xs"
+                >
+                  {project.category.name}
+                </Badge>
+              )}
+              <div className="flex items-center gap-1">
+                {getPlatformIcon(project.platform)}
+                <span className="text-xs text-muted-foreground capitalize">
+                  {project.platform || "Web"}
+                </span>
+              </div>
+              {project.status && (
+                <Badge
+                  className={cn("text-xs", getStatusColor(project.status))}
+                >
+                  {project.status.charAt(0).toUpperCase() +
+                    project.status.slice(1)}
+                </Badge>
+              )}
+            </div>
+
+            <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors line-clamp-1">
+              {project.title}
+            </h3>
+            {project.subtitle && (
+              <p className="text-sm text-muted-foreground font-medium mb-2 line-clamp-1">
+                {project.subtitle}
+              </p>
+            )}
+          </div>
+
+          {/* Stats */}
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Eye className="w-4 h-4" />
+              <span>{project.view_count || 0}</span>
+            </div>
+            {project.like_count > 0 && (
+              <div className="flex items-center gap-1">
+                <Heart className="w-4 h-4 text-red-400" />
+                <span>{project.like_count}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
+          {project.description}
+        </p>
+
+        {/* Awards in List View */}
+        {project.awards && project.awards.length > 0 && (
+          <div className="mb-4 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 rounded-lg border border-yellow-200/50 dark:border-yellow-800/50">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-4 h-4 text-yellow-600" />
+              <div>
+                <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
+                  {project.awards[0].title}
+                </p>
+                {project.awards[0].awarded_by && (
+                  <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                    by {project.awards[0].awarded_by}
+                  </p>
+                )}
+                {project.awards.length > 1 && (
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                    +{project.awards.length - 1} more award
+                    {project.awards.length > 2 ? "s" : ""}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Technologies and Metrics */}
+        <div className="flex items-center justify-between">
+          <div className="flex flex-wrap gap-1">
+            {project.technologies &&
+              project.technologies
+                .filter((tech) => tech.is_primary)
+                .slice(0, 6)
+                .map((tech) => (
+                  <Badge
+                    key={tech.id}
+                    variant="outline"
+                    className="text-xs"
+                    style={{ borderColor: tech.color }}
+                  >
+                    {tech.name}
+                  </Badge>
+                ))}
+          </div>
+
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            {project.duration_months && (
+              <div className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                <span>{project.duration_months}mo</span>
+              </div>
+            )}
+            {project.team_size && (
+              <div className="flex items-center gap-1">
+                <Users className="w-3 h-3" />
+                <span>{project.team_size}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 mt-4">
+          {project.demo_url && (
+            <a
+              href={project.demo_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Button size="sm" className="gap-1">
+                <ExternalLink className="w-3 h-3" />
+                Demo
+              </Button>
+            </a>
+          )}
+          {project.github_url && (
+            <a
+              href={project.github_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Button size="sm" variant="outline" className="gap-1">
+                <Github className="w-3 h-3" />
+                Code
+              </Button>
+            </a>
+          )}
+          {project.case_study_url && (
+            <a
+              href={project.case_study_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Button size="sm" variant="outline" className="gap-1">
+                <Star className="w-3 h-3" />
+                Case Study
+              </Button>
+            </a>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
 export default function EnhancedFeaturedProjects({
   projects,
   categories,
@@ -783,23 +1040,25 @@ export default function EnhancedFeaturedProjects({
                       <button
                         onClick={() => setViewMode("grid")}
                         className={cn(
-                          "px-3 py-2 text-sm transition-colors",
+                          "px-3 py-2 text-sm transition-colors flex items-center gap-1",
                           viewMode === "grid"
                             ? "bg-primary text-primary-foreground"
                             : "hover:bg-accent"
                         )}
                       >
+                        <Grid3X3 className="w-4 h-4" />
                         Grid
                       </button>
                       <button
                         onClick={() => setViewMode("list")}
                         className={cn(
-                          "px-3 py-2 text-sm transition-colors",
+                          "px-3 py-2 text-sm transition-colors flex items-center gap-1",
                           viewMode === "list"
                             ? "bg-primary text-primary-foreground"
                             : "hover:bg-accent"
                         )}
                       >
+                        <List className="w-4 h-4" />
                         List
                       </button>
                     </div>
@@ -956,7 +1215,7 @@ export default function EnhancedFeaturedProjects({
             </div>
           )}
 
-          {/* Projects Grid */}
+          {/* Projects Display */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -977,10 +1236,20 @@ export default function EnhancedFeaturedProjects({
                   </Button>
                 )}
               </div>
-            ) : (
+            ) : viewMode === "grid" ? (
               <div className="grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                 {filteredAndSortedProjects.map((project, index) => (
                   <EnhancedProjectCard
+                    key={project.id}
+                    project={project}
+                    index={index}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {filteredAndSortedProjects.map((project, index) => (
+                  <EnhancedProjectListItem
                     key={project.id}
                     project={project}
                     index={index}
