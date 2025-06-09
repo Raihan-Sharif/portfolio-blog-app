@@ -45,7 +45,9 @@ export default function BlogHeader({
           transition={{ duration: 0.5 }}
           className="text-center mb-8"
         >
-          <h1 className="text-4xl font-bold mb-4">Blog</h1>
+          <h1 className="text-4xl lg:text-5xl font-bold mb-4 bg-gradient-to-r from-primary via-purple-600 to-blue-600 bg-clip-text text-transparent">
+            Blog
+          </h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Thoughts, tutorials, and insights about web development, technology,
             and software engineering.
