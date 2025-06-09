@@ -87,11 +87,11 @@ const getIcon = (iconName: string, size: number = 20) => {
   }
 };
 
-export default function ContactPage({
-  showForm = true,
-  showFullLayout = true,
-  className = "",
-}: ContactComponentProps) {
+export default function ContactPage() {
+  const showFullLayout = true;
+  const showForm = true;
+  const className = "";
+
   const [contactInfo, setContactInfo] = useState<ContactInfo[]>([]);
   const [businessHours, setBusinessHours] = useState<BusinessHours[]>([]);
   const [availability, setAvailability] = useState<AvailabilityStatus | null>(
