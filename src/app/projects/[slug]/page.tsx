@@ -17,9 +17,10 @@ export async function generateMetadata({
     .rpc("get_project_with_details", { project_slug: params.slug })
     .single();
 
-  if (!project) {
+  if (!project?.title) {
     return {
-      title: "Project Not Found",
+      title: "Project Not Found | Raihan Sharif",
+      description: "The requested project could not be found.",
     };
   }
 
@@ -31,7 +32,7 @@ export async function generateMetadata({
       `${project.title} - A project by Raihan Sharif`,
     openGraph: {
       title: project.title,
-      description: project.description || project.subtitle,
+      description: project.description || project.subtitle || "",
       images: project.featured_image_url
         ? [
             {
@@ -85,10 +86,11 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     .order("view_count", { ascending: false })
     .limit(4);
 
-  // Process the project data to ensure technologies are properly formatted
+  // Process the project data to ensure technologies and awards are properly formatted
   const processedProject = {
     ...project,
     technologies: project.technologies || [],
+    awards: project.awards || [],
   };
 
   return (

@@ -104,7 +104,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchViewsData();
-  }, [selectedPeriod]);
+  }, [selectedPeriod]); // Add fetchViewsData dependency
 
   const fetchDashboardStats = async () => {
     try {

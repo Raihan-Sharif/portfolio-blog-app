@@ -81,6 +81,17 @@ interface GalleryImage {
   alt?: string;
 }
 
+interface ProjectAward {
+  id?: number;
+  title: string;
+  description?: string;
+  award_image_url?: string;
+  awarded_by?: string;
+  award_date?: string;
+  award_url?: string;
+  display_order: number;
+}
+
 interface ProjectEditorProps {
   params: {
     projectId: string;
@@ -155,9 +166,10 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
   // Dropdown data
   const [categories, setCategories] = useState<ProjectCategory[]>([]);
   const [technologies, setTechnologies] = useState<Technology[]>([]);
-  const [selectedTechnologies, setSelectedTechnologies] = useState<
+  const [selectedTechnologies, setSelectedTechnologies] = useState
     ProjectTechnology[]
   >([]);
+  const [projectAwards, setProjectAwards] = useState<ProjectAward[]>([]);
 
   // Load initial data
   useEffect(() => {
@@ -212,6 +224,18 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
 
       if (projectError) throw projectError;
 
+      // Load project awards
+      const { data: awards, error: awardsError } = await supabase
+        .from("project_awards")
+        .select("*")
+        .eq("project_id", params.projectId)
+        .eq("is_active", true)
+        .order("display_order");
+
+      if (awardsError) {
+        console.error("Error loading awards:", awardsError);
+      }
+
       if (project) {
         setFormData({
           title: project.title || "",
@@ -262,6 +286,7 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
         });
 
         setSelectedTechnologies(project.project_technologies || []);
+        setProjectAwards(awards || []);
       }
     } catch (err: any) {
       console.error("Error loading project:", err);
@@ -286,58 +311,35 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
     }
   };
 
-  const addKeyFeature = () => {
-    setFormData((prev) => ({
+  // Award management functions
+  const addAward = () => {
+    setProjectAwards((prev) => [
       ...prev,
-      key_features: [
-        ...prev.key_features,
-        { title: "", description: "", icon: "" },
-      ],
-    }));
+      {
+        title: "",
+        description: "",
+        award_image_url: "",
+        awarded_by: "",
+        award_date: "",
+        award_url: "",
+        display_order: prev.length,
+      },
+    ]);
   };
 
-  const updateKeyFeature = (index: number, field: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      key_features: prev.key_features.map((feature, i) =>
-        i === index ? { ...feature, [field]: value } : feature
-      ),
-    }));
+  const updateAward = (index: number, field: string, value: string | number) => {
+    setProjectAwards((prev) =>
+      prev.map((award, i) =>
+        i === index ? { ...award, [field]: value } : award
+      )
+    );
   };
 
-  const removeKeyFeature = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      key_features: prev.key_features.filter((_, i) => i !== index),
-    }));
+  const removeAward = (index: number) => {
+    setProjectAwards((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const addResult = () => {
-    setFormData((prev) => ({
-      ...prev,
-      results_achieved: [
-        ...prev.results_achieved,
-        { metric: "", value: "", description: "" },
-      ],
-    }));
-  };
-
-  const updateResult = (index: number, field: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      results_achieved: prev.results_achieved.map((result, i) =>
-        i === index ? { ...result, [field]: value } : result
-      ),
-    }));
-  };
-
-  const removeResult = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      results_achieved: prev.results_achieved.filter((_, i) => i !== index),
-    }));
-  };
-
+  // Gallery image management
   const addGalleryImage = () => {
     setFormData((prev) => ({
       ...prev,
@@ -364,6 +366,61 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
     }));
   };
 
+  // Key feature management
+  const addKeyFeature = () => {
+    setFormData((prev) => ({
+      ...prev,
+      key_features: [
+        ...prev.key_features,
+        { title: "", description: "", icon: "" },
+      ],
+    }));
+  };
+
+  const updateKeyFeature = (index: number, field: string, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      key_features: prev.key_features.map((feature, i) =>
+        i === index ? { ...feature, [field]: value } : feature
+      ),
+    }));
+  };
+
+  const removeKeyFeature = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      key_features: prev.key_features.filter((_, i) => i !== index),
+    }));
+  };
+
+  // Result management
+  const addResult = () => {
+    setFormData((prev) => ({
+      ...prev,
+      results_achieved: [
+        ...prev.results_achieved,
+        { metric: "", value: "", description: "" },
+      ],
+    }));
+  };
+
+  const updateResult = (index: number, field: string, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      results_achieved: prev.results_achieved.map((result, i) =>
+        i === index ? { ...result, [field]: value } : result
+      ),
+    }));
+  };
+
+  const removeResult = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      results_achieved: prev.results_achieved.filter((_, i) => i !== index),
+    }));
+  };
+
+  // Technology management
   const addTechnology = (technologyId: number) => {
     const technology = technologies.find((t) => t.id === technologyId);
     if (!technology) return;
@@ -461,6 +518,34 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
 
           if (techError) throw techError;
         }
+
+        // Handle project awards
+        // Delete existing awards
+        await supabase
+          .from("project_awards")
+          .delete()
+          .eq("project_id", projectId);
+
+        // Insert new awards
+        if (projectAwards.length > 0) {
+          const awardsData = projectAwards.map((award, index) => ({
+            project_id: projectId,
+            title: award.title,
+            description: award.description || null,
+            award_image_url: award.award_image_url || null,
+            awarded_by: award.awarded_by || null,
+            award_date: award.award_date || null,
+            award_url: award.award_url || null,
+            display_order: index,
+            is_active: true,
+          }));
+
+          const { error: awardsError } = await supabase
+            .from("project_awards")
+            .insert(awardsData);
+
+          if (awardsError) throw awardsError;
+        }
       }
 
       router.push("/admin/projects");
@@ -510,12 +595,13 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
 
       <div className="max-w-6xl mx-auto">
         <Tabs defaultValue="basic" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
             <TabsTrigger value="media">Media</TabsTrigger>
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="technologies">Tech Stack</TabsTrigger>
             <TabsTrigger value="features">Features</TabsTrigger>
+            <TabsTrigger value="awards">Awards</TabsTrigger>
           </TabsList>
 
           {/* Basic Information */}
@@ -785,7 +871,7 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
                   </div>
                 </div>
 
-                {/* Gallery Images */}
+                {/* Gallery Images with Upload */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <Label className="text-base font-semibold">
@@ -814,17 +900,21 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
                           <X className="w-4 h-4" />
                         </Button>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <Label>Image URL</Label>
-                          <Input
-                            value={image.url}
-                            onChange={(e) =>
-                              updateGalleryImage(index, "url", e.target.value)
-                            }
-                            placeholder="https://..."
-                          />
-                        </div>
+                      
+                      {/* Image Upload */}
+                      <div className="mb-4">
+                        <Label>Upload Image</Label>
+                        <ImageUploader
+                          initialImageUrl={image.url}
+                          onImageUploaded={(url) =>
+                            updateGalleryImage(index, "url", url)
+                          }
+                          bucketName="raihan-blog-app"
+                          folderPath="projects/gallery"
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <Label>Caption</Label>
                           <Input
@@ -1385,6 +1475,146 @@ export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Awards Tab */}
+          <TabsContent value="awards">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Award className="w-5 h-5" />
+                    Project Awards
+                  </CardTitle>
+                  <Button
+                    onClick={addAward}
+                    size="sm"
+                    className="gap-2"
+                    type="button"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Award
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {projectAwards.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Award className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No awards added yet. Click "Add Award" to get started.</p>
+                  </div>
+                ) : (
+                  projectAwards.map((award, index) => (
+                    <div key={index} className="border rounded-lg p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <h4 className="font-medium">Award {index + 1}</h4>
+                        <Button
+                          onClick={() => removeAward(index)}
+                          size="sm"
+                          variant="destructive"
+                          type="button"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+
+                      <div className="space-y-4">
+                        {/* Award Image Upload */}
+                        <div>
+                          <Label>Award Image (Optional)</Label>
+                          <ImageUploader
+                            initialImageUrl={award.award_image_url}
+                            onImageUploaded={(url) =>
+                              updateAward(index, "award_image_url", url)
+                            }
+                            bucketName="raihan-blog-app"
+                            folderPath="projects/awards"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label>Award Title *</Label>
+                            <Input
+                              value={award.title}
+                              onChange={(e) =>
+                                updateAward(index, "title", e.target.value)
+                              }
+                              placeholder="e.g., Best Web Application 2024"
+                            />
+                          </div>
+                          <div>
+                            <Label>Awarded By</Label>
+                            <Input
+                              value={award.awarded_by || ""}
+                              onChange={(e) =>
+                                updateAward(index, "awarded_by", e.target.value)
+                              }
+                              placeholder="e.g., Tech Excellence Awards"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label>Award Date</Label>
+                            <Input
+                              type="date"
+                              value={award.award_date || ""}
+                              onChange={(e) =>
+                                updateAward(index, "award_date", e.target.value)
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label>Award URL (Optional)</Label>
+                            <Input
+                              type="url"
+                              value={award.award_url || ""}
+                              onChange={(e) =>
+                                updateAward(index, "award_url", e.target.value)
+                              }
+                              placeholder="https://awards-site.com/winner"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label>Description (Optional)</Label>
+                          <Textarea
+                            value={award.description || ""}
+                            onChange={(e) =>
+                              updateAward(index, "description", e.target.value)
+                            }
+                            placeholder="Brief description of the award and achievement..."
+                            rows={3}
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Display Order</Label>
+                          <Input
+                            type="number"
+                            value={award.display_order}
+                            onChange={(e) =>
+                              updateAward(
+                                index,
+                                "display_order",
+                                parseInt(e.target.value) || 0
+                              )
+                            }
+                            placeholder="0"
+                          />
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Lower numbers appear first
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

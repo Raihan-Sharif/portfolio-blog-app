@@ -115,7 +115,7 @@ export function Navbar() {
         return false;
       }
     },
-    [user?.role]
+    [user?.role, CACHE_DURATION]
   );
 
   // Check admin role when user changes, but don't block the UI
@@ -151,7 +151,7 @@ export function Navbar() {
     // Use a small delay to avoid blocking navigation
     const timeoutId = setTimeout(checkAsync, 100);
     return () => clearTimeout(timeoutId);
-  }, [user, checkAdminRole]);
+  }, [user, checkAdminRole, CACHE_DURATION]);
 
   // Base navigation links
   const baseNavLinks = [

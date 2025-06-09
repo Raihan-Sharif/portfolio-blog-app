@@ -30,6 +30,7 @@ import {
   Star,
   Target,
   TrendingUp,
+  Trophy,
   Users,
   Zap,
 } from "lucide-react";
@@ -81,6 +82,17 @@ interface GalleryImage {
   alt?: string;
 }
 
+interface ProjectAward {
+  id: number;
+  title: string;
+  description?: string;
+  award_image_url?: string;
+  awarded_by?: string;
+  award_date?: string;
+  award_url?: string;
+  display_order: number;
+}
+
 interface Project {
   id: number;
   title: string;
@@ -121,6 +133,7 @@ interface Project {
     rating?: number;
   }>;
   technologies?: Technology[];
+  awards?: ProjectAward[];
   development_methodology?: string;
   version_control?: string;
   deployment_platform?: string;
@@ -310,6 +323,16 @@ export default function ProjectDetailPage({
                   </div>
                 )}
 
+                {/* Awards Badge */}
+                {project.awards && project.awards.length > 0 && (
+                  <div className="absolute top-4 right-4">
+                    <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0">
+                      <Trophy className="w-3 h-3 mr-1" />
+                      {project.awards.length} Award{project.awards.length > 1 ? 's' : ''}
+                    </Badge>
+                  </div>
+                )}
+
                 {/* Stats */}
                 <div className="absolute bottom-4 right-4 flex gap-2">
                   <div className="bg-black/40 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
@@ -358,7 +381,7 @@ export default function ProjectDetailPage({
             {/* Project Details */}
             <div className="space-y-6">
               {/* Category and Platform */}
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
                 {project.category && (
                   <Badge
                     variant="outline"
@@ -445,7 +468,7 @@ export default function ProjectDetailPage({
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-4">
                 {project.demo_url && (
-                  <a
+                  
                     href={project.demo_url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -461,7 +484,7 @@ export default function ProjectDetailPage({
                 )}
 
                 {project.github_url && (
-                  <a
+                  
                     href={project.github_url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -474,7 +497,7 @@ export default function ProjectDetailPage({
                 )}
 
                 {project.case_study_url && (
-                  <a
+                  
                     href={project.case_study_url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -487,7 +510,7 @@ export default function ProjectDetailPage({
                 )}
 
                 {project.documentation_url && (
-                  <a
+                  
                     href={project.documentation_url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -506,6 +529,92 @@ export default function ProjectDetailPage({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-8">
+              {/* Awards Section */}
+              {project.awards && project.awards.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6 }}
+                >
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Trophy className="w-5 h-5 text-yellow-500" />
+                        Awards & Recognition
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {project.awards.map((award, idx) => (
+                          <div
+                            key={idx}
+                            className="group relative overflow-hidden bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 border border-yellow-200/50 dark:border-yellow-800/50 rounded-xl p-6 hover:shadow-lg transition-all duration-300"
+                          >
+                            {/* Award Image */}
+                            {award.award_image_url && (
+                              <div className="relative w-16 h-16 mx-auto mb-4 rounded-full overflow-hidden bg-white shadow-lg">
+                                <Image
+                                  src={award.award_image_url}
+                                  alt={award.title}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                            )}
+                            
+                            {/* Award Content */}
+                            <div className="text-center">
+                              <h4 className="font-bold text-lg mb-2 text-yellow-800 dark:text-yellow-200">
+                                {award.title}
+                              </h4>
+                              
+                              {award.awarded_by && (
+                                <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300 mb-2">
+                                  by {award.awarded_by}
+                                </p>
+                              )}
+                              
+                              {award.award_date && (
+                                <p className="text-xs text-yellow-600 dark:text-yellow-400 mb-3">
+                                  {new Date(award.award_date).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'long'
+                                  })}
+                                </p>
+                              )}
+                              
+                              {award.description && (
+                                <p className="text-sm text-muted-foreground mb-4">
+                                  {award.description}
+                                </p>
+                              )}
+                              
+                              {award.award_url && (
+                                
+                                  href={award.award_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  View Award
+                                </a>
+                              )}
+                            </div>
+
+                            {/* Decorative Trophy Icon */}
+                            <div className="absolute top-3 right-3 opacity-20">
+                              <Trophy className="w-6 h-6 text-yellow-600" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
               {/* Key Features */}
               {project.key_features && project.key_features.length > 0 && (
                 <motion.div
@@ -574,7 +683,7 @@ export default function ProjectDetailPage({
                               {techs.map((tech) => (
                                 <div key={tech.id} className="group">
                                   {tech.official_url ? (
-                                    <a
+                                    
                                       href={tech.official_url}
                                       target="_blank"
                                       rel="noopener noreferrer"
@@ -642,6 +751,7 @@ export default function ProjectDetailPage({
                               {challenge.solution && (
                                 <>
                                   <h5 className="font-semibold mb-2 text-green-600 dark:text-green-400">
+                                    <h5 className="font-semibold mb-2 text-green-600 dark:text-green-400">
                                     Solution:
                                   </h5>
                                   <p className="text-muted-foreground">
@@ -730,7 +840,7 @@ export default function ProjectDetailPage({
                         </div>
                         <div>
                           {project.client_url ? (
-                            <a
+                            
                               href={project.client_url}
                               target="_blank"
                               rel="noopener noreferrer"
