@@ -1,5 +1,7 @@
 "use client";
 
+import { ViewTracker } from "@/components/view-tracker";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -385,6 +387,14 @@ export default function ProjectDetailPage({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/30 to-background">
+      {/* View Tracker - Client Component for tracking project views */}
+      <ViewTracker
+        type="project"
+        id={project.id}
+        delay={2000}
+        threshold={5000}
+        debug={process.env.NODE_ENV === "development"}
+      />
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 right-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
