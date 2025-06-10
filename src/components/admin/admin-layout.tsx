@@ -13,7 +13,11 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import {
+  BarChart3,
+  Bell,
   Briefcase,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   Home,
   Info,
@@ -21,8 +25,10 @@ import {
   Mail,
   Menu,
   Phone,
+  Search,
   Settings,
   Star,
+  User,
   Users,
   X,
 } from "lucide-react";
@@ -41,8 +47,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminLoading, setAdminLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Refs for better state management
+  // Admin check logic (same as before)
   const hasInitialized = useRef(false);
   const isCheckingAdmin = useRef(false);
   const adminCache = useRef<
@@ -50,16 +58,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   >(new Map());
   const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes cache
 
-  // Optimized admin check with aggressive caching
   const checkAdminStatus = useCallback(
     async (userId: string) => {
-      // Check cache first
       const cached = adminCache.current.get(userId);
       if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
         return cached.status;
       }
 
-      // Prevent concurrent checks
       if (isCheckingAdmin.current) {
         return null;
       }
@@ -67,7 +72,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       isCheckingAdmin.current = true;
 
       try {
-        // Quick check from user role first
         if (user?.role === "admin") {
           const adminStatus = true;
           adminCache.current.set(userId, {
@@ -77,7 +81,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           return adminStatus;
         }
 
-        // Check sessionStorage for faster access
         const sessionKey = `admin_${userId}`;
         const sessionData = sessionStorage.getItem(sessionKey);
         const sessionTime = sessionStorage.getItem(`${sessionKey}_time`);
@@ -91,7 +94,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           }
         }
 
-        // Database check as last resort
         const { data, error } = await supabase.rpc("get_user_with_role", {
           p_user_id: userId,
         });
@@ -99,7 +101,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         const adminStatus =
           !error && data && data.length > 0 && data[0].role_name === "admin";
 
-        // Cache the result
         adminCache.current.set(userId, {
           status: adminStatus,
           timestamp: Date.now(),
@@ -115,15 +116,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         isCheckingAdmin.current = false;
       }
     },
-    [user?.role, CACHE_DURATION] // Add CACHE_DURATION dependency
+    [user?.role, CACHE_DURATION]
   );
 
-  // Initialize admin status only once
   useEffect(() => {
     if (loading || hasInitialized.current) return;
 
     if (!user) {
-      // Only redirect if we've finished loading and there's no user
       if (!loading) {
         router.push("/sign-in?redirect=" + encodeURIComponent(pathname));
       }
@@ -131,7 +130,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
 
     const initializeAdmin = async () => {
-      // Don't show loading for navigation between admin pages
       const shouldShowLoading = !hasInitialized.current;
 
       if (shouldShowLoading) {
@@ -145,7 +143,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           setIsAdmin(adminStatus);
           hasInitialized.current = true;
 
-          // Only redirect if not admin and we're sure about the status
           if (!adminStatus && !loading) {
             router.push("/");
           }
@@ -165,7 +162,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     initializeAdmin();
   }, [user, loading, router, pathname, checkAdminStatus]);
 
-  // Handle sign out
   const handleSignOut = useCallback(async () => {
     if (user?.id) {
       adminCache.current.delete(user.id);
@@ -177,49 +173,98 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     router.push("/");
   }, [user, signOut, router]);
 
-  // Navigation items
+  // Navigation items with better organization
   const navItems = [
-    { name: "Dashboard", href: "/admin/dashboard", icon: <Home size={18} /> },
-    { name: "Blog Posts", href: "/admin/blog", icon: <FileText size={18} /> },
+    {
+      name: "Dashboard",
+      href: "/admin/dashboard",
+      icon: <BarChart3 size={20} />,
+      category: "main",
+    },
+    {
+      name: "Blog Posts",
+      href: "/admin/blog",
+      icon: <FileText size={20} />,
+      category: "content",
+    },
     {
       name: "Projects",
       href: "/admin/projects",
-      icon: <Briefcase size={18} />,
+      icon: <Briefcase size={20} />,
+      category: "content",
     },
     {
       name: "Hero Section",
       href: "/admin/hero",
-      icon: <Star size={18} />,
+      icon: <Star size={20} />,
+      category: "pages",
     },
-    { name: "Users", href: "/admin/users", icon: <Users size={18} /> },
     {
-      name: "Contact",
-      href: "/admin/contact-management",
-      icon: <Phone size={18} />,
+      name: "About Page",
+      href: "/admin/about",
+      icon: <Info size={20} />,
+      category: "pages",
     },
-    { name: "Messages", href: "/admin/contact", icon: <Mail size={18} /> },
-    { name: "About Page", href: "/admin/about", icon: <Info size={18} /> },
-    { name: "Settings", href: "/admin/settings", icon: <Settings size={18} /> },
+    {
+      name: "Users",
+      href: "/admin/users",
+      icon: <Users size={20} />,
+      category: "management",
+    },
+    {
+      name: "Contact Info",
+      href: "/admin/contact-management",
+      icon: <Phone size={20} />,
+      category: "management",
+    },
+    {
+      name: "Messages",
+      href: "/admin/contact",
+      icon: <Mail size={20} />,
+      category: "management",
+    },
+    {
+      name: "Settings",
+      href: "/admin/settings",
+      icon: <Settings size={20} />,
+      category: "system",
+    },
   ];
 
-  // Show loading only during initial admin check, not during navigation
+  // Group navigation items by category
+  const groupedNavItems = navItems.reduce((acc, item) => {
+    if (!acc[item.category]) {
+      acc[item.category] = [];
+    }
+    acc[item.category].push(item);
+    return acc;
+  }, {} as Record<string, typeof navItems>);
+
+  const categoryLabels = {
+    main: "Overview",
+    content: "Content",
+    pages: "Pages",
+    management: "Management",
+    system: "System",
+  };
+
   if (loading || (adminLoading && !hasInitialized.current)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
         <div className="text-center">
-          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading admin panel...</p>
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground font-medium">
+            Loading admin panel...
+          </p>
         </div>
       </div>
     );
   }
 
-  // Don't render anything if user is not authenticated
   if (!user) {
     return null;
   }
 
-  // Don't render anything if user is not admin (redirect will happen)
   if (hasInitialized.current && !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -230,81 +275,109 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     );
   }
 
-  // Show admin layout only if user is confirmed admin
   if (!hasInitialized.current || !isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
         <div className="text-center">
-          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Verifying permissions...</p>
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground font-medium">
+            Verifying permissions...
+          </p>
         </div>
       </div>
     );
   }
 
-  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
-
   return (
-    <div className="bg-background min-h-screen flex">
-      {/* Mobile sidebar toggle */}
-      <div className="md:hidden fixed top-4 left-4 z-50">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={toggleSidebar}
-          className="bg-background"
-        >
-          {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-        </Button>
-      </div>
-
+    <div className="bg-slate-50 dark:bg-slate-900 min-h-screen flex">
       {/* Sidebar */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 bg-card border-r transform transition-transform duration-200",
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full",
-          "md:translate-x-0"
+          "fixed inset-y-0 left-0 z-50 flex flex-col bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 shadow-lg transition-all duration-300",
+          isSidebarCollapsed ? "w-16" : "w-64",
+          !isSidebarOpen && "lg:translate-x-0 -translate-x-full"
         )}
       >
-        <div className="flex flex-col h-full">
-          <div className="flex items-center h-16 px-4 border-b">
-            <Link href="/" className="font-bold text-lg">
-              Admin Panel
-            </Link>
-          </div>
+        {/* Sidebar Header */}
+        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-200 dark:border-slate-700">
+          {!isSidebarCollapsed && (
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-primary to-purple-600 rounded-lg flex items-center justify-center">
+                <BarChart3 className="w-5 h-5 text-white" />
+              </div>
+              <h1 className="font-bold text-lg bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                Admin Panel
+              </h1>
+            </div>
+          )}
 
-          <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
-            {navItems.map((item) => {
-              const isActive =
-                pathname === item.href || pathname.startsWith(item.href + "/");
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-accent"
-                  )}
-                  onClick={() => {
-                    // Close mobile sidebar on navigation
-                    if (window.innerWidth < 768) {
-                      setIsSidebarOpen(false);
-                    }
-                  }}
-                >
-                  <span className="mr-3">{item.icon}</span>
-                  {item.name}
-                </Link>
-              );
-            })}
-          </nav>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="h-8 w-8 hover:bg-slate-100 dark:hover:bg-slate-700"
+          >
+            {isSidebarCollapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
 
-          <div className="border-t p-4">
-            <div className="flex items-center mb-3">
-              <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
-                <span className="font-medium text-sm">
+        {/* Navigation */}
+        <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
+          {Object.entries(groupedNavItems).map(([category, items]) => (
+            <div key={category}>
+              {!isSidebarCollapsed && (
+                <h3 className="px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
+                  {categoryLabels[category as keyof typeof categoryLabels]}
+                </h3>
+              )}
+              <div className="space-y-1">
+                {items.map((item) => {
+                  const isActive =
+                    pathname === item.href ||
+                    pathname.startsWith(item.href + "/");
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group",
+                        isActive
+                          ? "bg-gradient-to-r from-primary to-primary/80 text-white shadow-md shadow-primary/25"
+                          : "hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                      )}
+                      title={isSidebarCollapsed ? item.name : undefined}
+                    >
+                      <span
+                        className={cn(
+                          "transition-colors duration-200",
+                          isActive
+                            ? "text-white"
+                            : "text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300"
+                        )}
+                      >
+                        {item.icon}
+                      </span>
+                      {!isSidebarCollapsed && (
+                        <span className="ml-3">{item.name}</span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        {/* User Profile Section */}
+        <div className="border-t border-slate-200 dark:border-slate-700 p-4">
+          {!isSidebarCollapsed ? (
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
+                <span className="font-medium text-white text-sm">
                   {user?.full_name
                     ?.split(" ")
                     .map((n) => n[0])
@@ -312,63 +385,155 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     .toUpperCase() || "A"}
                 </span>
               </div>
-              <div className="ml-3">
-                <div className="text-sm font-medium">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-slate-900 dark:text-white truncate">
                   {user?.full_name || "Admin"}
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs text-slate-500 dark:text-slate-400">
                   Administrator
                 </div>
               </div>
             </div>
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-2"
-              onClick={handleSignOut}
-            >
-              <LogOut size={16} />
-              Sign Out
-            </Button>
-          </div>
+          ) : (
+            <div className="flex justify-center mb-4">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
+                <span className="font-medium text-white text-sm">
+                  {user?.full_name
+                    ?.split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase() || "A"}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <Button
+            variant="outline"
+            className={cn(
+              "border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700",
+              isSidebarCollapsed
+                ? "w-10 h-10 p-0"
+                : "w-full justify-start gap-2"
+            )}
+            onClick={handleSignOut}
+            title={isSidebarCollapsed ? "Sign Out" : undefined}
+          >
+            <LogOut size={16} />
+            {!isSidebarCollapsed && <span>Sign Out</span>}
+          </Button>
         </div>
+      </div>
+
+      {/* Mobile menu button */}
+      <div className="lg:hidden fixed top-4 left-4 z-60">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="bg-white dark:bg-slate-800 shadow-lg"
+        >
+          {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        </Button>
       </div>
 
       {/* Overlay for mobile */}
       {isSidebarOpen && (
         <div
-          className="md:hidden fixed inset-0 bg-black/50 z-30"
-          onClick={toggleSidebar}
+          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Main content */}
-      <div className="flex-1 md:ml-64">
-        <header className="sticky top-0 z-20 h-16 bg-background border-b px-4 flex items-center justify-end">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                Account
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href="/profile">Profile</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/" target="_blank" rel="noopener noreferrer">
-                  View Site
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSignOut}>
-                <LogOut className="mr-2 h-4 w-4" />
-                Sign Out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+      <div
+        className={cn(
+          "flex-1 transition-all duration-300",
+          isSidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
+        )}
+      >
+        {/* Top Header */}
+        <header className="sticky top-0 z-30 h-16 bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-700 px-6 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            {/* Mobile menu button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            >
+              <Menu size={20} />
+            </Button>
+
+            {/* Search */}
+            <div className="hidden md:flex items-center space-x-2 bg-slate-100 dark:bg-slate-700 rounded-lg px-3 py-2 min-w-[300px]">
+              <Search className="w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search..."
+                className="bg-transparent border-none outline-none text-sm text-slate-700 dark:text-slate-300 placeholder:text-slate-400 flex-1"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            {/* Notifications */}
+            <Button variant="ghost" size="icon" className="relative">
+              <Bell size={20} />
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs"></span>
+            </Button>
+
+            {/* View Site */}
+            <Button asChild variant="outline" size="sm">
+              <Link href="/" target="_blank" rel="noopener noreferrer">
+                <Home className="w-4 h-4 mr-2" />
+                View Site
+              </Link>
+            </Button>
+
+            {/* User Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
+                    <span className="font-medium text-white text-xs">
+                      {user?.full_name
+                        ?.split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .toUpperCase() || "A"}
+                    </span>
+                  </div>
+                  <span className="hidden md:block font-medium">
+                    {user?.full_name || "Admin"}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem asChild>
+                  <Link href="/profile">
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/" target="_blank" rel="noopener noreferrer">
+                    <Home className="mr-2 h-4 w-4" />
+                    View Site
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </header>
 
-        <main className="flex-1">{children}</main>
+        {/* Main Content Area */}
+        <main className="flex-1 p-6">{children}</main>
       </div>
     </div>
   );
