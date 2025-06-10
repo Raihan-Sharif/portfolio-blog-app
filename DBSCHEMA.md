@@ -1567,3 +1567,163 @@ END;
 $$
 LANGUAGE plpgsql;
 $$
+
+---
+
+-- Add to your DBSCHEMA.md file
+-- SQL functions for project view tracking
+
+-- Function to increment project view count
+CREATE OR REPLACE FUNCTION increment_project_view(project_id_param INTEGER)
+RETURNS VOID AS $$
+BEGIN
+-- First update the main projects table total view count
+UPDATE projects
+SET view_count = view_count + 1, updated_at = NOW()
+WHERE id = project_id_param;
+
+-- Then, update or insert the daily view count
+INSERT INTO project_views (project_id, view_date, view_count)
+VALUES (project_id_param, CURRENT_DATE, 1)
+ON CONFLICT (project_id, view_date)
+DO UPDATE SET view_count = project_views.view_count + 1;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Function to get project views per day for the last N days
+CREATE OR REPLACE FUNCTION get_project_views_by_day(project_id_param INTEGER, days_count INTEGER)
+RETURNS TABLE (
+  view_date DATE,
+  count INTEGER
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+WITH days AS (
+SELECT generate_series(
+CURRENT_DATE - (days_count - 1)::interval,
+CURRENT_DATE,
+'1 day'::interval
+)::date AS day
+)
+SELECT
+days.day AS view_date,
+COALESCE(pv.view_count, 0) AS count
+FROM days
+LEFT JOIN project_views pv ON pv.view_date = days.day AND pv.project_id = project_id_param
+ORDER BY days.day;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Function to get total project views per day across all projects
+CREATE OR REPLACE FUNCTION get_total_project_views_by_day(days_count INTEGER)
+RETURNS TABLE (
+  view_date DATE,
+  count INTEGER
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+WITH days AS (
+SELECT generate_series(
+CURRENT_DATE - (days_count - 1)::interval,
+CURRENT_DATE,
+'1 day'::interval
+)::date AS day
+)
+SELECT
+days.day AS view_date,
+COALESCE(SUM(pv.view_count), 0) AS count
+FROM days
+LEFT JOIN project_views pv ON pv.view_date = days.day
+GROUP BY days.day
+ORDER BY days.day;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Function to get combined views (posts + projects) per day
+CREATE OR REPLACE FUNCTION get_combined_views_by_day(days_count INTEGER)
+RETURNS TABLE (
+  view_date DATE,
+  post_views INTEGER,
+  project_views INTEGER,
+  total_views INTEGER
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+WITH days AS (
+SELECT generate_series(
+CURRENT_DATE - (days_count - 1)::interval,
+CURRENT_DATE,
+'1 day'::interval
+)::date AS day
+)
+SELECT
+days.day AS view_date,
+COALESCE(SUM(pov.view_count), 0) AS post_views,
+COALESCE(SUM(prv.view_count), 0) AS project_views,
+COALESCE(SUM(pov.view_count), 0) + COALESCE(SUM(prv.view_count), 0) AS total_views
+FROM days
+LEFT JOIN post_views pov ON pov.view_date = days.day
+LEFT JOIN project_views prv ON prv.view_date = days.day
+GROUP BY days.day
+ORDER BY days.day;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Function to get analytics summary
+CREATE OR REPLACE FUNCTION get_analytics_summary(days_count INTEGER DEFAULT 30)
+RETURNS TABLE (
+  total_posts INTEGER,
+  total_projects INTEGER,
+  total_post_views BIGINT,
+  total_project_views BIGINT,
+  avg_daily_views NUMERIC,
+  most_viewed_post_id INTEGER,
+  most_viewed_project_id INTEGER
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+SELECT
+(SELECT COUNT(_)::INTEGER FROM posts WHERE published = true) as total_posts,
+(SELECT COUNT(_)::INTEGER FROM projects WHERE is_active = true AND is_public = true) as total_projects,
+(SELECT COALESCE(SUM(view_count), 0) FROM post_views
+WHERE view_date >= CURRENT_DATE - days_count::interval) as total_post_views,
+(SELECT COALESCE(SUM(view_count), 0) FROM project_views
+WHERE view_date >= CURRENT_DATE - days_count::interval) as total_project_views,
+(SELECT ROUND(
+(COALESCE(SUM(pv.view_count), 0) + COALESCE(SUM(prv.view_count), 0))::NUMERIC / days_count, 2
+) FROM post_views pv
+FULL OUTER JOIN project_views prv ON pv.view_date = prv.view_date
+WHERE pv.view_date >= CURRENT_DATE - days_count::interval
+OR prv.view_date >= CURRENT_DATE - days_count::interval) as avg_daily_views,
+(SELECT id FROM posts ORDER BY view_count DESC LIMIT 1) as most_viewed_post_id,
+(SELECT id FROM projects WHERE is_active = true ORDER BY view_count DESC LIMIT 1) as most_viewed_project_id;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Grant execute permissions
+GRANT EXECUTE ON FUNCTION increment_project_view(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_project_views_by_day(INTEGER, INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_total_project_views_by_day(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_combined_views_by_day(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_analytics_summary(INTEGER) TO authenticated;
+
+--------
+$$

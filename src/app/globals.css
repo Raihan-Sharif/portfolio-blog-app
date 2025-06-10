@@ -26,6 +26,9 @@
     --radius: 0.5rem;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
   .dark {
     --background: 224 71.4% 4.1%;
     --foreground: 210 20% 98%;
@@ -146,4 +149,24 @@ form {
 
 .animate-shimmer {
   animation: shimmer 2s infinite;
+}
+
+/* Chart container styling */
+.recharts-wrapper {
+  font-family: inherit;
+}
+
+.recharts-tooltip-wrapper {
+  outline: none;
+}
+
+/* Loading shimmer effect */
+.loading-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  animation: shimmer 1.5s infinite;
 }

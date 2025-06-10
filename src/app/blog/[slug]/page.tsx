@@ -1,5 +1,7 @@
 import BlogContent from "@/components/blog/blog-content";
-import ViewTracker from "@/components/blog/view-tracker";
+// import ViewTracker from "@/components/blog/view-tracker";
+import { useViewTracking } from "@/hooks/use-view-tracking";
+
 import { Button } from "@/components/ui/button";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getReadTime } from "@/lib/utils";
@@ -142,10 +144,17 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     .order("created_at", { ascending: false })
     .limit(3);
 
+  // Add view tracking
+  useViewTracking("post", post?.id, {
+    enabled: !!post?.id,
+    delay: 2000, // 2 second delay
+    threshold: 5000, // 5 seconds minimum
+  });
+
   return (
     <div className="min-h-screen">
-      {/* Add ViewTracker component for client-side view tracking */}
-      <ViewTracker postId={post.id} />
+      {/* Add ViewTracker component for client-side view tracking
+      <ViewTracker postId={post.id} /> */}
 
       {/* Cover Image */}
       {post.cover_image_url && (
