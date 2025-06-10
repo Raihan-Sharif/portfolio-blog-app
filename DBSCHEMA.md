@@ -1727,3 +1727,59 @@ GRANT EXECUTE ON FUNCTION get_analytics_summary(INTEGER) TO authenticated;
 
 --------
 $$
+
+-- Function to get user activity (basic implementation)
+CREATE OR REPLACE FUNCTION get_user_activity()
+RETURNS TABLE (
+online_count integer,
+total_users integer,
+recent_activity json
+) AS $$
+BEGIN
+RETURN QUERY
+SELECT
+(SELECT COUNT(_)::integer FROM profiles WHERE created_at > NOW() - INTERVAL '1 hour') as online_count,
+(SELECT COUNT(_)::integer FROM profiles) as total_users,
+(SELECT json_agg(
+json_build_object(
+'id', id,
+'full_name', full_name,
+'created_at', created_at
+)
+) FROM profiles ORDER BY created_at DESC LIMIT 5) as recent_activity;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Function to get enhanced analytics
+CREATE OR REPLACE FUNCTION get_dashboard_analytics(days_count integer)
+RETURNS TABLE (
+  total_views integer,
+  avg_daily_views numeric,
+  growth_percentage numeric,
+  top_content json
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+SELECT
+(SELECT COALESCE(SUM(view_count), 0)::integer FROM post_views
+WHERE view_date >= CURRENT_DATE - days_count) as total_views,
+(SELECT ROUND(AVG(view_count), 2) FROM post_views
+WHERE view_date >= CURRENT_DATE - days_count) as avg_daily_views,
+15.5::numeric as growth_percentage, -- Replace with actual calculation
+(SELECT json_agg(
+json_build_object(
+'title', title,
+'views', view_count,
+'type', 'post'
+)
+) FROM posts ORDER BY view_count DESC LIMIT 5) as top_content;
+END;
+
+$$
+LANGUAGE plpgsql;
+-------------
+$$
