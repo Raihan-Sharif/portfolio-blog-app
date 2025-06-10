@@ -183,7 +183,7 @@ export default function DashboardPage() {
           content,
           cover_image_url,
           excerpt,
-          author:profiles(full_name)
+          profiles!inner(full_name)
         `
         )
         .order("created_at", { ascending: false })
@@ -373,7 +373,7 @@ export default function DashboardPage() {
         <Card
           className={cn(
             "relative overflow-hidden transition-all duration-200",
-            href && "hover:shadow-lg hover:scale-105 cursor-pointer"
+            href ? "hover:shadow-lg hover:scale-105 cursor-pointer" : ""
           )}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

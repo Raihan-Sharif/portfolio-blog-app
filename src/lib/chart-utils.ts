@@ -45,7 +45,7 @@ export function fillMissingDates(
   days: number,
   endDate: Date = new Date()
 ): ChartDataPoint[] {
-  const startDate = subDays(startDate(endDate), days - 1);
+  const startDate = subDays(startOfDay(endDate), days - 1);
   const dateRange = generateDateRange(startDate, endDate);
 
   // Create a map for quick lookup
