@@ -1,20 +1,33 @@
 // src/components/admin/loading-states.tsx
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Loader2,
+  RefreshCw,
+  WifiOff,
+  XCircle,
+  Zap,
+} from "lucide-react";
 
 interface LoadingSpinnerProps {
   size?: "sm" | "md" | "lg";
   className?: string;
   text?: string;
+  variant?: "default" | "pulse" | "bounce" | "spin";
 }
 
 export function LoadingSpinner({
   size = "md",
   className,
   text = "Loading...",
+  variant = "default",
 }: LoadingSpinnerProps) {
   const sizeClasses = {
     sm: "w-4 h-4",
@@ -22,14 +35,67 @@ export function LoadingSpinner({
     lg: "w-8 h-8",
   };
 
+  const spinnerVariants = {
+    default: (
+      <Loader2 className={cn("animate-spin text-primary", sizeClasses[size])} />
+    ),
+    pulse: (
+      <div
+        className={cn(
+          "rounded-full bg-primary animate-pulse",
+          sizeClasses[size]
+        )}
+      />
+    ),
+    bounce: (
+      <div className="flex space-x-1">
+        {[0, 1, 2].map((i) => (
+          <motion.div
+            key={i}
+            className="w-2 h-2 bg-primary rounded-full"
+            animate={{
+              y: ["0%", "-50%", "0%"],
+            }}
+            transition={{
+              duration: 0.6,
+              repeat: Infinity,
+              delay: i * 0.1,
+            }}
+          />
+        ))}
+      </div>
+    ),
+    spin: (
+      <div className="relative">
+        <div
+          className={cn(
+            "border-4 border-primary/20 border-t-primary rounded-full animate-spin",
+            sizeClasses[size]
+          )}
+        />
+        <div
+          className={cn(
+            "absolute inset-0 border-4 border-transparent border-r-purple-500 rounded-full animate-spin",
+            sizeClasses[size]
+          )}
+          style={{ animationDirection: "reverse", animationDuration: "1.5s" }}
+        />
+      </div>
+    ),
+  };
+
   return (
     <div className={cn("flex items-center justify-center", className)}>
       <div className="flex flex-col items-center space-y-3">
-        <Loader2
-          className={cn("animate-spin text-primary", sizeClasses[size])}
-        />
+        {spinnerVariants[variant]}
         {text && (
-          <p className="text-muted-foreground text-sm font-medium">{text}</p>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-muted-foreground text-sm font-medium"
+          >
+            {text}
+          </motion.p>
         )}
       </div>
     </div>
@@ -39,13 +105,32 @@ export function LoadingSpinner({
 interface LoadingCardProps {
   className?: string;
   height?: string;
+  title?: string;
+  description?: string;
 }
 
-export function LoadingCard({ className, height = "h-32" }: LoadingCardProps) {
+export function LoadingCard({
+  className,
+  height = "h-32",
+  title,
+  description,
+}: LoadingCardProps) {
   return (
     <Card className={className}>
-      <CardContent className={cn("flex items-center justify-center", height)}>
-        <LoadingSpinner />
+      <CardContent
+        className={cn(
+          "flex flex-col items-center justify-center",
+          height,
+          "space-y-4"
+        )}
+      >
+        <LoadingSpinner variant="spin" />
+        {title && <div className="font-medium">{title}</div>}
+        {description && (
+          <div className="text-sm text-muted-foreground text-center">
+            {description}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -54,16 +139,46 @@ export function LoadingCard({ className, height = "h-32" }: LoadingCardProps) {
 interface SkeletonProps {
   className?: string;
   lines?: number;
+  variant?: "text" | "circular" | "rectangular" | "card";
 }
 
-export function Skeleton({ className, lines = 1 }: SkeletonProps) {
+export function Skeleton({
+  className,
+  lines = 1,
+  variant = "text",
+}: SkeletonProps) {
+  const baseClasses = "animate-pulse bg-muted";
+
+  if (variant === "circular") {
+    return (
+      <div className={cn(baseClasses, "rounded-full w-12 h-12", className)} />
+    );
+  }
+
+  if (variant === "rectangular") {
+    return <div className={cn(baseClasses, "rounded w-full h-4", className)} />;
+  }
+
+  if (variant === "card") {
+    return (
+      <div className={cn("animate-pulse space-y-4 p-4", className)}>
+        <div className="h-4 bg-muted rounded w-3/4"></div>
+        <div className="space-y-2">
+          <div className="h-3 bg-muted rounded"></div>
+          <div className="h-3 bg-muted rounded w-5/6"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("animate-pulse", className)}>
       {Array.from({ length: lines }).map((_, i) => (
         <div
           key={i}
           className={cn(
-            "bg-muted rounded h-4 mb-2 last:mb-0",
+            baseClasses,
+            "rounded h-4 mb-2 last:mb-0",
             i === lines - 1 && lines > 1 ? "w-3/4" : "w-full"
           )}
         />
@@ -77,37 +192,40 @@ export function ChartSkeleton({ className }: { className?: string }) {
     <Card className={className}>
       <CardHeader>
         <Skeleton className="w-1/3 h-6" />
+        <Skeleton className="w-1/4 h-4" />
       </CardHeader>
       <CardContent>
         <div className="h-[300px] flex items-end justify-between space-x-2">
           {Array.from({ length: 7 }).map((_, i) => (
-            <div
+            <motion.div
               key={i}
               className="bg-muted rounded-t animate-pulse"
               style={{
                 height: `${Math.random() * 80 + 20}%`,
                 width: "100%",
               }}
+              initial={{ scaleY: 0 }}
+              animate={{ scaleY: 1 }}
+              transition={{ delay: i * 0.1, duration: 0.5 }}
             />
           ))}
+        </div>
+        <div className="mt-4 flex justify-between">
+          <Skeleton className="w-1/4 h-3" />
+          <Skeleton className="w-1/6 h-3" />
         </div>
       </CardContent>
     </Card>
   );
 }
 
-// src/components/admin/error-states.tsx
-("use client");
-
-import { Button } from "@/components/ui/button";
-import { AlertCircle, RefreshCw, WifiOff } from "lucide-react";
-
 interface ErrorStateProps {
   title?: string;
   message?: string;
   onRetry?: () => void;
   className?: string;
-  variant?: "default" | "network" | "permission" | "notFound";
+  variant?: "default" | "network" | "permission" | "notFound" | "timeout";
+  showIcon?: boolean;
 }
 
 export function ErrorState({
@@ -116,12 +234,14 @@ export function ErrorState({
   onRetry,
   className,
   variant = "default",
+  showIcon = true,
 }: ErrorStateProps) {
   const variants = {
     default: {
       icon: <AlertCircle className="w-12 h-12 text-red-500" />,
       title: title || "Something went wrong",
       message: message || "An unexpected error occurred. Please try again.",
+      color: "red",
     },
     network: {
       icon: <WifiOff className="w-12 h-12 text-orange-500" />,
@@ -129,16 +249,25 @@ export function ErrorState({
       message:
         message ||
         "Unable to connect to the server. Check your internet connection.",
+      color: "orange",
     },
     permission: {
-      icon: <AlertCircle className="w-12 h-12 text-yellow-500" />,
+      icon: <XCircle className="w-12 h-12 text-yellow-500" />,
       title: title || "Access Denied",
       message: message || "You don't have permission to access this resource.",
+      color: "yellow",
     },
     notFound: {
       icon: <AlertCircle className="w-12 h-12 text-blue-500" />,
       title: title || "Not Found",
       message: message || "The requested resource could not be found.",
+      color: "blue",
+    },
+    timeout: {
+      icon: <Clock className="w-12 h-12 text-purple-500" />,
+      title: title || "Request Timeout",
+      message: message || "The request took too long to complete.",
+      color: "purple",
     },
   };
 
@@ -147,14 +276,40 @@ export function ErrorState({
   return (
     <Card className={className}>
       <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-        {config.icon}
-        <h3 className="mt-4 text-lg font-semibold">{config.title}</h3>
-        <p className="mt-2 text-muted-foreground max-w-md">{config.message}</p>
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", duration: 0.5 }}
+        >
+          {showIcon && config.icon}
+        </motion.div>
+        <motion.h3
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="mt-4 text-lg font-semibold"
+        >
+          {config.title}
+        </motion.h3>
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mt-2 text-muted-foreground max-w-md"
+        >
+          {config.message}
+        </motion.p>
         {onRetry && (
-          <Button onClick={onRetry} variant="outline" className="mt-4 gap-2">
-            <RefreshCw className="w-4 h-4" />
-            Try Again
-          </Button>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Button onClick={onRetry} variant="outline" className="mt-4 gap-2">
+              <RefreshCw className="w-4 h-4" />
+              Try Again
+            </Button>
+          </motion.div>
         )}
       </CardContent>
     </Card>
@@ -167,6 +322,7 @@ interface EmptyStateProps {
   description?: string;
   action?: React.ReactNode;
   className?: string;
+  variant?: "default" | "illustration" | "minimal";
 }
 
 export function EmptyState({
@@ -175,311 +331,258 @@ export function EmptyState({
   description,
   action,
   className,
+  variant = "default",
 }: EmptyStateProps) {
   return (
-    <Card className={className}>
+    <Card className={cn("border-dashed border-2", className)}>
       <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-        {icon && <div className="mb-4 opacity-50">{icon}</div>}
-        <h3 className="text-lg font-semibold">{title}</h3>
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", duration: 0.6 }}
+        >
+          {icon && (
+            <div
+              className={cn(
+                "mb-4",
+                variant === "illustration" ? "opacity-30" : "opacity-50"
+              )}
+            >
+              {icon}
+            </div>
+          )}
+        </motion.div>
+        <motion.h3
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="text-lg font-semibold mb-2"
+        >
+          {title}
+        </motion.h3>
         {description && (
-          <p className="mt-2 text-muted-foreground max-w-md">{description}</p>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-muted-foreground max-w-md mb-4"
+          >
+            {description}
+          </motion.p>
         )}
-        {action && <div className="mt-4">{action}</div>}
+        {action && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            {action}
+          </motion.div>
+        )}
       </CardContent>
     </Card>
   );
 }
 
-// src/components/admin/status-indicators.tsx
-("use client");
-
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Clock, XCircle } from "lucide-react";
-
 interface StatusBadgeProps {
-  status: "success" | "pending" | "warning" | "error";
+  status: "success" | "pending" | "warning" | "error" | "info";
   text?: string;
   className?: string;
+  animated?: boolean;
 }
 
-export function StatusBadge({ status, text, className }: StatusBadgeProps) {
+export function StatusBadge({
+  status,
+  text,
+  className,
+  animated = false,
+}: StatusBadgeProps) {
   const variants = {
     success: {
       icon: <CheckCircle className="w-3 h-3" />,
       text: text || "Success",
       className:
-        "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+        "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-200 dark:border-green-800",
     },
     pending: {
       icon: <Clock className="w-3 h-3" />,
       text: text || "Pending",
       className:
-        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 border-yellow-200 dark:border-yellow-800",
     },
     warning: {
       icon: <AlertCircle className="w-3 h-3" />,
       text: text || "Warning",
       className:
-        "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+        "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 border-orange-200 dark:border-orange-800",
     },
     error: {
       icon: <XCircle className="w-3 h-3" />,
       text: text || "Error",
-      className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+      className:
+        "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-red-200 dark:border-red-800",
+    },
+    info: {
+      icon: <Zap className="w-3 h-3" />,
+      text: text || "Info",
+      className:
+        "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-blue-200 dark:border-blue-800",
     },
   };
 
   const variant = variants[status];
 
   return (
-    <Badge
-      variant="outline"
-      className={cn("gap-1", variant.className, className)}
+    <motion.span
+      initial={animated ? { scale: 0 } : false}
+      animate={animated ? { scale: 1 } : false}
+      className={cn(
+        "inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-full border",
+        variant.className,
+        className
+      )}
     >
-      {variant.icon}
+      <span className={animated ? "animate-pulse" : ""}>{variant.icon}</span>
       {variant.text}
-    </Badge>
+    </motion.span>
+  );
+}
+
+interface ProgressProps {
+  value: number;
+  max?: number;
+  className?: string;
+  showLabel?: boolean;
+  variant?: "default" | "success" | "warning" | "error";
+  animated?: boolean;
+}
+
+export function Progress({
+  value,
+  max = 100,
+  className,
+  showLabel = false,
+  variant = "default",
+  animated = true,
+}: ProgressProps) {
+  const percentage = Math.min(Math.max((value / max) * 100, 0), 100);
+
+  const variantClasses = {
+    default: "bg-primary",
+    success: "bg-green-500",
+    warning: "bg-yellow-500",
+    error: "bg-red-500",
+  };
+
+  return (
+    <div className={cn("space-y-1", className)}>
+      {showLabel && (
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Progress</span>
+          <span className="font-medium">{Math.round(percentage)}%</span>
+        </div>
+      )}
+      <div className="w-full bg-secondary/20 rounded-full h-2 overflow-hidden">
+        <motion.div
+          className={cn(
+            "h-full rounded-full transition-all duration-300",
+            variantClasses[variant]
+          )}
+          initial={animated ? { width: 0 } : false}
+          animate={animated ? { width: `${percentage}%` } : false}
+          style={!animated ? { width: `${percentage}%` } : undefined}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+        />
+      </div>
+    </div>
   );
 }
 
 export function ConnectionStatus({ isOnline }: { isOnline: boolean }) {
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <div
+    <motion.div
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="flex items-center gap-2 text-xs"
+    >
+      <motion.div
         className={cn(
           "w-2 h-2 rounded-full",
           isOnline ? "bg-green-500" : "bg-red-500"
         )}
+        animate={isOnline ? { scale: [1, 1.2, 1] } : {}}
+        transition={{ duration: 2, repeat: Infinity }}
       />
-      <span className="text-muted-foreground">
+      <span className="text-muted-foreground font-medium">
         {isOnline ? "Online" : "Offline"}
       </span>
-    </div>
+    </motion.div>
   );
 }
 
-// src/hooks/use-online-status.ts
-("use client");
-
-import { useEffect, useState } from "react";
-
-export function useOnlineStatus() {
-  const [isOnline, setIsOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true
-  );
-
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
-
-  return isOnline;
+// Loading overlay for full-screen loading
+interface LoadingOverlayProps {
+  isVisible: boolean;
+  message?: string;
+  variant?: "default" | "blur" | "solid";
 }
 
-// src/components/admin/data-table.tsx
-("use client");
-
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
-
-interface Column<T> {
-  key: keyof T;
-  header: string;
-  render?: (value: any, item: T) => React.ReactNode;
-  sortable?: boolean;
-  className?: string;
-}
-
-interface DataTableProps<T> {
-  data: T[];
-  columns: Column<T>[];
-  searchable?: boolean;
-  searchPlaceholder?: string;
-  paginated?: boolean;
-  pageSize?: number;
-  className?: string;
-  emptyState?: React.ReactNode;
-}
-
-export function DataTable<T extends Record<string, any>>({
-  data,
-  columns,
-  searchable = false,
-  searchPlaceholder = "Search...",
-  paginated = false,
-  pageSize = 10,
-  className,
-  emptyState,
-}: DataTableProps<T>) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortConfig, setSortConfig] = useState<{
-    key: keyof T;
-    direction: "asc" | "desc";
-  } | null>(null);
-
-  // Filter data based on search
-  const filteredData = searchable
-    ? data.filter((item) =>
-        Object.values(item).some((value) =>
-          String(value).toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      )
-    : data;
-
-  // Sort data
-  const sortedData = sortConfig
-    ? [...filteredData].sort((a, b) => {
-        const aValue = a[sortConfig.key];
-        const bValue = b[sortConfig.key];
-
-        if (aValue < bValue) {
-          return sortConfig.direction === "asc" ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortConfig.direction === "asc" ? 1 : -1;
-        }
-        return 0;
-      })
-    : filteredData;
-
-  // Paginate data
-  const paginatedData = paginated
-    ? sortedData.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-    : sortedData;
-
-  const totalPages = Math.ceil(sortedData.length / pageSize);
-
-  const handleSort = (key: keyof T) => {
-    setSortConfig((prev) => ({
-      key,
-      direction: prev?.key === key && prev.direction === "asc" ? "desc" : "asc",
-    }));
+export function LoadingOverlay({
+  isVisible,
+  message = "Loading...",
+  variant = "blur",
+}: LoadingOverlayProps) {
+  const overlayClasses = {
+    default: "bg-background/80 backdrop-blur-sm",
+    blur: "bg-background/60 backdrop-blur-md",
+    solid: "bg-background",
   };
 
-  if (data.length === 0 && emptyState) {
-    return <div className={className}>{emptyState}</div>;
-  }
-
   return (
-    <div className={cn("space-y-4", className)}>
-      {searchable && (
-        <div className="flex items-center space-x-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder={searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
+    <AnimatePresence>
+      {isVisible && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className={cn(
+            "fixed inset-0 z-50 flex items-center justify-center",
+            overlayClasses[variant]
+          )}
+        >
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            className="bg-card p-8 rounded-2xl shadow-2xl border max-w-sm mx-4"
+          >
+            <LoadingSpinner variant="spin" size="lg" text={message} />
+          </motion.div>
+        </motion.div>
       )}
+    </AnimatePresence>
+  );
+}
 
-      <div className="border rounded-lg overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {columns.map((column) => (
-                <TableHead
-                  key={String(column.key)}
-                  className={cn(
-                    column.className,
-                    column.sortable && "cursor-pointer hover:bg-muted/50"
-                  )}
-                  onClick={() => column.sortable && handleSort(column.key)}
-                >
-                  <div className="flex items-center space-x-1">
-                    <span>{column.header}</span>
-                    {column.sortable && sortConfig?.key === column.key && (
-                      <span className="text-xs">
-                        {sortConfig.direction === "asc" ? "↑" : "↓"}
-                      </span>
-                    )}
-                  </div>
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedData.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  No data found
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedData.map((item, index) => (
-                <TableRow key={index}>
-                  {columns.map((column) => (
-                    <TableCell
-                      key={String(column.key)}
-                      className={column.className}
-                    >
-                      {column.render
-                        ? column.render(item[column.key], item)
-                        : String(item[column.key] || "")}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {paginated && totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {(currentPage - 1) * pageSize + 1} to{" "}
-            {Math.min(currentPage * pageSize, sortedData.length)} of{" "}
-            {sortedData.length} results
-          </p>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(currentPage - 1)}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Previous
-            </Button>
-            <span className="text-sm">
-              Page {currentPage} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(currentPage + 1)}
-              disabled={currentPage === totalPages}
-            >
-              Next
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+// Pulse loading for real-time data
+export function PulseLoader({ className }: { className?: string }) {
+  return (
+    <div className={cn("flex items-center space-x-1", className)}>
+      {[0, 1, 2].map((i) => (
+        <motion.div
+          key={i}
+          className="w-2 h-2 bg-primary rounded-full"
+          animate={{
+            scale: [1, 1.5, 1],
+            opacity: [0.5, 1, 0.5],
+          }}
+          transition={{
+            duration: 1.5,
+            repeat: Infinity,
+            delay: i * 0.2,
+          }}
+        />
+      ))}
     </div>
   );
 }

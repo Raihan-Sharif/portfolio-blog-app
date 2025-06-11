@@ -29,6 +29,7 @@
   html {
     scroll-behavior: smooth;
   }
+
   .dark {
     --background: 224 71.4% 4.1%;
     --foreground: 210 20% 98%;
@@ -61,16 +62,71 @@
   }
 }
 
-/* Fix for navbar overlapping content */
-main {
+/* FIXED: Admin layout specific styles */
+.admin-layout {
+  /* Ensure admin layout takes full viewport */
+  min-height: 100vh;
+  display: flex;
+  position: relative;
+}
+
+.admin-sidebar {
+  /* High z-index for sidebar */
+  z-index: 60;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.admin-main-content {
+  /* Proper positioning for main content */
+  flex: 1;
+  position: relative;
+  z-index: 10;
+  min-height: 100vh;
+}
+
+.admin-header {
+  /* Sticky header with proper z-index */
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+/* FIXED: Prevent navbar and footer on admin pages */
+.admin-page .navbar,
+.admin-page .footer {
+  display: none !important;
+}
+
+/* Fix for navbar overlapping content on client pages */
+main:not(.admin-main-content) {
   padding-top: 4rem; /* 64px to account for navbar height */
 }
 
-/* Ensure buttons and links are clickable */
+/* FIXED: Ensure buttons and links are clickable with proper z-index */
 button,
-a {
+a,
+.clickable {
   position: relative;
   z-index: 1;
+}
+
+/* FIXED: Admin specific dropdown and modal z-indexes */
+.admin-layout [data-radix-popper-content-wrapper] {
+  z-index: 70 !important;
+}
+
+.admin-layout [data-radix-dialog-overlay] {
+  z-index: 80 !important;
+}
+
+.admin-layout [data-radix-dialog-content] {
+  z-index: 90 !important;
 }
 
 /* Improve spacing in forms */
@@ -169,4 +225,104 @@ form {
     transparent
   );
   animation: shimmer 1.5s infinite;
+}
+
+/* FIXED: Admin layout responsive adjustments */
+@media (max-width: 1024px) {
+  .admin-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .admin-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .admin-main-content {
+    margin-left: 0 !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .admin-main-content.sidebar-collapsed {
+    margin-left: 4rem; /* 64px for collapsed sidebar */
+  }
+
+  .admin-main-content.sidebar-expanded {
+    margin-left: 16rem; /* 256px for expanded sidebar */
+  }
+}
+
+/* FIXED: Prevent layout shift during hydration */
+.no-fouc {
+  opacity: 0;
+}
+
+.no-fouc.loaded {
+  opacity: 1;
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* FIXED: Specific fixes for badge hydration */
+.badge-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* FIXED: Mobile overlay for admin sidebar */
+.admin-mobile-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 50;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.admin-mobile-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* FIXED: Ensure proper text rendering */
+.text-rendering-fix {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* FIXED: Admin dashboard specific improvements */
+.admin-dashboard .grid {
+  gap: 1.5rem;
+}
+
+.admin-dashboard .card {
+  border: 0;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* FIXED: Prevent scroll issues in admin layout */
+.admin-layout {
+  overflow-x: hidden;
+}
+
+.admin-main-content {
+  overflow-x: auto;
+  width: 100%;
+}
+
+/* FIXED: Loading states */
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }

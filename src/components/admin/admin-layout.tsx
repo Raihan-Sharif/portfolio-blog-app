@@ -48,7 +48,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [adminLoading, setAdminLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Admin check logic (same as before)
   const hasInitialized = useRef(false);
@@ -289,17 +288,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   return (
-    <div className="bg-slate-50 dark:bg-slate-900 min-h-screen flex">
+    <div className="bg-slate-50 dark:bg-slate-900 min-h-screen">
       {/* Sidebar */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex flex-col bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 shadow-lg transition-all duration-300",
+          "fixed inset-y-0 left-0 flex flex-col bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 shadow-lg transition-all duration-300",
+          // FIXED: Higher z-index to ensure sidebar is on top
+          "z-[60]",
           isSidebarCollapsed ? "w-16" : "w-64",
           !isSidebarOpen && "lg:translate-x-0 -translate-x-full"
         )}
       >
-        {/* Sidebar Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-200 dark:border-slate-700">
+        {/* Sidebar Header - FIXED: Removed potential overlap */}
+        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
           {!isSidebarCollapsed && (
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-gradient-to-br from-primary to-purple-600 rounded-lg flex items-center justify-center">
@@ -373,7 +374,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </nav>
 
         {/* User Profile Section */}
-        <div className="border-t border-slate-200 dark:border-slate-700 p-4">
+        <div className="border-t border-slate-200 dark:border-slate-700 p-4 bg-white dark:bg-slate-800">
           {!isSidebarCollapsed ? (
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
@@ -426,7 +427,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       </div>
 
       {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-4 left-4 z-60">
+      <div className="lg:hidden fixed top-4 left-4 z-[70]">
         <Button
           variant="outline"
           size="icon"
@@ -440,7 +441,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {/* Overlay for mobile */}
       {isSidebarOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          className="lg:hidden fixed inset-0 bg-black/50 z-[50]"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -449,11 +450,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       <div
         className={cn(
           "flex-1 transition-all duration-300",
+          // FIXED: Proper margin to prevent overlap
           isSidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
         )}
       >
         {/* Top Header */}
-        <header className="sticky top-0 z-30 h-16 bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-700 px-6 flex items-center justify-between">
+        <header className="sticky top-0 z-40 h-16 bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-700 px-6 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             {/* Mobile menu button */}
             <Button
@@ -532,8 +534,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </div>
         </header>
 
-        {/* Main Content Area */}
-        <main className="flex-1 p-6">{children}</main>
+        {/* Main Content Area - FIXED: Proper z-index and positioning */}
+        <main className="flex-1 p-6 relative z-10 min-h-[calc(100vh-4rem)]">
+          {children}
+        </main>
       </div>
     </div>
   );
