@@ -2185,3 +2185,268 @@ LANGUAGE plpgsql SECURITY DEFINER;
 
 ---------
 $$
+
+-- Add to your DBSCHEMA.md file
+-- Enhanced Admin Dashboard Schema
+
+-- Notifications Table
+CREATE TABLE notifications (
+id SERIAL PRIMARY KEY,
+title TEXT NOT NULL,
+message TEXT NOT NULL,
+type TEXT NOT NULL CHECK (type IN ('info', 'success', 'warning', 'error', 'contact', 'comment', 'system')),
+priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+icon TEXT,
+action_url TEXT,
+action_label TEXT,
+user_id UUID REFERENCES profiles(id), -- NULL for system-wide notifications
+is_read BOOLEAN DEFAULT FALSE,
+is_global BOOLEAN DEFAULT FALSE, -- Global notifications for all admins
+metadata JSONB, -- Additional data like contact_message_id, post_id, etc.
+expires_at TIMESTAMP WITH TIME ZONE,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Notification Recipients (for tracking read status per user for global notifications)
+CREATE TABLE notification_recipients (
+id SERIAL PRIMARY KEY,
+notification_id INTEGER REFERENCES notifications(id) ON DELETE CASCADE,
+user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+is_read BOOLEAN DEFAULT FALSE,
+read_at TIMESTAMP WITH TIME ZONE,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+UNIQUE(notification_id, user_id)
+);
+
+-- Online Users Tracking
+CREATE TABLE online_users (
+id SERIAL PRIMARY KEY,
+user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+session_id TEXT NOT NULL,
+ip_address INET,
+user_agent TEXT,
+page_url TEXT,
+is_authenticated BOOLEAN DEFAULT FALSE,
+last_activity TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+UNIQUE(user_id, session_id)
+);
+
+-- Dashboard Settings
+CREATE TABLE dashboard_settings (
+id SERIAL PRIMARY KEY,
+user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+settings JSONB NOT NULL DEFAULT '{}',
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+UNIQUE(user_id)
+);
+
+-- System Analytics
+CREATE TABLE system_analytics (
+id bigint primary key generated always as identity,
+metric_name TEXT NOT NULL,
+metric_value NUMERIC NOT NULL,
+metadata JSONB,
+recorded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+date_key DATE DEFAULT CURRENT_DATE
+);
+
+CREATE INDEX idx_metric_name_date_key ON system_analytics(metric_name, date_key);
+
+-- Enable RLS
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification_recipients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE online_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dashboard_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_analytics ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for Notifications
+CREATE POLICY "Admin can view all notifications"
+ON notifications FOR SELECT
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+CREATE POLICY "Admin can manage notifications"
+ON notifications FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+-- RLS Policies for Online Users
+CREATE POLICY "Admin can view online users"
+ON online_users FOR SELECT
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+-- Functions for Notifications
+CREATE OR REPLACE FUNCTION create_contact_notification()
+RETURNS TRIGGER AS $$
+BEGIN
+INSERT INTO notifications (
+title,
+message,
+type,
+priority,
+icon,
+action_url,
+action_label,
+is_global,
+metadata
+) VALUES (
+'New Contact Message',
+'New message from ' || NEW.name || ': ' || LEFT(NEW.subject, 50) || '...',
+'contact',
+CASE WHEN NEW.priority = 'urgent' THEN 'urgent' ELSE 'normal' END,
+'Mail',
+'/admin/contact',
+'View Message',
+true,
+jsonb_build_object('contact_message_id', NEW.id, 'sender_name', NEW.name)
+);
+
+RETURN NEW;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Trigger for contact messages
+CREATE TRIGGER on_contact_message_created
+  AFTER INSERT ON contact_messages
+  FOR EACH ROW EXECUTE FUNCTION create_contact_notification();
+
+-- Function to track online users
+CREATE OR REPLACE FUNCTION update_online_user(
+  p_user_id UUID DEFAULT NULL,
+  p_session_id TEXT DEFAULT NULL,
+  p_ip_address INET DEFAULT NULL,
+  p_user_agent TEXT DEFAULT NULL,
+  p_page_url TEXT DEFAULT NULL,
+  p_is_authenticated BOOLEAN DEFAULT FALSE
+)
+RETURNS VOID AS
+$$
+
+BEGIN
+INSERT INTO online*users (
+user_id,
+session_id,
+ip_address,
+user_agent,
+page_url,
+is_authenticated,
+last_activity
+) VALUES (
+p_user_id,
+COALESCE(p_session_id, 'anonymous*' || extract(epoch from now())),
+p_ip_address,
+p_user_agent,
+p_page_url,
+p_is_authenticated,
+NOW()
+)
+ON CONFLICT (user_id, session_id)
+DO UPDATE SET
+last_activity = NOW(),
+page_url = EXCLUDED.page_url,
+ip_address = EXCLUDED.ip_address,
+user_agent = EXCLUDED.user_agent;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Function to get online users count
+CREATE OR REPLACE FUNCTION get_online_users_count()
+RETURNS TABLE (
+  total_online INTEGER,
+  authenticated_users INTEGER,
+  anonymous_users INTEGER
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+SELECT
+COUNT(\*)::INTEGER as total_online,
+COUNT(CASE WHEN is_authenticated THEN 1 END)::INTEGER as authenticated_users,
+COUNT(CASE WHEN NOT is_authenticated THEN 1 END)::INTEGER as anonymous_users
+FROM online_users
+WHERE last_activity > NOW() - INTERVAL '5 minutes';
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Function to clean old online users
+CREATE OR REPLACE FUNCTION cleanup_online_users()
+RETURNS VOID AS
+$$
+
+BEGIN
+DELETE FROM online_users
+WHERE last_activity < NOW() - INTERVAL '15 minutes';
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Function to mark notification as read
+CREATE OR REPLACE FUNCTION mark_notification_read(
+  p_notification_id INTEGER,
+  p_user_id UUID
+)
+RETURNS BOOLEAN AS
+$$
+
+BEGIN
+-- For global notifications, use notification_recipients table
+IF EXISTS (SELECT 1 FROM notifications WHERE id = p_notification_id AND is_global = true) THEN
+INSERT INTO notification_recipients (notification_id, user_id, is_read, read_at)
+VALUES (p_notification_id, p_user_id, true, NOW())
+ON CONFLICT (notification_id, user_id)
+DO UPDATE SET is_read = true, read_at = NOW();
+ELSE
+-- For user-specific notifications, update directly
+UPDATE notifications
+SET is_read = true, updated_at = NOW()
+WHERE id = p_notification_id AND (user_id = p_user_id OR user_id IS NULL);
+END IF;
+
+RETURN FOUND;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Grant permissions
+GRANT EXECUTE ON FUNCTION update_online_user(UUID, TEXT, INET, TEXT, TEXT, BOOLEAN) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_online_users_count() TO authenticated;
+GRANT EXECUTE ON FUNCTION mark_notification_read(INTEGER, UUID) TO authenticated;
+
+-- Create indexes for performance
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_type ON notifications(type);
+CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX idx_online_users_last_activity ON online_users(last_activity);
+CREATE INDEX idx_notification_recipients_user_id ON notification_recipients(user_id);
+CREATE INDEX idx_system_analytics_metric_date ON system_analytics(metric_name, date_key);
+
+----------
+$$
