@@ -1683,39 +1683,9 @@ END;
 $$
 LANGUAGE plpgsql;
 
--- Function to get analytics summary
-CREATE OR REPLACE FUNCTION get_analytics_summary(days_count INTEGER DEFAULT 30)
-RETURNS TABLE (
-  total_posts INTEGER,
-  total_projects INTEGER,
-  total_post_views BIGINT,
-  total_project_views BIGINT,
-  avg_daily_views NUMERIC,
-  most_viewed_post_id INTEGER,
-  most_viewed_project_id INTEGER
-) AS
-$$
-
-BEGIN
-RETURN QUERY
-SELECT
-(SELECT COUNT(_)::INTEGER FROM posts WHERE published = true) as total_posts,
-(SELECT COUNT(_)::INTEGER FROM projects WHERE is_active = true AND is_public = true) as total_projects,
-(SELECT COALESCE(SUM(view_count), 0) FROM post_views
-WHERE view_date >= CURRENT_DATE - days_count::interval) as total_post_views,
-(SELECT COALESCE(SUM(view_count), 0) FROM project_views
-WHERE view_date >= CURRENT_DATE - days_count::interval) as total_project_views,
-(SELECT ROUND(
-(COALESCE(SUM(pv.view_count), 0) + COALESCE(SUM(prv.view_count), 0))::NUMERIC / days_count, 2
-) FROM post_views pv
-FULL OUTER JOIN project_views prv ON pv.view_date = prv.view_date
-WHERE pv.view_date >= CURRENT_DATE - days_count::interval
-OR prv.view_date >= CURRENT_DATE - days_count::interval) as avg_daily_views,
-(SELECT id FROM posts ORDER BY view_count DESC LIMIT 1) as most_viewed_post_id,
-(SELECT id FROM projects WHERE is_active = true ORDER BY view_count DESC LIMIT 1) as most_viewed_project_id;
-END;
 
 $$
+
 LANGUAGE plpgsql;
 
 -- Grant execute permissions
@@ -1725,5 +1695,758 @@ GRANT EXECUTE ON FUNCTION get_total_project_views_by_day(INTEGER) TO authenticat
 GRANT EXECUTE ON FUNCTION get_combined_views_by_day(INTEGER) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_analytics_summary(INTEGER) TO authenticated;
 
---------
+---
+
+$$
+
+-- Function to get user activity (basic implementation)
+CREATE OR REPLACE FUNCTION get*user_activity()
+RETURNS TABLE (
+online_count integer,
+total_users integer,
+recent_activity json
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+SELECT
+(SELECT COUNT(*)::integer FROM profiles WHERE created*at > NOW() - INTERVAL '1 hour') as online_count,
+(SELECT COUNT(\*)::integer FROM profiles) as total_users,
+(SELECT json_agg(
+json_build_object(
+'id', id,
+'full_name', full_name,
+'created_at', created_at
+)
+) FROM profiles ORDER BY created_at DESC LIMIT 5) as recent_activity;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Function to get enhanced analytics
+CREATE OR REPLACE FUNCTION get_dashboard_analytics(days_count integer)
+RETURNS TABLE (
+  total_views integer,
+  avg_daily_views numeric,
+  growth_percentage numeric,
+  top_content json
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+SELECT
+(SELECT COALESCE(SUM(view_count), 0)::integer FROM post_views
+WHERE view_date >= CURRENT_DATE - days_count) as total_views,
+(SELECT ROUND(AVG(view_count), 2) FROM post_views
+WHERE view_date >= CURRENT_DATE - days_count) as avg_daily_views,
+15.5::numeric as growth_percentage, -- Replace with actual calculation
+(SELECT json_agg(
+json_build_object(
+'title', title,
+'views', view_count,
+'type', 'post'
+)
+) FROM posts ORDER BY view_count DESC LIMIT 5) as top_content;
+END;
+
+$$
+LANGUAGE plpgsql;
+-------------
+$$
+
+-- 1. Fix the get_total_views_by_day function
+CREATE OR REPLACE FUNCTION get_total_views_by_day(days_count INTEGER)
+RETURNS TABLE (
+view_date DATE,
+count INTEGER
+) AS
+
+$$
+BEGIN
+  RETURN QUERY
+  WITH days AS (
+    SELECT generate_series(
+      CURRENT_DATE - (days_count - 1) * INTERVAL '1 day',
+      CURRENT_DATE,
+      INTERVAL '1 day'
+    )::date AS day
+  )
+  SELECT
+    days.day AS view_date,
+    COALESCE(SUM(pv.view_count), 0)::INTEGER AS count
+  FROM days
+  LEFT JOIN post_views pv ON pv.view_date = days.day
+  GROUP BY days.day
+  ORDER BY days.day;
+END;
+$$
+
+LANGUAGE plpgsql;
+
+-- 2. Fix the get_combined_views_by_day function
+CREATE OR REPLACE FUNCTION get_combined_views_by_day(days_count INTEGER)
+RETURNS TABLE (
+view_date DATE,
+post_views INTEGER,
+project_views INTEGER,
+total_views INTEGER
+) AS
+
+$$
+BEGIN
+  RETURN QUERY
+  WITH days AS (
+    SELECT generate_series(
+      CURRENT_DATE - (days_count - 1) * INTERVAL '1 day',
+      CURRENT_DATE,
+      INTERVAL '1 day'
+    )::date AS day
+  )
+  SELECT
+    days.day AS view_date,
+    COALESCE(SUM(pov.view_count), 0)::INTEGER AS post_views,
+    COALESCE(SUM(prv.view_count), 0)::INTEGER AS project_views,
+    (COALESCE(SUM(pov.view_count), 0) + COALESCE(SUM(prv.view_count), 0))::INTEGER AS total_views
+  FROM days
+  LEFT JOIN post_views pov ON pov.view_date = days.day
+  LEFT JOIN project_views prv ON prv.view_date = days.day
+  GROUP BY days.day
+  ORDER BY days.day;
+END;
+$$
+
+LANGUAGE plpgsql;
+
+-- 3. Fix the get_analytics_summary function
+CREATE OR REPLACE FUNCTION get_analytics_summary(days_count INTEGER DEFAULT 30)
+RETURNS TABLE (
+total_posts INTEGER,
+total_projects INTEGER,
+total_post_views BIGINT,
+total_project_views BIGINT,
+avg_daily_views NUMERIC,
+most_viewed_post_id INTEGER,
+most_viewed_project_id INTEGER
+) AS
+
+$$
+BEGIN
+  RETURN QUERY
+  WITH date_range AS (
+    SELECT CURRENT_DATE - (days_count - 1) * INTERVAL '1 day' AS start_date
+  )
+  SELECT
+    (SELECT COUNT(*)::INTEGER FROM posts WHERE published = true) AS total_posts,
+    (SELECT COUNT(*)::INTEGER FROM projects WHERE is_active = true AND is_public = true) AS total_projects,
+    (SELECT COALESCE(SUM(view_count), 0) FROM post_views
+     WHERE view_date >= (SELECT start_date FROM date_range)) AS total_post_views,
+    (SELECT COALESCE(SUM(view_count), 0) FROM project_views
+     WHERE view_date >= (SELECT start_date FROM date_range)) AS total_project_views,
+    ROUND((
+      (SELECT COALESCE(SUM(view_count), 0) FROM post_views
+       WHERE view_date >= (SELECT start_date FROM date_range)) +
+      (SELECT COALESCE(SUM(view_count), 0) FROM project_views
+       WHERE view_date >= (SELECT start_date FROM date_range))
+    )::NUMERIC / days_count, 2) AS avg_daily_views,
+    (SELECT id FROM posts WHERE published = true ORDER BY view_count DESC LIMIT 1) AS most_viewed_post_id,
+    (SELECT id FROM projects WHERE is_active = true AND is_public = true ORDER BY view_count DESC LIMIT 1) AS most_viewed_project_id;
+END;
+$$
+
+LANGUAGE plpgsql;
+
+-- 4. Grant execute permissions
+GRANT EXECUTE ON FUNCTION get_total_views_by_day(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_combined_views_by_day(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_analytics_summary(INTEGER) TO authenticated;
+
+-- 5. Fix RLS policies for analytics functions
+-- First drop existing policies if they exist
+DO $$
+BEGIN
+IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow reading post views') THEN
+DROP POLICY "Allow reading post views" ON post_views;
+END IF;
+
+IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow reading project views') THEN
+DROP POLICY "Allow reading project views" ON project_views;
+END IF;
+END $$;
+
+-- Create new policies without IF NOT EXISTS (for older PostgreSQL versions)
+CREATE POLICY "Allow reading post views" ON post_views
+FOR SELECT USING (true);
+
+CREATE POLICY "Allow reading project views" ON project_views
+FOR SELECT USING (true);
+
+-- 6. Test the functions (run these to verify they work)
+
+---
+
+-- Complete Database Optimizations and Fixes
+-- Run these in your Supabase SQL editor
+
+-- 1. Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_post_views_date ON post_views(view_date);
+CREATE INDEX IF NOT EXISTS idx_project_views_date ON project_views(view_date);
+CREATE INDEX IF NOT EXISTS idx_posts_published ON posts(published) WHERE published = true;
+CREATE INDEX IF NOT EXISTS idx_projects_active ON projects(is_active, is_public) WHERE is_active = true AND is_public = true;
+
+-- 2. Optimized analytics summary function
+CREATE OR REPLACE FUNCTION get_optimized_analytics_summary(days_count INTEGER DEFAULT 30)
+RETURNS TABLE (
+total_posts INTEGER,
+total_projects INTEGER,
+total_post_views BIGINT,
+total_project_views BIGINT,
+avg_daily_views NUMERIC,
+growth_rate NUMERIC
+) AS
+
+$$
+DECLARE
+  start_date DATE := CURRENT_DATE - (days_count - 1);
+  previous_start_date DATE := CURRENT_DATE - (days_count * 2 - 1);
+  previous_end_date DATE := CURRENT_DATE - days_count;
+  current_views BIGINT;
+  previous_views BIGINT;
+BEGIN
+  -- Get current period views
+  SELECT COALESCE(SUM(pv.view_count), 0) + COALESCE(SUM(prv.view_count), 0)
+  INTO current_views
+  FROM (
+    SELECT COALESCE(SUM(view_count), 0) as view_count
+    FROM post_views
+    WHERE view_date >= start_date
+  ) pv,
+  (
+    SELECT COALESCE(SUM(view_count), 0) as view_count
+    FROM project_views
+    WHERE view_date >= start_date
+  ) prv;
+
+  -- Get previous period views for growth calculation
+  SELECT COALESCE(SUM(pv.view_count), 0) + COALESCE(SUM(prv.view_count), 0)
+  INTO previous_views
+  FROM (
+    SELECT COALESCE(SUM(view_count), 0) as view_count
+    FROM post_views
+    WHERE view_date >= previous_start_date AND view_date <= previous_end_date
+  ) pv,
+  (
+    SELECT COALESCE(SUM(view_count), 0) as view_count
+    FROM project_views
+    WHERE view_date >= previous_start_date AND view_date <= previous_end_date
+  ) prv;
+
+  RETURN QUERY
+  SELECT
+    (SELECT COUNT(*)::INTEGER FROM posts WHERE published = true) AS total_posts,
+    (SELECT COUNT(*)::INTEGER FROM projects WHERE is_active = true AND is_public = true) AS total_projects,
+    (SELECT COALESCE(SUM(view_count), 0) FROM post_views WHERE view_date >= start_date) AS total_post_views,
+    (SELECT COALESCE(SUM(view_count), 0) FROM project_views WHERE view_date >= start_date) AS total_project_views,
+    ROUND(current_views::NUMERIC / days_count, 2) AS avg_daily_views,
+    CASE
+      WHEN previous_views > 0 THEN ROUND(((current_views - previous_views)::NUMERIC / previous_views) * 100, 2)
+      ELSE 0
+    END AS growth_rate;
+END;
+$$
+
+LANGUAGE plpgsql;
+
+-- 3. Optimized daily views function with better date handling
+CREATE OR REPLACE FUNCTION get_optimized_daily_views(days_count INTEGER)
+RETURNS TABLE (
+view_date DATE,
+post_views INTEGER,
+project_views INTEGER,
+total_views INTEGER
+) AS
+
+$$
+BEGIN
+  RETURN QUERY
+  WITH date_series AS (
+    SELECT generate_series(
+      CURRENT_DATE - (days_count - 1),
+      CURRENT_DATE,
+      '1 day'::interval
+    )::date AS date_val
+  )
+  SELECT
+    ds.date_val AS view_date,
+    COALESCE(pv.total_views, 0)::INTEGER AS post_views,
+    COALESCE(prv.total_views, 0)::INTEGER AS project_views,
+    (COALESCE(pv.total_views, 0) + COALESCE(prv.total_views, 0))::INTEGER AS total_views
+  FROM date_series ds
+  LEFT JOIN (
+    SELECT
+      view_date,
+      SUM(view_count) AS total_views
+    FROM post_views
+    WHERE view_date >= CURRENT_DATE - (days_count - 1)
+    GROUP BY view_date
+  ) pv ON pv.view_date = ds.date_val
+  LEFT JOIN (
+    SELECT
+      view_date,
+      SUM(view_count) AS total_views
+    FROM project_views
+    WHERE view_date >= CURRENT_DATE - (days_count - 1)
+    GROUP BY view_date
+  ) prv ON prv.view_date = ds.date_val
+  ORDER BY ds.date_val;
+END;
+$$
+
+LANGUAGE plpgsql;
+
+-- 4. Function to safely increment view counts (prevents SQL injection and errors)
+CREATE OR REPLACE FUNCTION safe_increment_post_view(post_id_param INTEGER)
+RETURNS BOOLEAN AS $$
+BEGIN
+-- Validate input
+IF post_id_param IS NULL OR post_id_param <= 0 THEN
+RETURN FALSE;
+END IF;
+
+-- Check if post exists
+IF NOT EXISTS (SELECT 1 FROM posts WHERE id = post_id_param) THEN
+RETURN FALSE;
+END IF;
+
+-- Update main posts table
+UPDATE posts
+SET view_count = view_count + 1, updated_at = NOW()
+WHERE id = post_id_param;
+
+-- Update/insert daily view count
+INSERT INTO post_views (post_id, view_date, view_count)
+VALUES (post_id_param, CURRENT_DATE, 1)
+ON CONFLICT (post_id, view_date)
+DO UPDATE SET view_count = post_views.view_count + 1;
+
+RETURN TRUE;
+EXCEPTION
+WHEN OTHERS THEN
+RETURN FALSE;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 5. Function to safely increment project view counts
+CREATE OR REPLACE FUNCTION safe_increment_project_view(project_id_param INTEGER)
+RETURNS BOOLEAN AS
+$$
+
+BEGIN
+-- Validate input
+IF project_id_param IS NULL OR project_id_param <= 0 THEN
+RETURN FALSE;
+END IF;
+
+-- Check if project exists and is public
+IF NOT EXISTS (
+SELECT 1 FROM projects
+WHERE id = project_id_param
+AND is_active = true
+AND is_public = true
+) THEN
+RETURN FALSE;
+END IF;
+
+-- Update main projects table
+UPDATE projects
+SET view_count = view_count + 1, updated_at = NOW()
+WHERE id = project_id_param;
+
+-- Update/insert daily view count
+INSERT INTO project_views (project_id, view_date, view_count)
+VALUES (project_id_param, CURRENT_DATE, 1)
+ON CONFLICT (project_id, view_date)
+DO UPDATE SET view_count = project_views.view_count + 1;
+
+RETURN TRUE;
+EXCEPTION
+WHEN OTHERS THEN
+RETURN FALSE;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 6. Create a materialized view for faster analytics (refresh periodically)
+CREATE MATERIALIZED VIEW IF NOT EXISTS analytics_summary AS
+SELECT
+  COUNT(CASE WHEN p.published = true THEN 1 END) as total_posts,
+  COUNT(CASE WHEN pr.is_active = true AND pr.is_public = true THEN 1 END) as total_projects,
+  (SELECT COUNT(*) FROM profiles) as total_users,
+  COALESCE(SUM(pv.view_count), 0) as total_post_views,
+  COALESCE(SUM(prv.view_count), 0) as total_project_views,
+  CURRENT_DATE as last_updated
+FROM posts p
+FULL OUTER JOIN projects pr ON false -- Force cross join
+LEFT JOIN post_views pv ON true
+LEFT JOIN project_views prv ON true;
+
+-- Create index on materialized view
+CREATE UNIQUE INDEX IF NOT EXISTS idx_analytics_summary_date ON analytics_summary(last_updated);
+
+-- 7. Function to refresh analytics (call this periodically)
+CREATE OR REPLACE FUNCTION refresh_analytics_summary()
+RETURNS VOID AS
+$$
+
+BEGIN
+REFRESH MATERIALIZED VIEW CONCURRENTLY analytics_summary;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 8. Grant permissions
+GRANT EXECUTE ON FUNCTION get_optimized_analytics_summary(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_optimized_daily_views(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION safe_increment_post_view(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION safe_increment_project_view(INTEGER) TO authenticated;
+GRANT SELECT ON analytics_summary TO authenticated;
+
+-- 9. Create a function to clean up old view data (run monthly)
+CREATE OR REPLACE FUNCTION cleanup_old_view_data(days_to_keep INTEGER DEFAULT 365)
+RETURNS INTEGER AS
+$$
+
+DECLARE
+deleted_count INTEGER := 0;
+post_views_deleted INTEGER := 0;
+project_views_deleted INTEGER := 0;
+BEGIN
+-- Delete old post views
+DELETE FROM post_views
+WHERE view_date < CURRENT_DATE - (days_to_keep \* INTERVAL '1 day');
+
+GET DIAGNOSTICS post_views_deleted = ROW_COUNT;
+
+-- Delete old project views
+DELETE FROM project_views
+WHERE view_date < CURRENT_DATE - (days_to_keep \* INTERVAL '1 day');
+
+GET DIAGNOSTICS project_views_deleted = ROW_COUNT;
+
+-- Calculate total deleted rows
+deleted_count := post_views_deleted + project_views_deleted;
+
+RETURN deleted_count;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- SELECT cleanup_old_view_data(365); -- Keeps 1 year of data
+-- Schedule to run on the 1st of every month at 3 AM
+/*
+SELECT cron.schedule(
+  'cleanup_old_views',
+  '0 3 1 * *',
+  'SELECT cleanup_old_view_data(180);'
+);
+
+*/
+-- 10. Create extension for better performance if not exists
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
+-- 11. Create a monitoring function for performance
+CREATE OR REPLACE FUNCTION get_performance_stats()
+RETURNS TABLE (
+  total_queries BIGINT,
+  avg_exec_time NUMERIC,
+  slow_queries_count BIGINT
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+SELECT
+SUM(calls) as total_queries,
+ROUND(AVG(mean_exec_time), 2) as avg_exec_time,
+COUNT(CASE WHEN mean_exec_time > 1000 THEN 1 END) as slow_queries_count
+FROM pg_stat_statements
+WHERE query NOT LIKE '%pg_stat_statements%';
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+---------
+$$
+
+-- Add to your DBSCHEMA.md file
+-- Enhanced Admin Dashboard Schema
+
+-- Notifications Table
+CREATE TABLE notifications (
+id SERIAL PRIMARY KEY,
+title TEXT NOT NULL,
+message TEXT NOT NULL,
+type TEXT NOT NULL CHECK (type IN ('info', 'success', 'warning', 'error', 'contact', 'comment', 'system')),
+priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+icon TEXT,
+action_url TEXT,
+action_label TEXT,
+user_id UUID REFERENCES profiles(id), -- NULL for system-wide notifications
+is_read BOOLEAN DEFAULT FALSE,
+is_global BOOLEAN DEFAULT FALSE, -- Global notifications for all admins
+metadata JSONB, -- Additional data like contact_message_id, post_id, etc.
+expires_at TIMESTAMP WITH TIME ZONE,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Notification Recipients (for tracking read status per user for global notifications)
+CREATE TABLE notification_recipients (
+id SERIAL PRIMARY KEY,
+notification_id INTEGER REFERENCES notifications(id) ON DELETE CASCADE,
+user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+is_read BOOLEAN DEFAULT FALSE,
+read_at TIMESTAMP WITH TIME ZONE,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+UNIQUE(notification_id, user_id)
+);
+
+-- Online Users Tracking
+CREATE TABLE online_users (
+id SERIAL PRIMARY KEY,
+user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+session_id TEXT NOT NULL,
+ip_address INET,
+user_agent TEXT,
+page_url TEXT,
+is_authenticated BOOLEAN DEFAULT FALSE,
+last_activity TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+UNIQUE(user_id, session_id)
+);
+
+-- Dashboard Settings
+CREATE TABLE dashboard_settings (
+id SERIAL PRIMARY KEY,
+user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+settings JSONB NOT NULL DEFAULT '{}',
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+UNIQUE(user_id)
+);
+
+-- System Analytics
+CREATE TABLE system_analytics (
+id bigint primary key generated always as identity,
+metric_name TEXT NOT NULL,
+metric_value NUMERIC NOT NULL,
+metadata JSONB,
+recorded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+date_key DATE DEFAULT CURRENT_DATE
+);
+
+CREATE INDEX idx_metric_name_date_key ON system_analytics(metric_name, date_key);
+
+-- Enable RLS
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification_recipients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE online_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dashboard_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_analytics ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for Notifications
+CREATE POLICY "Admin can view all notifications"
+ON notifications FOR SELECT
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+CREATE POLICY "Admin can manage notifications"
+ON notifications FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+-- RLS Policies for Online Users
+CREATE POLICY "Admin can view online users"
+ON online_users FOR SELECT
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+-- Functions for Notifications
+CREATE OR REPLACE FUNCTION create_contact_notification()
+RETURNS TRIGGER AS $$
+BEGIN
+INSERT INTO notifications (
+title,
+message,
+type,
+priority,
+icon,
+action_url,
+action_label,
+is_global,
+metadata
+) VALUES (
+'New Contact Message',
+'New message from ' || NEW.name || ': ' || LEFT(NEW.subject, 50) || '...',
+'contact',
+CASE WHEN NEW.priority = 'urgent' THEN 'urgent' ELSE 'normal' END,
+'Mail',
+'/admin/contact',
+'View Message',
+true,
+jsonb_build_object('contact_message_id', NEW.id, 'sender_name', NEW.name)
+);
+
+RETURN NEW;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Trigger for contact messages
+CREATE TRIGGER on_contact_message_created
+  AFTER INSERT ON contact_messages
+  FOR EACH ROW EXECUTE FUNCTION create_contact_notification();
+
+-- Function to track online users
+CREATE OR REPLACE FUNCTION update_online_user(
+  p_user_id UUID DEFAULT NULL,
+  p_session_id TEXT DEFAULT NULL,
+  p_ip_address INET DEFAULT NULL,
+  p_user_agent TEXT DEFAULT NULL,
+  p_page_url TEXT DEFAULT NULL,
+  p_is_authenticated BOOLEAN DEFAULT FALSE
+)
+RETURNS VOID AS
+$$
+
+BEGIN
+INSERT INTO online*users (
+user_id,
+session_id,
+ip_address,
+user_agent,
+page_url,
+is_authenticated,
+last_activity
+) VALUES (
+p_user_id,
+COALESCE(p_session_id, 'anonymous*' || extract(epoch from now())),
+p_ip_address,
+p_user_agent,
+p_page_url,
+p_is_authenticated,
+NOW()
+)
+ON CONFLICT (user_id, session_id)
+DO UPDATE SET
+last_activity = NOW(),
+page_url = EXCLUDED.page_url,
+ip_address = EXCLUDED.ip_address,
+user_agent = EXCLUDED.user_agent;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Function to get online users count
+CREATE OR REPLACE FUNCTION get_online_users_count()
+RETURNS TABLE (
+  total_online INTEGER,
+  authenticated_users INTEGER,
+  anonymous_users INTEGER
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+SELECT
+COUNT(\*)::INTEGER as total_online,
+COUNT(CASE WHEN is_authenticated THEN 1 END)::INTEGER as authenticated_users,
+COUNT(CASE WHEN NOT is_authenticated THEN 1 END)::INTEGER as anonymous_users
+FROM online_users
+WHERE last_activity > NOW() - INTERVAL '5 minutes';
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Function to clean old online users
+CREATE OR REPLACE FUNCTION cleanup_online_users()
+RETURNS VOID AS
+$$
+
+BEGIN
+DELETE FROM online_users
+WHERE last_activity < NOW() - INTERVAL '15 minutes';
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Function to mark notification as read
+CREATE OR REPLACE FUNCTION mark_notification_read(
+  p_notification_id INTEGER,
+  p_user_id UUID
+)
+RETURNS BOOLEAN AS
+$$
+
+BEGIN
+-- For global notifications, use notification_recipients table
+IF EXISTS (SELECT 1 FROM notifications WHERE id = p_notification_id AND is_global = true) THEN
+INSERT INTO notification_recipients (notification_id, user_id, is_read, read_at)
+VALUES (p_notification_id, p_user_id, true, NOW())
+ON CONFLICT (notification_id, user_id)
+DO UPDATE SET is_read = true, read_at = NOW();
+ELSE
+-- For user-specific notifications, update directly
+UPDATE notifications
+SET is_read = true, updated_at = NOW()
+WHERE id = p_notification_id AND (user_id = p_user_id OR user_id IS NULL);
+END IF;
+
+RETURN FOUND;
+END;
+
+$$
+LANGUAGE plpgsql;
+
+-- Grant permissions
+GRANT EXECUTE ON FUNCTION update_online_user(UUID, TEXT, INET, TEXT, TEXT, BOOLEAN) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_online_users_count() TO authenticated;
+GRANT EXECUTE ON FUNCTION mark_notification_read(INTEGER, UUID) TO authenticated;
+
+-- Create indexes for performance
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_type ON notifications(type);
+CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX idx_online_users_last_activity ON online_users(last_activity);
+CREATE INDEX idx_notification_recipients_user_id ON notification_recipients(user_id);
+CREATE INDEX idx_system_analytics_metric_date ON system_analytics(metric_name, date_key);
+
+----------
 $$

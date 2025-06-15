@@ -1,32 +1,25 @@
 // src/components/providers/auth-provider.tsx
 "use client";
 
+import { useOnlineTracking } from "@/hooks/use-online-tracking";
 import { supabase } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
 import {
   createContext,
   ReactNode,
   useCallback,
   useContext,
   useEffect,
-  useMemo,
-  useRef,
   useState,
 } from "react";
 
-type User = {
-  id: string;
-  email?: string;
-  full_name?: string;
-  avatar_url?: string;
-  bio?: string;
-  role?: string;
-};
-
 interface AuthContextType {
-  user: User | null;
+  user: (User & { full_name?: string; role?: string }) | null;
   loading: boolean;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  isAdmin: boolean;
+  isEditor: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -34,305 +27,296 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   signOut: async () => {},
   refreshUser: async () => {},
+  isAdmin: false,
+  isEditor: false,
 });
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};
 
 interface AuthProviderProps {
   children: ReactNode;
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<
+    (User & { full_name?: string; role?: string }) | null
+  >(null);
   const [loading, setLoading] = useState(true);
-  const [authInitialized, setAuthInitialized] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isEditor, setIsEditor] = useState(false);
 
-  // Cache management
-  const userCacheRef = useRef<Map<string, User>>(new Map());
-  const lastRefreshRef = useRef<number>(0);
-  const isRefreshingRef = useRef(false);
-  const refreshThrottleMs = 5000; // Increased throttle time
+  // Set up online tracking
+  useOnlineTracking(user, {
+    enabled: true,
+    updateInterval: 30000, // 30 seconds
+  });
 
-  // Function to get user details with role information
-  const getUserDetails = useCallback(async (userId: string) => {
+  // Enhanced user role checking with caching
+  const checkUserRole = useCallback(async (userId: string) => {
     try {
-      // Check cache first with longer TTL
-      const cached = userCacheRef.current.get(userId);
-      if (cached && Date.now() - lastRefreshRef.current < 10 * 60 * 1000) {
-        // 10 minutes
-        return cached;
+      // Check cache first
+      const cacheKey = `user_role_${userId}`;
+      const cachedRole = sessionStorage.getItem(cacheKey);
+      const cacheTime = sessionStorage.getItem(`${cacheKey}_time`);
+      const cacheTimeout = 10 * 60 * 1000; // 10 minutes
+
+      if (
+        cachedRole &&
+        cacheTime &&
+        Date.now() - parseInt(cacheTime) < cacheTimeout
+      ) {
+        return cachedRole;
       }
 
-      // Call our custom function
+      // Fetch from database
       const { data, error } = await supabase.rpc("get_user_with_role", {
         p_user_id: userId,
       });
 
       if (error) {
-        console.error("Error calling get_user_with_role:", error);
-
-        // Fallback: just get the profile
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", userId)
-          .single();
-
-        if (profileError) {
-          console.error("Error fetching profile:", profileError);
-          return cached || null;
-        }
-
-        const userDetails = {
-          id: userId,
-          ...profile,
-          role: "viewer",
-        };
-
-        userCacheRef.current.set(userId, userDetails);
-        return userDetails;
+        console.error("Error fetching user role:", error);
+        return null;
       }
 
-      if (data && data.length > 0) {
-        const userWithRole = data[0];
-        const userDetails = {
-          id: userId,
-          full_name: userWithRole.full_name,
-          avatar_url: userWithRole.avatar_url,
-          bio: userWithRole.bio,
-          created_at: userWithRole.created_at,
-          updated_at: userWithRole.updated_at,
-          role: userWithRole.role_name,
-        };
+      const role = data?.[0]?.role_name || null;
 
-        userCacheRef.current.set(userId, userDetails);
-        return userDetails;
+      // Cache the result
+      if (role) {
+        sessionStorage.setItem(cacheKey, role);
+        sessionStorage.setItem(`${cacheKey}_time`, Date.now().toString());
       }
 
-      // Fallback
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
-
-      if (profileError) {
-        return cached || null;
-      }
-
-      const userDetails = {
-        id: userId,
-        ...profile,
-        role: "viewer",
-      };
-
-      userCacheRef.current.set(userId, userDetails);
-      return userDetails;
-    } catch (err) {
-      console.error("Error in getUserDetails:", err);
-      const cached = userCacheRef.current.get(userId);
-      return cached || null;
+      return role;
+    } catch (error) {
+      console.error("Error in checkUserRole:", error);
+      return null;
     }
   }, []);
 
-  // Throttled refresh function
+  // Refresh user data and role
   const refreshUser = useCallback(async () => {
-    const now = Date.now();
-    if (
-      now - lastRefreshRef.current < refreshThrottleMs ||
-      isRefreshingRef.current
-    ) {
-      return;
-    }
-
-    isRefreshingRef.current = true;
-    lastRefreshRef.current = now;
-
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
 
-      if (sessionData?.session?.user) {
-        const userDetails = await getUserDetails(sessionData.session.user.id);
+      if (currentUser) {
+        // Get additional user data from profiles table
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", currentUser.id)
+          .single();
 
-        if (userDetails) {
-          const updatedUser = {
-            id: sessionData.session.user.id,
-            email: sessionData.session.user.email,
-            ...userDetails,
-          };
-          setUser(updatedUser);
-        } else {
-          setUser({
-            id: sessionData.session.user.id,
-            email: sessionData.session.user.email,
-            role: "viewer",
-          });
-        }
+        // Get user role
+        const role = await checkUserRole(currentUser.id);
+
+        const enhancedUser = {
+          ...currentUser,
+          full_name:
+            profileData?.full_name ||
+            currentUser.user_metadata?.full_name ||
+            null,
+          role: role,
+        };
+
+        setUser(enhancedUser);
+        setIsAdmin(role === "admin");
+        setIsEditor(role === "admin" || role === "editor");
       } else {
         setUser(null);
-        userCacheRef.current.clear();
+        setIsAdmin(false);
+        setIsEditor(false);
+        // Clear cache when user logs out
+        const keys = Object.keys(sessionStorage);
+        keys.forEach((key) => {
+          if (key.startsWith("user_role_")) {
+            sessionStorage.removeItem(key);
+          }
+        });
       }
-    } catch (err) {
-      console.error("Error refreshing user:", err);
-    } finally {
-      isRefreshingRef.current = false;
+    } catch (error) {
+      console.error("Error refreshing user:", error);
+      setUser(null);
+      setIsAdmin(false);
+      setIsEditor(false);
     }
-  }, [getUserDetails]);
+  }, [checkUserRole]);
 
-  // Initial setup - get session only once
+  // Initialize auth state
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        setLoading(true);
+    let mounted = true;
 
+    const initializeAuth = async () => {
+      try {
+        // Get initial session
         const {
           data: { session },
         } = await supabase.auth.getSession();
 
-        if (session?.user) {
-          const userDetails = await getUserDetails(session.user.id);
+        if (session?.user && mounted) {
+          // Get additional user data
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", session.user.id)
+            .single();
 
-          if (userDetails) {
-            setUser({
-              id: session.user.id,
-              email: session.user.email,
-              ...userDetails,
-            });
-          } else {
-            setUser({
-              id: session.user.id,
-              email: session.user.email,
-              role: "viewer",
-            });
-          }
-        } else {
-          setUser(null);
+          // Get user role
+          const role = await checkUserRole(session.user.id);
+
+          const enhancedUser = {
+            ...session.user,
+            full_name:
+              profileData?.full_name ||
+              session.user.user_metadata?.full_name ||
+              null,
+            role: role,
+          };
+
+          setUser(enhancedUser);
+          setIsAdmin(role === "admin");
+          setIsEditor(role === "admin" || role === "editor");
         }
-      } catch (err) {
-        console.error("Error initializing auth:", err);
-        setUser(null);
+      } catch (error) {
+        console.error("Error initializing auth:", error);
       } finally {
-        setLoading(false);
-        setAuthInitialized(true);
-      }
-    };
-
-    initAuth();
-  }, [getUserDetails]);
-
-  const lastFocusRefresh = useRef<number>(0);
-
-  // Simplified and less aggressive focus handling
-  useEffect(() => {
-    if (!authInitialized || !user) return;
-
-    let focusTimeout: NodeJS.Timeout;
-    const FOCUS_REFRESH_THROTTLE = 30 * 60 * 1000; // 30 minutes
-
-    const handleVisibilityChange = () => {
-      // Only refresh if:
-      // 1. Tab becomes visible
-      // 2. User is logged in
-      // 3. It's been more than 30 minutes since last focus refresh
-      // 4. User is not currently navigating (no pending refreshes)
-      if (
-        document.visibilityState === "visible" &&
-        !document.hidden &&
-        user &&
-        Date.now() - lastFocusRefresh.current > FOCUS_REFRESH_THROTTLE &&
-        !isRefreshingRef.current
-      ) {
-        if (focusTimeout) {
-          clearTimeout(focusTimeout);
-        }
-
-        // Add a longer delay to avoid interfering with navigation
-        focusTimeout = setTimeout(() => {
-          lastFocusRefresh.current = Date.now();
-          refreshUser();
-        }, 5000); // 5 second delay
-      }
-    };
-
-    // Only add visibility change listener, remove focus listener that was more aggressive
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      if (focusTimeout) {
-        clearTimeout(focusTimeout);
-      }
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [authInitialized, user, refreshUser]);
-
-  // Simplified auth state change listener - only handle explicit events
-  useEffect(() => {
-    if (!authInitialized) return;
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log("Auth state changed:", event);
-
-        // Only handle explicit sign out and sign in events
-        if (event === "SIGNED_OUT") {
-          setUser(null);
-          userCacheRef.current.clear();
+        if (mounted) {
           setLoading(false);
-          return;
         }
-
-        if (event === "SIGNED_IN" && session?.user) {
-          try {
-            const userDetails = await getUserDetails(session.user.id);
-
-            if (userDetails) {
-              setUser({
-                id: session.user.id,
-                email: session.user.email,
-                ...userDetails,
-              });
-            } else {
-              setUser({
-                id: session.user.id,
-                email: session.user.email,
-                role: "viewer",
-              });
-            }
-          } catch (err) {
-            console.error("Error handling sign in:", err);
-          }
-        }
-
-        // Don't handle TOKEN_REFRESHED to avoid interfering with navigation
       }
-    );
+    };
+
+    initializeAuth();
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
+      if (event === "SIGNED_IN" && session?.user) {
+        // User signed in
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", session.user.id)
+          .single();
+
+        const role = await checkUserRole(session.user.id);
+
+        const enhancedUser = {
+          ...session.user,
+          full_name:
+            profileData?.full_name ||
+            session.user.user_metadata?.full_name ||
+            null,
+          role: role,
+        };
+
+        setUser(enhancedUser);
+        setIsAdmin(role === "admin");
+        setIsEditor(role === "admin" || role === "editor");
+      } else if (event === "SIGNED_OUT") {
+        // User signed out
+        setUser(null);
+        setIsAdmin(false);
+        setIsEditor(false);
+
+        // Clear all cached data
+        const keys = Object.keys(sessionStorage);
+        keys.forEach((key) => {
+          if (key.startsWith("user_role_") || key.startsWith("user_session_")) {
+            sessionStorage.removeItem(key);
+          }
+        });
+      } else if (event === "TOKEN_REFRESHED" && session?.user) {
+        // Token refreshed, update user data
+        await refreshUser();
+      }
+
+      setLoading(false);
+    });
 
     return () => {
-      authListener.subscription.unsubscribe();
+      mounted = false;
+      subscription.unsubscribe();
     };
-  }, [authInitialized, getUserDetails]);
+  }, [checkUserRole, refreshUser]);
 
-  // Simple sign out
+  // Enhanced sign out function
   const signOut = useCallback(async () => {
-    setLoading(true);
-    await supabase.auth.signOut();
-    setUser(null);
-    userCacheRef.current.clear();
-    setLoading(false);
+    try {
+      setLoading(true);
+
+      // Clear all cached data first
+      const keys = Object.keys(sessionStorage);
+      keys.forEach((key) => {
+        if (
+          key.startsWith("user_role_") ||
+          key.startsWith("user_session_") ||
+          key.startsWith("admin_") ||
+          key.startsWith("navbar_admin_")
+        ) {
+          sessionStorage.removeItem(key);
+        }
+      });
+
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error("Error signing out:", error);
+        throw error;
+      }
+
+      // Reset state
+      setUser(null);
+      setIsAdmin(false);
+      setIsEditor(false);
+    } catch (error) {
+      console.error("Error during sign out:", error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Stable context value
-  const contextValue = useMemo(
-    () => ({
-      user,
-      loading,
-      signOut,
-      refreshUser,
-    }),
-    [user, loading, signOut, refreshUser]
-  );
+  // Cleanup online tracking on unmount
+  useEffect(() => {
+    return () => {
+      // Cleanup function runs when component unmounts
+      if (user) {
+        // Optional: Send offline status (this might not work on page close)
+        supabase.rpc("cleanup_online_users").catch(console.error);
+      }
+    };
+  }, [user]);
 
-  return (
-    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
-  );
+  // Periodic cleanup of old online users (admin only)
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const cleanupInterval = setInterval(() => {
+      supabase.rpc("cleanup_online_users").catch(console.error);
+    }, 5 * 60 * 1000); // Every 5 minutes
+
+    return () => clearInterval(cleanupInterval);
+  }, [isAdmin]);
+
+  const value: AuthContextType = {
+    user,
+    loading,
+    signOut,
+    refreshUser,
+    isAdmin,
+    isEditor,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

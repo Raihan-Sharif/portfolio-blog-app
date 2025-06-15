@@ -1,4 +1,4 @@
-// src/components/admin/dashboard-analytics.tsx
+// src/components/admin/enhanced-dashboard-analytics.tsx
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,10 @@ import {
   Eye,
   TrendingDown,
   TrendingUp,
+  Users,
+  Zap,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -24,7 +26,7 @@ import {
   YAxis,
 } from "recharts";
 
-interface AnalyticsData {
+interface EnhancedAnalyticsData {
   viewsPerDay: Array<{
     date: string;
     post_views: number;
@@ -39,9 +41,22 @@ interface AnalyticsData {
     avg_daily_views: number;
   };
   previousPeriodViews: number;
+  userActivity: {
+    online: number;
+    registered: number;
+    anonymous: number;
+    byCountry: Array<{ name: string; value: number; flag: string }>;
+    byDevice: Array<{ name: string; value: number; icon: any }>;
+  };
+  performance: {
+    responseTime: number;
+    uptime: number;
+    errors: number;
+    satisfaction: number;
+  };
 }
 
-interface DashboardAnalyticsProps {
+interface EnhancedDashboardAnalyticsProps {
   period: "7d" | "30d" | "90d";
   onPeriodChange?: (period: "7d" | "30d" | "90d") => void;
   className?: string;
@@ -53,12 +68,12 @@ const TIME_PERIODS = [
   { key: "90d" as const, label: "3M", days: 90 },
 ];
 
-export default function DashboardAnalytics({
+export default function EnhancedDashboardAnalytics({
   period,
   onPeriodChange,
   className,
-}: DashboardAnalyticsProps) {
-  const [data, setData] = useState<AnalyticsData>({
+}: EnhancedDashboardAnalyticsProps) {
+  const [data, setData] = useState<EnhancedAnalyticsData>({
     viewsPerDay: [],
     summary: {
       total_posts: 0,
@@ -68,27 +83,43 @@ export default function DashboardAnalytics({
       avg_daily_views: 0,
     },
     previousPeriodViews: 0,
+    userActivity: {
+      online: 0,
+      registered: 0,
+      anonymous: 0,
+      byCountry: [],
+      byDevice: [],
+    },
+    performance: {
+      responseTime: 0,
+      uptime: 0,
+      errors: 0,
+      satisfaction: 0,
+    },
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
-    let isMounted = true;
+    isMountedRef.current = true;
 
     const fetchData = async () => {
-      if (isMounted) {
-        await fetchAnalyticsData();
+      if (isMountedRef.current) {
+        await fetchEnhancedAnalyticsData();
       }
     };
 
     fetchData();
 
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
     };
   }, [period]);
 
-  const fetchAnalyticsData = async () => {
+  const fetchEnhancedAnalyticsData = async () => {
+    if (!isMountedRef.current) return;
+
     try {
       setLoading(true);
       setError(null);
@@ -96,13 +127,12 @@ export default function DashboardAnalytics({
       const selectedPeriod = TIME_PERIODS.find((p) => p.key === period);
       if (!selectedPeriod) return;
 
-      // FIXED: Use proper SQL aggregation without casting issues
+      // Fetch views data with fallback
       let viewsData = [];
       let summaryData = null;
       let previousPeriodViews = 0;
 
       try {
-        // Try to use the RPC functions first
         const { data: rpcViewsData, error: rpcError } = await supabase.rpc(
           "get_combined_views_by_day",
           { days_count: selectedPeriod.days }
@@ -112,7 +142,6 @@ export default function DashboardAnalytics({
           viewsData = rpcViewsData;
         } else {
           console.warn("RPC function failed, using fallback:", rpcError);
-          // Fallback to manual aggregation
           viewsData = await fetchViewsDataFallback(selectedPeriod.days);
         }
       } catch (err) {
@@ -120,7 +149,7 @@ export default function DashboardAnalytics({
         viewsData = await fetchViewsDataFallback(selectedPeriod.days);
       }
 
-      // Fetch summary data with proper error handling
+      // Fetch summary data
       try {
         const { data: rpcSummaryData, error: summaryError } =
           await supabase.rpc("get_analytics_summary", {
@@ -138,44 +167,69 @@ export default function DashboardAnalytics({
         summaryData = await fetchSummaryDataFallback(selectedPeriod.days);
       }
 
-      // Calculate previous period for comparison
-      try {
-        const previousData = await fetchViewsDataFallback(
-          selectedPeriod.days * 2
-        );
-        previousPeriodViews = previousData
-          .slice(0, selectedPeriod.days)
-          .reduce((sum: number, day: any) => sum + (day.total_views || 0), 0);
-      } catch (err) {
-        console.warn("Previous period calculation failed:", err);
-      }
+      // Get user count for activity simulation
+      const { count: totalUsers } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true });
 
-      setData({
-        viewsPerDay: viewsData || [],
-        summary: summaryData || {
-          total_posts: 0,
-          total_projects: 0,
-          total_post_views: 0,
-          total_project_views: 0,
-          avg_daily_views: 0,
-        },
-        previousPeriodViews,
-      });
+      // Mock enhanced data (replace with real data when available)
+      const mockUserActivity = {
+        online: Math.floor(Math.random() * 50) + 10,
+        registered: totalUsers || 0,
+        anonymous: Math.floor(Math.random() * 20) + 5,
+        byCountry: [
+          { name: "Bangladesh", value: 45, flag: "🇧🇩" },
+          { name: "USA", value: 25, flag: "🇺🇸" },
+          { name: "India", value: 15, flag: "🇮🇳" },
+          { name: "UK", value: 10, flag: "🇬🇧" },
+          { name: "Others", value: 5, flag: "🌍" },
+        ],
+        byDevice: [
+          { name: "Desktop", value: 60, icon: "Monitor" },
+          { name: "Mobile", value: 35, icon: "Smartphone" },
+          { name: "Tablet", value: 5, icon: "Tablet" },
+        ],
+      };
+
+      const mockPerformance = {
+        responseTime: Math.floor(Math.random() * 100) + 50,
+        uptime: 99.9,
+        errors: Math.floor(Math.random() * 5),
+        satisfaction: Math.floor(Math.random() * 20) + 80,
+      };
+
+      if (isMountedRef.current) {
+        setData({
+          viewsPerDay: viewsData || [],
+          summary: summaryData || {
+            total_posts: 0,
+            total_projects: 0,
+            total_post_views: 0,
+            total_project_views: 0,
+            avg_daily_views: 0,
+          },
+          previousPeriodViews,
+          userActivity: mockUserActivity,
+          performance: mockPerformance,
+        });
+      }
     } catch (err) {
-      console.error("Error fetching analytics data:", err);
-      setError("Failed to load analytics data");
+      console.error("Error fetching enhanced analytics data:", err);
+      if (isMountedRef.current) {
+        setError("Failed to load analytics data");
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
-  // FIXED: Fallback function with proper SQL syntax
   const fetchViewsDataFallback = async (days: number) => {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(endDate.getDate() - days);
 
-    // Create date range array
     const dateRange = [];
     for (let i = 0; i < days; i++) {
       const date = new Date(startDate);
@@ -183,7 +237,6 @@ export default function DashboardAnalytics({
       dateRange.push(date.toISOString().split("T")[0]);
     }
 
-    // FIXED: Proper aggregation without interval casting
     const { data: postViewsData } = await supabase
       .from("post_views")
       .select("view_date, view_count")
@@ -196,32 +249,27 @@ export default function DashboardAnalytics({
       .gte("view_date", startDate.toISOString().split("T")[0])
       .lte("view_date", endDate.toISOString().split("T")[0]);
 
-    // Aggregate data by date
     const viewsByDate: Record<
       string,
       { post_views: number; project_views: number }
     > = {};
 
-    // Initialize all dates with zero values
     dateRange.forEach((date) => {
       viewsByDate[date] = { post_views: 0, project_views: 0 };
     });
 
-    // Aggregate post views
     (postViewsData || []).forEach((view) => {
       if (viewsByDate[view.view_date]) {
         viewsByDate[view.view_date].post_views += view.view_count || 0;
       }
     });
 
-    // Aggregate project views
     (projectViewsData || []).forEach((view) => {
       if (viewsByDate[view.view_date]) {
         viewsByDate[view.view_date].project_views += view.view_count || 0;
       }
     });
 
-    // Convert to array format
     return dateRange.map((date) => ({
       date,
       post_views: viewsByDate[date].post_views,
@@ -231,14 +279,12 @@ export default function DashboardAnalytics({
     }));
   };
 
-  // FIXED: Fallback summary function
   const fetchSummaryDataFallback = async (days: number) => {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(endDate.getDate() - days);
 
     try {
-      // Get counts
       const [
         { count: totalPosts },
         { count: totalProjects },
@@ -344,11 +390,11 @@ export default function DashboardAnalytics({
     return (
       <Card className={className}>
         <CardContent className="p-6">
-          <div className="h-[400px] flex items-center justify-center">
+          <div className="h-[500px] flex items-center justify-center">
             <div className="flex items-center space-x-2">
               <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
               <span className="text-muted-foreground">
-                Loading analytics...
+                Loading enhanced analytics...
               </span>
             </div>
           </div>
@@ -361,10 +407,14 @@ export default function DashboardAnalytics({
     return (
       <Card className={className}>
         <CardContent className="p-6">
-          <div className="h-[400px] flex items-center justify-center">
+          <div className="h-[500px] flex items-center justify-center">
             <div className="text-center">
               <p className="text-red-500 mb-4">{error}</p>
-              <Button onClick={fetchAnalyticsData} variant="outline" size="sm">
+              <Button
+                onClick={fetchEnhancedAnalyticsData}
+                variant="outline"
+                size="sm"
+              >
                 Retry
               </Button>
             </div>
@@ -376,11 +426,12 @@ export default function DashboardAnalytics({
 
   return (
     <div className={cn("space-y-6", className)}>
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+      {/* Enhanced Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/50 dark:from-slate-800 dark:to-blue-900/10">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Eye className="w-4 h-4 text-blue-500" />
               Total Views ({period.toUpperCase()})
             </CardTitle>
           </CardHeader>
@@ -408,16 +459,14 @@ export default function DashboardAnalytics({
                   <span className="ml-1">vs previous</span>
                 </div>
               </div>
-              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20">
-                <Eye className="h-5 w-5 text-blue-600" />
-              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-green-50/50 dark:from-slate-800 dark:to-green-900/10">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Activity className="w-4 h-4 text-green-500" />
               Avg Daily Views
             </CardTitle>
           </CardHeader>
@@ -431,51 +480,60 @@ export default function DashboardAnalytics({
                   Per day average
                 </div>
               </div>
-              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/20">
-                <Activity className="h-5 w-5 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-purple-50/50 dark:from-slate-800 dark:to-purple-900/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Users className="w-4 h-4 text-purple-500" />
+              Active Users
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold">
+                  {data.userActivity.online}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Currently online
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-orange-50/50 dark:from-slate-800 dark:to-orange-900/10">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Content Split
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Zap className="w-4 h-4 text-orange-500" />
+              Performance
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center">
-                  <div className="w-3 h-3 bg-blue-500 rounded mr-2"></div>
-                  Blog Views
-                </span>
-                <span className="font-medium">
-                  {data.summary.total_post_views?.toLocaleString() || 0}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center">
-                  <div className="w-3 h-3 bg-purple-500 rounded mr-2"></div>
-                  Project Views
-                </span>
-                <span className="font-medium">
-                  {data.summary.total_project_views?.toLocaleString() || 0}
-                </span>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold">
+                  {data.performance.satisfaction}%
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Satisfaction score
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Chart */}
-      <Card>
+      {/* Enhanced Chart */}
+      <Card className="border-0 shadow-lg">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-primary" />
-              Views Analytics
+              Enhanced Views Analytics
             </CardTitle>
             {onPeriodChange && (
               <div className="flex bg-muted rounded-lg p-1">
@@ -495,7 +553,7 @@ export default function DashboardAnalytics({
           </div>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={400}>
             <AreaChart
               data={data.viewsPerDay}
               margin={{ top: 10, right: 30, left: 0, bottom: 0 }}

@@ -1,3 +1,5 @@
+// src/app/layout.tsx
+import { NotificationManager } from "@/components/admin/notification-manager";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { AuthProvider } from "@/components/providers/auth-provider";
@@ -12,6 +14,61 @@ export const metadata: Metadata = {
   title: "Raihan Sharif | Full Stack Developer",
   description:
     "Portfolio and blog of Raihan Sharif, a full stack developer with expertise in .NET, React, Next.js, and more.",
+  keywords: [
+    "Raihan Sharif",
+    "Full Stack Developer",
+    ".NET Developer",
+    "React Developer",
+    "Next.js",
+    "TypeScript",
+    "Web Development",
+    "Portfolio",
+    "Blog",
+  ],
+  authors: [{ name: "Raihan Sharif" }],
+  creator: "Raihan Sharif",
+  publisher: "Raihan Sharif",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+  ),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Raihan Sharif | Full Stack Developer",
+    description:
+      "Portfolio and blog of Raihan Sharif, a full stack developer with expertise in .NET, React, Next.js, and more.",
+    url: "/",
+    siteName: "Raihan Sharif Portfolio",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Raihan Sharif | Full Stack Developer",
+    description:
+      "Portfolio and blog of Raihan Sharif, a full stack developer with expertise in .NET, React, Next.js, and more.",
+    creator: "@raihan_sharif",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  verification: {
+    google: process.env.GOOGLE_VERIFICATION_ID,
+  },
 };
 
 export default function RootLayout({
@@ -21,6 +78,44 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Preconnect to external domains for performance */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin=""
+        />
+
+        {/* Favicon and app icons */}
+        <link rel="icon" href="/favicon.ico" />
+        <link
+          rel="apple-touch-icon"
+          sizes="180x180"
+          href="/apple-touch-icon.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="32x32"
+          href="/favicon-32x32.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="16x16"
+          href="/favicon-16x16.png"
+        />
+        <link rel="manifest" href="/site.webmanifest" />
+
+        {/* Theme color for mobile browsers */}
+        <meta name="theme-color" content="#0f172a" />
+        <meta name="msapplication-TileColor" content="#0f172a" />
+
+        {/* Security headers */}
+        <meta httpEquiv="X-Content-Type-Options" content="nosniff" />
+        <meta httpEquiv="Referrer-Policy" content="origin-when-cross-origin" />
+      </head>
       <body className={inter.className}>
         <ThemeProvider
           attribute="class"
@@ -29,11 +124,17 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <div className="flex min-h-screen flex-col">
+            {/* Background pattern */}
+            <div className="fixed inset-0 bg-dot-pattern bg-dot-sm opacity-[0.02] dark:opacity-[0.05] pointer-events-none" />
+
+            <div className="relative flex min-h-screen flex-col">
               <Navbar />
               <main className="flex-1 pt-16">{children}</main>
               <Footer />
             </div>
+
+            {/* Global notification manager */}
+            <NotificationManager />
           </AuthProvider>
         </ThemeProvider>
       </body>

@@ -2,6 +2,7 @@
 "use client";
 
 import { useAuth } from "@/components/providers/auth-provider";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,27 +11,33 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ModeToggle } from "@/components/ui/mode-toggle";
 import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 import {
+  Activity,
+  AlertCircle,
   BarChart3,
   Bell,
   Briefcase,
+  CheckCircle,
   ChevronLeft,
   ChevronRight,
+  Circle,
   FileText,
   Home,
   Info,
   LogOut,
   Mail,
   Menu,
+  MessageSquare,
   Phone,
-  Search,
   Settings,
+  Shield,
   Star,
   User,
   Users,
-  X,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -38,6 +45,34 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
+}
+
+interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  type:
+    | "info"
+    | "success"
+    | "warning"
+    | "error"
+    | "contact"
+    | "comment"
+    | "system";
+  priority: "low" | "normal" | "high" | "urgent";
+  icon?: string;
+  action_url?: string;
+  action_label?: string;
+  is_read: boolean;
+  is_global: boolean;
+  metadata?: any;
+  created_at: string;
+}
+
+interface OnlineStats {
+  total_online: number;
+  authenticated_users: number;
+  anonymous_users: number;
 }
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
@@ -48,15 +83,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [adminLoading, setAdminLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [onlineStats, setOnlineStats] = useState<OnlineStats>({
+    total_online: 0,
+    authenticated_users: 0,
+    anonymous_users: 0,
+  });
+  const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
 
-  // Admin check logic (same as before)
+  // Admin check logic (simplified for better performance)
   const hasInitialized = useRef(false);
-  const isCheckingAdmin = useRef(false);
   const adminCache = useRef<
     Map<string, { status: boolean; timestamp: number }>
   >(new Map());
-  const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes cache
+  const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
   const checkAdminStatus = useCallback(
     async (userId: string) => {
@@ -65,35 +106,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         return cached.status;
       }
 
-      if (isCheckingAdmin.current) {
-        return null;
-      }
-
-      isCheckingAdmin.current = true;
-
       try {
-        if (user?.role === "admin") {
-          const adminStatus = true;
-          adminCache.current.set(userId, {
-            status: adminStatus,
-            timestamp: Date.now(),
-          });
-          return adminStatus;
-        }
-
-        const sessionKey = `admin_${userId}`;
-        const sessionData = sessionStorage.getItem(sessionKey);
-        const sessionTime = sessionStorage.getItem(`${sessionKey}_time`);
-
-        if (sessionData && sessionTime) {
-          const timestamp = parseInt(sessionTime);
-          if (Date.now() - timestamp < CACHE_DURATION) {
-            const status = sessionData === "true";
-            adminCache.current.set(userId, { status, timestamp: Date.now() });
-            return status;
-          }
-        }
-
         const { data, error } = await supabase.rpc("get_user_with_role", {
           p_user_id: userId,
         });
@@ -105,20 +118,93 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           status: adminStatus,
           timestamp: Date.now(),
         });
-        sessionStorage.setItem(sessionKey, adminStatus.toString());
-        sessionStorage.setItem(`${sessionKey}_time`, Date.now().toString());
 
         return adminStatus;
       } catch (err) {
         console.error("Error checking admin status:", err);
         return false;
-      } finally {
-        isCheckingAdmin.current = false;
       }
     },
-    [user?.role, CACHE_DURATION]
+    [CACHE_DURATION]
   );
 
+  // Track online presence
+  const trackOnlinePresence = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      await supabase.rpc("update_online_user", {
+        p_user_id: user.id,
+        p_session_id: `admin_${user.id}`,
+        p_page_url: pathname,
+        p_is_authenticated: true,
+      });
+    } catch (error) {
+      console.error("Error tracking online presence:", error);
+    }
+  }, [user, pathname]);
+
+  // Fetch notifications
+  const fetchNotifications = useCallback(async () => {
+    if (!user || !isAdmin) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .or(`user_id.eq.${user.id},is_global.eq.true`)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+
+      setNotifications(data || []);
+      setUnreadCount(data?.filter((n) => !n.is_read).length || 0);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
+  }, [user, isAdmin]);
+
+  // Fetch online users stats
+  const fetchOnlineStats = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.rpc("get_online_users_count");
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setOnlineStats(data[0]);
+      }
+    } catch (error) {
+      console.error("Error fetching online stats:", error);
+    }
+  }, []);
+
+  // Mark notification as read
+  const markNotificationAsRead = useCallback(
+    async (notificationId: number) => {
+      if (!user) return;
+
+      try {
+        await supabase.rpc("mark_notification_read", {
+          p_notification_id: notificationId,
+          p_user_id: user.id,
+        });
+
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.id === notificationId ? { ...n, is_read: true } : n
+          )
+        );
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      } catch (error) {
+        console.error("Error marking notification as read:", error);
+      }
+    },
+    [user]
+  );
+
+  // Initialize admin status
   useEffect(() => {
     if (loading || hasInitialized.current) return;
 
@@ -130,22 +216,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
 
     const initializeAdmin = async () => {
-      const shouldShowLoading = !hasInitialized.current;
-
-      if (shouldShowLoading) {
-        setAdminLoading(true);
-      }
+      setAdminLoading(true);
 
       try {
         const adminStatus = await checkAdminStatus(user.id);
+        setIsAdmin(adminStatus);
+        hasInitialized.current = true;
 
-        if (adminStatus !== null) {
-          setIsAdmin(adminStatus);
-          hasInitialized.current = true;
-
-          if (!adminStatus && !loading) {
-            router.push("/");
-          }
+        if (!adminStatus && !loading) {
+          router.push("/");
         }
       } catch (err) {
         console.error("Error initializing admin:", err);
@@ -153,27 +232,99 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           router.push("/");
         }
       } finally {
-        if (shouldShowLoading) {
-          setAdminLoading(false);
-        }
+        setAdminLoading(false);
       }
     };
 
     initializeAdmin();
   }, [user, loading, router, pathname, checkAdminStatus]);
 
+  // Track online presence and fetch data
+  useEffect(() => {
+    if (isAdmin && user) {
+      trackOnlinePresence();
+      fetchNotifications();
+      fetchOnlineStats();
+
+      // Set up intervals for real-time updates
+      const presenceInterval = setInterval(trackOnlinePresence, 30000); // 30 seconds
+      const statsInterval = setInterval(fetchOnlineStats, 60000); // 1 minute
+      const notificationsInterval = setInterval(fetchNotifications, 120000); // 2 minutes
+
+      return () => {
+        clearInterval(presenceInterval);
+        clearInterval(statsInterval);
+        clearInterval(notificationsInterval);
+      };
+    }
+  }, [
+    isAdmin,
+    user,
+    trackOnlinePresence,
+    fetchNotifications,
+    fetchOnlineStats,
+  ]);
+
   const handleSignOut = useCallback(async () => {
     if (user?.id) {
       adminCache.current.delete(user.id);
-      sessionStorage.removeItem(`admin_${user.id}`);
-      sessionStorage.removeItem(`admin_${user.id}_time`);
     }
-
     await signOut();
     router.push("/");
   }, [user, signOut, router]);
 
-  // Navigation items with better organization
+  const getNotificationIcon = (type: string, icon?: string) => {
+    if (icon) {
+      const IconComponent = {
+        Mail: Mail,
+        MessageSquare: MessageSquare,
+        Bell: Bell,
+        AlertCircle: AlertCircle,
+        CheckCircle: CheckCircle,
+        Info: AlertCircle,
+        Activity: Activity,
+      }[icon];
+
+      if (IconComponent) {
+        return <IconComponent size={16} />;
+      }
+    }
+
+    switch (type) {
+      case "contact":
+        return <Mail size={16} />;
+      case "comment":
+        return <MessageSquare size={16} />;
+      case "success":
+        return <CheckCircle size={16} />;
+      case "warning":
+        return <AlertCircle size={16} />;
+      case "error":
+        return <AlertCircle size={16} />;
+      default:
+        return <Bell size={16} />;
+    }
+  };
+
+  const getNotificationColor = (type: string, priority: string) => {
+    if (priority === "urgent") return "text-red-500";
+    if (priority === "high") return "text-orange-500";
+
+    switch (type) {
+      case "contact":
+        return "text-blue-500";
+      case "success":
+        return "text-green-500";
+      case "warning":
+        return "text-yellow-500";
+      case "error":
+        return "text-red-500";
+      default:
+        return "text-gray-500";
+    }
+  };
+
+  // Navigation items with enhanced organization
   const navItems = [
     {
       name: "Dashboard",
@@ -231,7 +382,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     },
   ];
 
-  // Group navigation items by category
   const groupedNavItems = navItems.reduce((acc, item) => {
     if (!acc[item.category]) {
       acc[item.category] = [];
@@ -261,51 +411,28 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     );
   }
 
-  if (!user) {
+  if (!user || !hasInitialized.current || !isAdmin) {
     return null;
   }
 
-  if (hasInitialized.current && !isAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground">Redirecting...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!hasInitialized.current || !isAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground font-medium">
-            Verifying permissions...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-slate-50 dark:bg-slate-900 min-h-screen flex">
-      {/* Sidebar */}
+    <div className="bg-slate-50/50 dark:bg-slate-950/50 min-h-screen flex">
+      {/* Enhanced Sidebar */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex flex-col bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 shadow-lg transition-all duration-300",
+          "fixed inset-y-0 left-0 z-50 flex flex-col bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border-r border-slate-200/60 dark:border-slate-800/60 shadow-2xl transition-all duration-300",
           isSidebarCollapsed ? "w-16" : "w-64",
           !isSidebarOpen && "lg:translate-x-0 -translate-x-full"
         )}
       >
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-200/60 dark:border-slate-800/60 bg-gradient-to-r from-primary/5 to-purple-500/5">
           {!isSidebarCollapsed && (
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary to-purple-600 rounded-lg flex items-center justify-center">
-                <BarChart3 className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 bg-gradient-to-br from-primary via-purple-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Shield className="w-5 h-5 text-white" />
               </div>
-              <h1 className="font-bold text-lg bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+              <h1 className="font-bold text-lg bg-gradient-to-r from-slate-900 via-slate-700 to-slate-600 dark:from-white dark:via-slate-200 dark:to-slate-300 bg-clip-text text-transparent">
                 Admin Panel
               </h1>
             </div>
@@ -315,7 +442,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             variant="ghost"
             size="icon"
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="h-8 w-8 hover:bg-slate-100 dark:hover:bg-slate-700"
+            className="h-8 w-8 hover:bg-slate-100/60 dark:hover:bg-slate-800/60 rounded-lg"
           >
             {isSidebarCollapsed ? (
               <ChevronRight className="h-4 w-4" />
@@ -324,6 +451,40 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             )}
           </Button>
         </div>
+
+        {/* Online Users Stats */}
+        {!isSidebarCollapsed && (
+          <div className="px-4 py-3 border-b border-slate-200/60 dark:border-slate-800/60">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                  Online Users
+                </span>
+                <Circle className="w-2 h-2 text-green-500 fill-current animate-pulse" />
+              </div>
+              <div className="flex items-center space-x-4 text-sm">
+                <div className="text-center">
+                  <div className="font-bold text-green-600 dark:text-green-400">
+                    {onlineStats.total_online}
+                  </div>
+                  <div className="text-xs text-slate-500">Total</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-bold text-blue-600 dark:text-blue-400">
+                    {onlineStats.authenticated_users}
+                  </div>
+                  <div className="text-xs text-slate-500">Users</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-bold text-gray-600 dark:text-gray-400">
+                    {onlineStats.anonymous_users}
+                  </div>
+                  <div className="text-xs text-slate-500">Guests</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
@@ -344,25 +505,37 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group",
+                        "flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative",
                         isActive
-                          ? "bg-gradient-to-r from-primary to-primary/80 text-white shadow-md shadow-primary/25"
-                          : "hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                          ? "bg-gradient-to-r from-primary/10 via-purple-500/10 to-blue-500/10 text-primary dark:text-primary border border-primary/20 shadow-lg shadow-primary/10"
+                          : "hover:bg-slate-100/60 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:scale-105"
                       )}
                       title={isSidebarCollapsed ? item.name : undefined}
                     >
                       <span
                         className={cn(
-                          "transition-colors duration-200",
+                          "transition-colors duration-200 flex-shrink-0",
                           isActive
-                            ? "text-white"
+                            ? "text-primary"
                             : "text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300"
                         )}
                       >
                         {item.icon}
                       </span>
                       {!isSidebarCollapsed && (
-                        <span className="ml-3">{item.name}</span>
+                        <span className="ml-3 flex-1">{item.name}</span>
+                      )}
+                      {isActive && (
+                        <motion.div
+                          layoutId="activeNavItem"
+                          className="absolute inset-0 bg-gradient-to-r from-primary/5 via-purple-500/5 to-blue-500/5 rounded-xl -z-10"
+                          initial={false}
+                          transition={{
+                            type: "spring",
+                            bounce: 0.2,
+                            duration: 0.6,
+                          }}
+                        />
                       )}
                     </Link>
                   );
@@ -373,10 +546,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </nav>
 
         {/* User Profile Section */}
-        <div className="border-t border-slate-200 dark:border-slate-700 p-4">
+        <div className="border-t border-slate-200/60 dark:border-slate-800/60 p-4 bg-gradient-to-r from-slate-50/50 to-slate-100/50 dark:from-slate-900/50 dark:to-slate-800/50">
           {!isSidebarCollapsed ? (
             <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary via-purple-600 to-blue-600 flex items-center justify-center shadow-lg">
                 <span className="font-medium text-white text-sm">
                   {user?.full_name
                     ?.split(" ")
@@ -396,7 +569,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             </div>
           ) : (
             <div className="flex justify-center mb-4">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary via-purple-600 to-blue-600 flex items-center justify-center shadow-lg">
                 <span className="font-medium text-white text-sm">
                   {user?.full_name
                     ?.split(" ")
@@ -411,7 +584,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <Button
             variant="outline"
             className={cn(
-              "border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700",
+              "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200",
               isSidebarCollapsed
                 ? "w-10 h-10 p-0"
                 : "w-full justify-start gap-2"
@@ -425,19 +598,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </div>
       </div>
 
-      {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-4 left-4 z-60">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="bg-white dark:bg-slate-800 shadow-lg"
-        >
-          {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-        </Button>
-      </div>
-
-      {/* Overlay for mobile */}
+      {/* Mobile overlay */}
       {isSidebarOpen && (
         <div
           className="lg:hidden fixed inset-0 bg-black/50 z-40"
@@ -452,8 +613,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           isSidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
         )}
       >
-        {/* Top Header */}
-        <header className="sticky top-0 z-30 h-16 bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-700 px-6 flex items-center justify-between">
+        {/* Enhanced Top Header */}
+        <header className="sticky top-0 z-30 h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-800/60 px-6 flex items-center justify-between shadow-sm">
           <div className="flex items-center space-x-4">
             {/* Mobile menu button */}
             <Button
@@ -465,23 +626,114 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <Menu size={20} />
             </Button>
 
-            {/* Search */}
-            <div className="hidden md:flex items-center space-x-2 bg-slate-100 dark:bg-slate-700 rounded-lg px-3 py-2 min-w-[300px]">
-              <Search className="w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="bg-transparent border-none outline-none text-sm text-slate-700 dark:text-slate-300 placeholder:text-slate-400 flex-1"
-              />
+            {/* Page title */}
+            <div>
+              <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
+                {pathname
+                  .split("/")
+                  .pop()
+                  ?.replace("-", " ")
+                  .replace(/^\w/, (c) => c.toUpperCase()) || "Dashboard"}
+              </h1>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Manage your portfolio and blog
+              </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-4">
             {/* Notifications */}
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell size={20} />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs"></span>
-            </Button>
+            <DropdownMenu
+              open={notificationsPanelOpen}
+              onOpenChange={setNotificationsPanelOpen}
+            >
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell size={20} />
+                  {unreadCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 text-xs bg-red-500 text-white flex items-center justify-center">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80">
+                <div className="p-3 border-b">
+                  <h4 className="font-medium">Notifications</h4>
+                  {unreadCount > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {unreadCount} unread notification
+                      {unreadCount > 1 ? "s" : ""}
+                    </p>
+                  )}
+                </div>
+                <div className="max-h-96 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="p-4 text-center text-muted-foreground">
+                      No notifications
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <DropdownMenuItem
+                        key={notification.id}
+                        className={cn(
+                          "p-3 cursor-pointer block",
+                          !notification.is_read &&
+                            "bg-blue-50/50 dark:bg-blue-900/10"
+                        )}
+                        onClick={() => {
+                          if (!notification.is_read) {
+                            markNotificationAsRead(notification.id);
+                          }
+                          if (notification.action_url) {
+                            router.push(notification.action_url);
+                          }
+                          setNotificationsPanelOpen(false);
+                        }}
+                      >
+                        <div className="flex items-start space-x-3">
+                          <div
+                            className={cn(
+                              "mt-0.5",
+                              getNotificationColor(
+                                notification.type,
+                                notification.priority
+                              )
+                            )}
+                          >
+                            {getNotificationIcon(
+                              notification.type,
+                              notification.icon
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-900 dark:text-white">
+                              {notification.title}
+                            </p>
+                            <p className="text-sm text-slate-600 dark:text-slate-400 truncate">
+                              {notification.message}
+                            </p>
+                            <div className="flex items-center justify-between mt-1">
+                              <p className="text-xs text-slate-500">
+                                {new Date(
+                                  notification.created_at
+                                ).toLocaleDateString()}
+                              </p>
+                              {!notification.is_read && (
+                                <Circle className="w-2 h-2 text-blue-500 fill-current" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Theme Toggle */}
+            <ModeToggle />
 
             {/* View Site */}
             <Button asChild variant="outline" size="sm">
@@ -495,7 +747,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary via-purple-600 to-blue-600 flex items-center justify-center">
                     <span className="font-medium text-white text-xs">
                       {user?.full_name
                         ?.split(" ")
@@ -533,7 +785,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-6 bg-gradient-to-br from-slate-50/50 via-white/30 to-slate-100/50 dark:from-slate-950/50 dark:via-slate-900/30 dark:to-slate-800/50 min-h-screen">
+          {children}
+        </main>
       </div>
     </div>
   );
