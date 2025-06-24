@@ -38,6 +38,7 @@ import {
   Star,
   User,
   Users,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -81,7 +82,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminLoading, setAdminLoading] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Start closed on mobile
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -92,41 +93,38 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   });
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
 
-  // Admin check logic (simplified for better performance)
+  // Enhanced admin check with better caching
   const hasInitialized = useRef(false);
   const adminCache = useRef<
     Map<string, { status: boolean; timestamp: number }>
   >(new Map());
   const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
-  const checkAdminStatus = useCallback(
-    async (userId: string) => {
-      const cached = adminCache.current.get(userId);
-      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        return cached.status;
-      }
+  const checkAdminStatus = useCallback(async (userId: string) => {
+    const cached = adminCache.current.get(userId);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      return cached.status;
+    }
 
-      try {
-        const { data, error } = await supabase.rpc("get_user_with_role", {
-          p_user_id: userId,
-        });
+    try {
+      const { data, error } = await supabase.rpc("get_user_with_role", {
+        p_user_id: userId,
+      });
 
-        const adminStatus =
-          !error && data && data.length > 0 && data[0].role_name === "admin";
+      const adminStatus =
+        !error && data && data.length > 0 && data[0].role_name === "admin";
 
-        adminCache.current.set(userId, {
-          status: adminStatus,
-          timestamp: Date.now(),
-        });
+      adminCache.current.set(userId, {
+        status: adminStatus,
+        timestamp: Date.now(),
+      });
 
-        return adminStatus;
-      } catch (err) {
-        console.error("Error checking admin status:", err);
-        return false;
-      }
-    },
-    [CACHE_DURATION]
-  );
+      return adminStatus;
+    } catch (err) {
+      console.error("Error checking admin status:", err);
+      return false;
+    }
+  }, []);
 
   // Track online presence
   const trackOnlinePresence = useCallback(async () => {
@@ -144,7 +142,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
   }, [user, pathname]);
 
-  // Fetch notifications
+  // Fetch notifications with proper error handling
   const fetchNotifications = useCallback(async () => {
     if (!user || !isAdmin) return;
 
@@ -180,17 +178,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
   }, []);
 
-  // Mark notification as read
+  // Mark notification as read with proper implementation
   const markNotificationAsRead = useCallback(
     async (notificationId: number) => {
       if (!user) return;
 
       try {
-        await supabase.rpc("mark_notification_read", {
+        const { error } = await supabase.rpc("mark_notification_read", {
           p_notification_id: notificationId,
           p_user_id: user.id,
         });
 
+        if (error) throw error;
+
+        // Update local state
         setNotifications((prev) =>
           prev.map((n) =>
             n.id === notificationId ? { ...n, is_read: true } : n
@@ -324,6 +325,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
   };
 
+  // Handle notification click
+  const handleNotificationClick = useCallback(
+    (notification: Notification) => {
+      if (!notification.is_read) {
+        markNotificationAsRead(notification.id);
+      }
+      if (notification.action_url) {
+        router.push(notification.action_url);
+      }
+      setNotificationsPanelOpen(false);
+    },
+    [markNotificationAsRead, router]
+  );
+
   // Navigation items with enhanced organization
   const navItems = [
     {
@@ -398,6 +413,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     system: "System",
   };
 
+  // Close sidebar when clicking outside on mobile
+  const handleOverlayClick = useCallback(() => {
+    setIsSidebarOpen(false);
+  }, []);
+
   if (loading || (adminLoading && !hasInitialized.current)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
@@ -417,12 +437,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="bg-slate-50/50 dark:bg-slate-950/50 min-h-screen flex">
+      {/* Mobile overlay */}
+      {isSidebarOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={handleOverlayClick}
+        />
+      )}
+
       {/* Enhanced Sidebar */}
       <div
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex flex-col bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border-r border-slate-200/60 dark:border-slate-800/60 shadow-2xl transition-all duration-300",
           isSidebarCollapsed ? "w-16" : "w-64",
-          !isSidebarOpen && "lg:translate-x-0 -translate-x-full"
+          isSidebarOpen || "lg:translate-x-0 -translate-x-full"
         )}
       >
         {/* Sidebar Header */}
@@ -438,18 +466,30 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             </div>
           )}
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="h-8 w-8 hover:bg-slate-100/60 dark:hover:bg-slate-800/60 rounded-lg"
-          >
-            {isSidebarCollapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
-            )}
-          </Button>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="h-8 w-8 hover:bg-slate-100/60 dark:hover:bg-slate-800/60 rounded-lg hidden lg:flex"
+            >
+              {isSidebarCollapsed ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <ChevronLeft className="h-4 w-4" />
+              )}
+            </Button>
+
+            {/* Mobile close button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsSidebarOpen(false)}
+              className="h-8 w-8 hover:bg-slate-100/60 dark:hover:bg-slate-800/60 rounded-lg lg:hidden"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Online Users Stats */}
@@ -511,6 +551,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                           : "hover:bg-slate-100/60 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:scale-105"
                       )}
                       title={isSidebarCollapsed ? item.name : undefined}
+                      onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile when nav item clicked
                     >
                       <span
                         className={cn(
@@ -598,18 +639,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </div>
       </div>
 
-      {/* Mobile overlay */}
-      {isSidebarOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/50 z-40"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
       {/* Main content */}
       <div
         className={cn(
-          "flex-1 transition-all duration-300",
+          "flex-1 transition-all duration-300 flex flex-col min-h-screen",
           isSidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
         )}
       >
@@ -681,15 +714,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                           !notification.is_read &&
                             "bg-blue-50/50 dark:bg-blue-900/10"
                         )}
-                        onClick={() => {
-                          if (!notification.is_read) {
-                            markNotificationAsRead(notification.id);
-                          }
-                          if (notification.action_url) {
-                            router.push(notification.action_url);
-                          }
-                          setNotificationsPanelOpen(false);
-                        }}
+                        onClick={() => handleNotificationClick(notification)}
                       >
                         <div className="flex items-start space-x-3">
                           <div
@@ -785,9 +810,24 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 p-6 bg-gradient-to-br from-slate-50/50 via-white/30 to-slate-100/50 dark:from-slate-950/50 dark:via-slate-900/30 dark:to-slate-800/50 min-h-screen">
+        <main className="flex-1 p-6 bg-gradient-to-br from-slate-50/50 via-white/30 to-slate-100/50 dark:from-slate-950/50 dark:via-slate-900/30 dark:to-slate-800/50">
           {children}
         </main>
+
+        {/* Fixed Admin Footer */}
+        <footer className="border-t border-slate-200/60 dark:border-slate-800/60 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl">
+          <div className="px-6 py-4">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
+              <div>
+                © {new Date().getFullYear()} Admin Dashboard. All rights
+                reserved.
+              </div>
+              <div className="flex items-center space-x-4">
+                <span>Made with ❤️ by Raihan Sharif</span>
+              </div>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
   );

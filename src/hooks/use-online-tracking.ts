@@ -2,7 +2,7 @@
 "use client";
 
 import { supabase } from "@/lib/supabase/client";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UseOnlineTrackingOptions {
   enabled?: boolean;
@@ -20,31 +20,50 @@ export function useOnlineTracking(
     sessionId,
   } = options;
 
+  const [isClient, setIsClient] = useState(false);
   const lastUpdateRef = useRef<number>(0);
   const intervalRef = useRef<NodeJS.Timeout>();
   const isActiveRef = useRef(true);
 
-  // Generate or use provided session ID
+  // Ensure we're on the client side
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // Generate or use provided session ID - only on client side
   const getSessionId = useCallback(() => {
+    if (!isClient) return null;
+
     if (sessionId) return sessionId;
 
     // Try to get from sessionStorage first
-    let storedSessionId = sessionStorage.getItem("user_session_id");
-    if (!storedSessionId) {
+    let storedSessionId = null;
+    try {
+      storedSessionId = sessionStorage.getItem("user_session_id");
+      if (!storedSessionId) {
+        storedSessionId = `session_${Date.now()}_${Math.random()
+          .toString(36)
+          .substr(2, 9)}`;
+        sessionStorage.setItem("user_session_id", storedSessionId);
+      }
+    } catch (error) {
+      // Fallback if sessionStorage is not available
       storedSessionId = `session_${Date.now()}_${Math.random()
         .toString(36)
         .substr(2, 9)}`;
-      sessionStorage.setItem("user_session_id", storedSessionId);
     }
+
     return storedSessionId;
-  }, [sessionId]);
+  }, [sessionId, isClient]);
 
   // Get user's IP address and user agent
   const getUserInfo = useCallback(async () => {
+    if (!isClient) return { userAgent: null, pageUrl: null, ipAddress: null };
+
     const userAgent = navigator.userAgent;
     const pageUrl = window.location.pathname;
 
-    // Get IP address (you might want to use a service for this)
+    // Get IP address (optional)
     let ipAddress = null;
     try {
       // Optional: You can use a service like ipify.org
@@ -60,11 +79,11 @@ export function useOnlineTracking(
       pageUrl,
       ipAddress,
     };
-  }, []);
+  }, [isClient]);
 
   // Update online status
   const updateOnlineStatus = useCallback(async () => {
-    if (!enabled || !user) return;
+    if (!enabled || !user || !isClient) return;
 
     const now = Date.now();
     // Prevent too frequent updates
@@ -75,6 +94,8 @@ export function useOnlineTracking(
     try {
       const userInfo = await getUserInfo();
       const currentSessionId = getSessionId();
+
+      if (!currentSessionId) return;
 
       await supabase.rpc("update_online_user", {
         p_user_id: user?.id || null,
@@ -89,20 +110,24 @@ export function useOnlineTracking(
     } catch (error) {
       console.error("Error updating online status:", error);
     }
-  }, [enabled, user, updateInterval, getUserInfo, getSessionId]);
+  }, [enabled, user, updateInterval, getUserInfo, getSessionId, isClient]);
 
   // Track page visibility
   const handleVisibilityChange = useCallback(() => {
+    if (!isClient) return;
+
     isActiveRef.current = !document.hidden;
 
     if (isActiveRef.current) {
       // User came back to the page, update immediately
       updateOnlineStatus();
     }
-  }, [updateOnlineStatus]);
+  }, [updateOnlineStatus, isClient]);
 
   // Track user activity
   const handleActivity = useCallback(() => {
+    if (!isClient) return;
+
     if (isActiveRef.current) {
       const now = Date.now();
       // Update if enough time has passed since last update
@@ -110,11 +135,11 @@ export function useOnlineTracking(
         updateOnlineStatus();
       }
     }
-  }, [updateOnlineStatus, updateInterval]);
+  }, [updateOnlineStatus, updateInterval, isClient]);
 
   // Set up tracking
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !isClient) return;
 
     // Initial update
     updateOnlineStatus();
@@ -157,6 +182,7 @@ export function useOnlineTracking(
     };
   }, [
     enabled,
+    isClient,
     updateInterval,
     updateOnlineStatus,
     handleVisibilityChange,
@@ -165,19 +191,23 @@ export function useOnlineTracking(
 
   // Handle page unload
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !isClient) return;
 
     const handleBeforeUnload = () => {
+      const currentSessionId = getSessionId();
+      if (!currentSessionId) return;
+
       // Note: We can't make async calls here, but we could use sendBeacon
       // if we had an endpoint that accepts beacon data
-      navigator.sendBeacon &&
+      if (navigator.sendBeacon) {
         navigator.sendBeacon(
           "/api/user-offline",
           JSON.stringify({
-            sessionId: getSessionId(),
+            sessionId: currentSessionId,
             userId: user?.id,
           })
         );
+      }
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -185,11 +215,11 @@ export function useOnlineTracking(
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [enabled, user, getSessionId]);
+  }, [enabled, user, getSessionId, isClient]);
 
   return {
     updateOnlineStatus,
-    sessionId: getSessionId(),
+    sessionId: isClient ? getSessionId() : null,
   };
 }
 

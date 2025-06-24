@@ -9,10 +9,11 @@ import {
   Activity,
   BarChart3,
   Eye,
+  RefreshCw,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -71,24 +72,26 @@ export default function DashboardAnalytics({
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const isMountedRef = useRef(true);
+  const maxRetries = 3;
 
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchData = async () => {
-      if (isMounted) {
-        await fetchAnalyticsData();
-      }
-    };
-
-    fetchData();
-
+    isMountedRef.current = true;
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
     };
+  }, []);
+
+  useEffect(() => {
+    if (isMountedRef.current) {
+      fetchAnalyticsData();
+    }
   }, [period]);
 
-  const fetchAnalyticsData = async () => {
+  const fetchAnalyticsData = useCallback(async () => {
+    if (!isMountedRef.current) return;
+
     try {
       setLoading(true);
       setError(null);
@@ -96,13 +99,25 @@ export default function DashboardAnalytics({
       const selectedPeriod = TIME_PERIODS.find((p) => p.key === period);
       if (!selectedPeriod) return;
 
-      // FIXED: Use proper SQL aggregation without casting issues
+      // Generate date range for the period
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - selectedPeriod.days + 1);
+
+      // Create date array for the period
+      const dateRange = [];
+      for (let i = 0; i < selectedPeriod.days; i++) {
+        const date = new Date(startDate);
+        date.setDate(startDate.getDate() + i);
+        dateRange.push(date.toISOString().split("T")[0]);
+      }
+
+      // Fetch views data with proper error handling
       let viewsData = [];
       let summaryData = null;
-      let previousPeriodViews = 0;
 
       try {
-        // Try to use the RPC functions first
+        // Try to use RPC function first
         const { data: rpcViewsData, error: rpcError } = await supabase.rpc(
           "get_combined_views_by_day",
           { days_count: selectedPeriod.days }
@@ -112,22 +127,27 @@ export default function DashboardAnalytics({
           viewsData = rpcViewsData;
         } else {
           console.warn("RPC function failed, using fallback:", rpcError);
-          // Fallback to manual aggregation
-          viewsData = await fetchViewsDataFallback(selectedPeriod.days);
+          viewsData = await fetchViewsDataFallback(
+            selectedPeriod.days,
+            dateRange
+          );
         }
       } catch (err) {
         console.warn("RPC failed, using fallback:", err);
-        viewsData = await fetchViewsDataFallback(selectedPeriod.days);
+        viewsData = await fetchViewsDataFallback(
+          selectedPeriod.days,
+          dateRange
+        );
       }
 
-      // Fetch summary data with proper error handling
+      // Fetch summary data
       try {
         const { data: rpcSummaryData, error: summaryError } =
           await supabase.rpc("get_analytics_summary", {
             days_count: selectedPeriod.days,
           });
 
-        if (!summaryError && rpcSummaryData) {
+        if (!summaryError && rpcSummaryData && rpcSummaryData.length > 0) {
           summaryData = rpcSummaryData[0];
         } else {
           console.warn("Summary RPC failed, using fallback:", summaryError);
@@ -139,9 +159,11 @@ export default function DashboardAnalytics({
       }
 
       // Calculate previous period for comparison
+      let previousPeriodViews = 0;
       try {
         const previousData = await fetchViewsDataFallback(
-          selectedPeriod.days * 2
+          selectedPeriod.days * 2,
+          dateRange
         );
         previousPeriodViews = previousData
           .slice(0, selectedPeriod.days)
@@ -150,51 +172,50 @@ export default function DashboardAnalytics({
         console.warn("Previous period calculation failed:", err);
       }
 
-      setData({
-        viewsPerDay: viewsData || [],
-        summary: summaryData || {
-          total_posts: 0,
-          total_projects: 0,
-          total_post_views: 0,
-          total_project_views: 0,
-          avg_daily_views: 0,
-        },
-        previousPeriodViews,
-      });
+      if (isMountedRef.current) {
+        setData({
+          viewsPerDay: viewsData || [],
+          summary: summaryData || {
+            total_posts: 0,
+            total_projects: 0,
+            total_post_views: 0,
+            total_project_views: 0,
+            avg_daily_views: 0,
+          },
+          previousPeriodViews,
+        });
+        setRetryCount(0);
+      }
     } catch (err) {
       console.error("Error fetching analytics data:", err);
-      setError("Failed to load analytics data");
+      if (isMountedRef.current) {
+        setError("Failed to load analytics data");
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [period]);
 
-  // FIXED: Fallback function with proper SQL syntax
-  const fetchViewsDataFallback = async (days: number) => {
+  const fetchViewsDataFallback = async (days: number, dateRange: string[]) => {
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setDate(endDate.getDate() - days);
+    startDate.setDate(endDate.getDate() - days + 1);
 
-    // Create date range array
-    const dateRange = [];
-    for (let i = 0; i < days; i++) {
-      const date = new Date(startDate);
-      date.setDate(startDate.getDate() + i);
-      dateRange.push(date.toISOString().split("T")[0]);
-    }
-
-    // FIXED: Proper aggregation without interval casting
-    const { data: postViewsData } = await supabase
-      .from("post_views")
-      .select("view_date, view_count")
-      .gte("view_date", startDate.toISOString().split("T")[0])
-      .lte("view_date", endDate.toISOString().split("T")[0]);
-
-    const { data: projectViewsData } = await supabase
-      .from("project_views")
-      .select("view_date, view_count")
-      .gte("view_date", startDate.toISOString().split("T")[0])
-      .lte("view_date", endDate.toISOString().split("T")[0]);
+    const [{ data: postViewsData }, { data: projectViewsData }] =
+      await Promise.all([
+        supabase
+          .from("post_views")
+          .select("view_date, view_count")
+          .gte("view_date", startDate.toISOString().split("T")[0])
+          .lte("view_date", endDate.toISOString().split("T")[0]),
+        supabase
+          .from("project_views")
+          .select("view_date, view_count")
+          .gte("view_date", startDate.toISOString().split("T")[0])
+          .lte("view_date", endDate.toISOString().split("T")[0]),
+      ]);
 
     // Aggregate data by date
     const viewsByDate: Record<
@@ -231,14 +252,12 @@ export default function DashboardAnalytics({
     }));
   };
 
-  // FIXED: Fallback summary function
   const fetchSummaryDataFallback = async (days: number) => {
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setDate(endDate.getDate() - days);
+    startDate.setDate(endDate.getDate() - days + 1);
 
     try {
-      // Get counts
       const [
         { count: totalPosts },
         { count: totalProjects },
@@ -296,19 +315,23 @@ export default function DashboardAnalytics({
   };
 
   const formatDateLabel = (dateStr: string) => {
-    const date = new Date(dateStr);
-    if (period === "7d") {
-      return date.toLocaleDateString("en-US", { weekday: "short" });
-    } else if (period === "30d") {
-      return date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
-    } else {
-      return date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
+    try {
+      const date = new Date(dateStr);
+      if (period === "7d") {
+        return date.toLocaleDateString("en-US", { weekday: "short" });
+      } else if (period === "30d") {
+        return date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        });
+      } else {
+        return date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        });
+      }
+    } catch {
+      return dateStr;
     }
   };
 
@@ -332,6 +355,13 @@ export default function DashboardAnalytics({
       value: Math.abs(change),
       isPositive: change >= 0,
     };
+  };
+
+  const handleRetry = () => {
+    if (retryCount < maxRetries) {
+      setRetryCount((prev) => prev + 1);
+      fetchAnalyticsData();
+    }
   };
 
   const growthMetrics = calculateGrowthPercentage();
@@ -364,9 +394,17 @@ export default function DashboardAnalytics({
           <div className="h-[400px] flex items-center justify-center">
             <div className="text-center">
               <p className="text-red-500 mb-4">{error}</p>
-              <Button onClick={fetchAnalyticsData} variant="outline" size="sm">
-                Retry
-              </Button>
+              <div className="space-y-2">
+                <Button onClick={handleRetry} variant="outline" size="sm">
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Retry ({retryCount}/{maxRetries})
+                </Button>
+                {retryCount >= maxRetries && (
+                  <p className="text-sm text-muted-foreground">
+                    Maximum retries reached. Please refresh the page.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -380,7 +418,8 @@ export default function DashboardAnalytics({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Eye className="w-4 h-4 text-blue-500" />
               Total Views ({period.toUpperCase()})
             </CardTitle>
           </CardHeader>
@@ -408,16 +447,14 @@ export default function DashboardAnalytics({
                   <span className="ml-1">vs previous</span>
                 </div>
               </div>
-              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20">
-                <Eye className="h-5 w-5 text-blue-600" />
-              </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Activity className="w-4 h-4 text-green-500" />
               Avg Daily Views
             </CardTitle>
           </CardHeader>
@@ -430,9 +467,6 @@ export default function DashboardAnalytics({
                 <div className="text-xs text-muted-foreground mt-1">
                   Per day average
                 </div>
-              </div>
-              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/20">
-                <Activity className="h-5 w-5 text-green-600" />
               </div>
             </div>
           </CardContent>
@@ -525,13 +559,17 @@ export default function DashboardAnalytics({
                   boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                 }}
                 labelFormatter={(value) => {
-                  const date = new Date(value);
-                  return date.toLocaleDateString("en-US", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  });
+                  try {
+                    const date = new Date(value);
+                    return date.toLocaleDateString("en-US", {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    });
+                  } catch {
+                    return value;
+                  }
                 }}
                 formatter={(value: any, name: string) => [
                   value,
