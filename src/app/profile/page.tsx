@@ -34,8 +34,8 @@ export default function ProfilePage() {
     if (user) {
       setFormState({
         full_name: user.full_name || "",
-        bio: user.bio || "",
-        avatar_url: user.avatar_url || "",
+        bio: (user as any).bio || "",
+        avatar_url: (user as any).avatar_url || "",
       });
     }
   }, [user, loading, router]);
