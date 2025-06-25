@@ -293,7 +293,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Cleanup function runs when component unmounts
       if (user) {
         // Optional: Send offline status (this might not work on page close)
-        supabase.rpc("cleanup_online_users").catch(console.error);
+        supabase.rpc("cleanup_online_users").then(
+          () => {},
+          (err) => console.error(err)
+        );
       }
     };
   }, [user]);
@@ -303,7 +306,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!isAdmin) return;
 
     const cleanupInterval = setInterval(() => {
-      supabase.rpc("cleanup_online_users").catch(console.error);
+      supabase.rpc("cleanup_online_users").then(
+        () => {},
+        (err) => console.error(err)
+      );
     }, 5 * 60 * 1000); // Every 5 minutes
 
     return () => clearInterval(cleanupInterval);
