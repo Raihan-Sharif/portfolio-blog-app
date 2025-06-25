@@ -82,7 +82,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminLoading, setAdminLoading] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Start closed on mobile
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -142,22 +142,52 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
   }, [user, pathname]);
 
-  // Fetch notifications with proper error handling
+  // Fetch notifications with proper error handling and read status
   const fetchNotifications = useCallback(async () => {
     if (!user || !isAdmin) return;
 
     try {
+      // Fetch notifications with recipient data for global notifications
       const { data, error } = await supabase
         .from("notifications")
-        .select("*")
+        .select(
+          `
+          *,
+          notification_recipients!left(
+            is_read,
+            user_id
+          )
+        `
+        )
         .or(`user_id.eq.${user.id},is_global.eq.true`)
         .order("created_at", { ascending: false })
         .limit(10);
 
       if (error) throw error;
 
-      setNotifications(data || []);
-      setUnreadCount(data?.filter((n) => !n.is_read).length || 0);
+      // Process notifications to determine read status
+      const processedNotifications = (data || []).map((notification) => {
+        let isRead = false;
+
+        if (notification.is_global) {
+          // For global notifications, check if current user has read it
+          const userRecipient = notification.notification_recipients?.find(
+            (recipient: any) => recipient.user_id === user.id
+          );
+          isRead = userRecipient?.is_read || false;
+        } else {
+          // For user-specific notifications
+          isRead = notification.is_read;
+        }
+
+        return {
+          ...notification,
+          is_read: isRead,
+        };
+      });
+
+      setNotifications(processedNotifications);
+      setUnreadCount(processedNotifications.filter((n) => !n.is_read).length);
     } catch (error) {
       console.error("Error fetching notifications:", error);
     }
@@ -191,7 +221,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
         if (error) throw error;
 
-        // Update local state
+        // Update local state immediately
         setNotifications((prev) =>
           prev.map((n) =>
             n.id === notificationId ? { ...n, is_read: true } : n
@@ -551,7 +581,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                           : "hover:bg-slate-100/60 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:scale-105"
                       )}
                       title={isSidebarCollapsed ? item.name : undefined}
-                      onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile when nav item clicked
+                      onClick={() => setIsSidebarOpen(false)}
                     >
                       <span
                         className={cn(
@@ -639,7 +669,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </div>
       </div>
 
-      {/* Main content */}
+      {/* Main content wrapper - FIXED: Proper margin calculation */}
       <div
         className={cn(
           "flex-1 transition-all duration-300 flex flex-col min-h-screen",
@@ -814,10 +844,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           {children}
         </main>
 
-        {/* Fixed Admin Footer */}
+        {/* FIXED: Admin Footer with proper positioning */}
         <footer className="border-t border-slate-200/60 dark:border-slate-800/60 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl">
           <div className="px-6 py-4">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
               <div>
                 © {new Date().getFullYear()} Admin Dashboard. All rights
                 reserved.
