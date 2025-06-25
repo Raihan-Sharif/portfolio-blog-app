@@ -119,6 +119,8 @@ const TIME_PERIODS = [
   { key: "7d" as TimePeriod, label: "7D", days: 7 },
   { key: "30d" as TimePeriod, label: "30D", days: 30 },
   { key: "90d" as TimePeriod, label: "3M", days: 90 },
+  { key: "180d" as TimePeriod, label: "6M", days: 180 },
+  { key: "365d" as TimePeriod, label: "12M", days: 365 },
 ];
 
 const CHART_COLORS = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444"];
