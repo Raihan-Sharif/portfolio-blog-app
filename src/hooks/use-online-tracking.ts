@@ -24,6 +24,7 @@ export function useOnlineTracking(
   const lastUpdateRef = useRef<number>(0);
   const intervalRef = useRef<NodeJS.Timeout>();
   const isActiveRef = useRef(true);
+  const currentSessionId = useRef<string | null>(null);
 
   // Ensure we're on the client side
   useEffect(() => {
@@ -36,24 +37,26 @@ export function useOnlineTracking(
 
     if (sessionId) return sessionId;
 
-    // Try to get from sessionStorage first
-    let storedSessionId = null;
-    try {
-      storedSessionId = sessionStorage.getItem("user_session_id");
-      if (!storedSessionId) {
-        storedSessionId = `session_${Date.now()}_${Math.random()
+    // Generate a unique session ID that persists during the browser session
+    if (!currentSessionId.current) {
+      try {
+        let storedSessionId = sessionStorage.getItem("user_session_id");
+        if (!storedSessionId) {
+          storedSessionId = `session_${Date.now()}_${Math.random()
+            .toString(36)
+            .substr(2, 9)}`;
+          sessionStorage.setItem("user_session_id", storedSessionId);
+        }
+        currentSessionId.current = storedSessionId;
+      } catch (error) {
+        // Fallback if sessionStorage is not available
+        currentSessionId.current = `session_${Date.now()}_${Math.random()
           .toString(36)
           .substr(2, 9)}`;
-        sessionStorage.setItem("user_session_id", storedSessionId);
       }
-    } catch (error) {
-      // Fallback if sessionStorage is not available
-      storedSessionId = `session_${Date.now()}_${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
     }
 
-    return storedSessionId;
+    return currentSessionId.current;
   }, [sessionId, isClient]);
 
   // Get user's IP address and user agent
@@ -66,7 +69,7 @@ export function useOnlineTracking(
     // Get IP address (optional)
     let ipAddress = null;
     try {
-      // Optional: You can use a service like ipify.org
+      // You can use a service like ipify.org if needed
       // const response = await fetch('https://api.ipify.org?format=json');
       // const data = await response.json();
       // ipAddress = data.ip;
@@ -81,9 +84,9 @@ export function useOnlineTracking(
     };
   }, [isClient]);
 
-  // Update online status
+  // Update online status with better authentication tracking
   const updateOnlineStatus = useCallback(async () => {
-    if (!enabled || !user || !isClient) return;
+    if (!enabled || !isClient) return;
 
     const now = Date.now();
     // Prevent too frequent updates
@@ -93,17 +96,20 @@ export function useOnlineTracking(
 
     try {
       const userInfo = await getUserInfo();
-      const currentSessionId = getSessionId();
+      const currentSessionIdValue = getSessionId();
 
-      if (!currentSessionId) return;
+      if (!currentSessionIdValue) return;
+
+      // Determine if user is authenticated more reliably
+      const isAuthenticated = !!(user && user.id);
 
       await supabase.rpc("update_online_user", {
-        p_user_id: user?.id || null,
-        p_session_id: currentSessionId,
+        p_user_id: isAuthenticated ? user.id : null,
+        p_session_id: currentSessionIdValue,
         p_ip_address: userInfo.ipAddress,
         p_user_agent: userInfo.userAgent,
         p_page_url: userInfo.pageUrl,
-        p_is_authenticated: !!user?.id,
+        p_is_authenticated: isAuthenticated,
       });
 
       lastUpdateRef.current = now;
@@ -137,6 +143,22 @@ export function useOnlineTracking(
     }
   }, [updateOnlineStatus, updateInterval, isClient]);
 
+  // Clean up user session when they leave
+  const cleanupUserSession = useCallback(async () => {
+    const currentSessionIdValue = getSessionId();
+    if (!currentSessionIdValue) return;
+
+    try {
+      // Remove from online users table
+      await supabase
+        .from("online_users")
+        .delete()
+        .eq("session_id", currentSessionIdValue);
+    } catch (error) {
+      console.error("Error cleaning up user session:", error);
+    }
+  }, [getSessionId]);
+
   // Set up tracking
   useEffect(() => {
     if (!enabled || !isClient) return;
@@ -162,7 +184,7 @@ export function useOnlineTracking(
       "scroll",
       "touchstart",
     ];
-    const throttledActivity = throttle(handleActivity, updateInterval / 6); // Throttle activity updates
+    const throttledActivity = throttle(handleActivity, updateInterval / 6);
 
     activityEvents.forEach((event) => {
       document.addEventListener(event, throttledActivity, { passive: true });
@@ -189,37 +211,60 @@ export function useOnlineTracking(
     handleActivity,
   ]);
 
-  // Handle page unload
+  // Handle page unload with better cleanup
   useEffect(() => {
     if (!enabled || !isClient) return;
 
-    const handleBeforeUnload = () => {
-      const currentSessionId = getSessionId();
-      if (!currentSessionId) return;
+    const handleBeforeUnload = async () => {
+      const currentSessionIdValue = getSessionId();
+      if (!currentSessionIdValue) return;
 
-      // Note: We can't make async calls here, but we could use sendBeacon
-      // if we had an endpoint that accepts beacon data
+      // Use sendBeacon for reliable cleanup on page unload
       if (navigator.sendBeacon) {
-        navigator.sendBeacon(
-          "/api/user-offline",
-          JSON.stringify({
-            sessionId: currentSessionId,
-            userId: user?.id,
-          })
-        );
+        const data = JSON.stringify({
+          sessionId: currentSessionIdValue,
+          userId: user?.id,
+        });
+
+        navigator.sendBeacon("/api/user-offline", data);
+      } else {
+        // Fallback for browsers that don't support sendBeacon
+        try {
+          await cleanupUserSession();
+        } catch (error) {
+          console.error("Error during cleanup:", error);
+        }
       }
     };
 
+    const handlePageHide = () => {
+      // More reliable than beforeunload
+      handleBeforeUnload();
+    };
+
     window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handlePageHide);
 
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handlePageHide);
     };
-  }, [enabled, user, getSessionId, isClient]);
+  }, [enabled, user, getSessionId, cleanupUserSession, isClient]);
+
+  // Clean up when user changes (login/logout)
+  useEffect(() => {
+    if (!isClient) return;
+
+    // When user changes, update the session immediately
+    if (enabled) {
+      updateOnlineStatus();
+    }
+  }, [user?.id, enabled, updateOnlineStatus, isClient]);
 
   return {
     updateOnlineStatus,
     sessionId: isClient ? getSessionId() : null,
+    cleanupUserSession,
   };
 }
 

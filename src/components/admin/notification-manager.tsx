@@ -179,7 +179,7 @@ export function NotificationManager({
   return null;
 }
 
-// Hook for using notifications
+// Enhanced hook for using notifications with better read status handling
 export function useNotifications() {
   const { user, isAdmin } = useAuth();
 
@@ -238,10 +238,13 @@ export function useNotifications() {
       if (!user) return;
 
       try {
-        await supabase.rpc("mark_notification_read", {
+        const { data, error } = await supabase.rpc("mark_notification_read", {
           p_notification_id: notificationId,
           p_user_id: user.id,
         });
+
+        if (error) throw error;
+        return data;
       } catch (error) {
         console.error("Error marking notification as read:", error);
         throw error;
@@ -255,12 +258,10 @@ export function useNotifications() {
       if (!user) return [];
 
       try {
-        const { data, error } = await supabase
-          .from("notifications")
-          .select("*")
-          .or(`user_id.eq.${user.id},is_global.eq.true`)
-          .order("created_at", { ascending: false })
-          .limit(limit);
+        const { data, error } = await supabase.rpc("get_user_notifications", {
+          p_user_id: user.id,
+          p_limit: limit,
+        });
 
         if (error) throw error;
         return data || [];
@@ -276,40 +277,15 @@ export function useNotifications() {
     if (!user) return 0;
 
     try {
-      // For global notifications, check if user has read them via notification_recipients
-      // For user-specific notifications, check is_read directly
-      const { data, error } = await supabase
-        .from("notifications")
-        .select(
-          `
-          id,
-          is_global,
-          is_read,
-          notification_recipients!left(is_read)
-        `
-        )
-        .or(`user_id.eq.${user.id},is_global.eq.true`)
-        .or(
-          "is_read.eq.false,notification_recipients.is_read.eq.false,notification_recipients.is_read.is.null"
-        );
+      const { data, error } = await supabase.rpc(
+        "get_unread_notification_count",
+        {
+          p_user_id: user.id,
+        }
+      );
 
       if (error) throw error;
-
-      // Count unread notifications
-      const unreadCount =
-        data?.filter((notification) => {
-          if (notification.is_global) {
-            // For global notifications, check if user has read it
-            return !notification.notification_recipients?.some(
-              (recipient: any) => recipient.is_read === true
-            );
-          } else {
-            // For user-specific notifications, check is_read directly
-            return !notification.is_read;
-          }
-        }).length || 0;
-
-      return unreadCount;
+      return data || 0;
     } catch (error) {
       console.error("Error getting unread count:", error);
       return 0;

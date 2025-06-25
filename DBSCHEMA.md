@@ -2331,7 +2331,7 @@ CREATE TRIGGER on_contact_message_created
   AFTER INSERT ON contact_messages
   FOR EACH ROW EXECUTE FUNCTION create_contact_notification();
 
--- Function to track online users
+-- Enhanced function to update online user with better authentication tracking
 CREATE OR REPLACE FUNCTION update_online_user(
   p_user_id UUID DEFAULT NULL,
   p_session_id TEXT DEFAULT NULL,
@@ -2344,7 +2344,13 @@ RETURNS VOID AS
 $$
 
 BEGIN
-INSERT INTO online*users (
+-- Ensure we have a session ID
+IF p_session_id IS NULL THEN
+RETURN;
+END IF;
+
+-- Insert or update the online user record
+INSERT INTO online_users (
 user_id,
 session_id,
 ip_address,
@@ -2354,7 +2360,7 @@ is_authenticated,
 last_activity
 ) VALUES (
 p_user_id,
-COALESCE(p_session_id, 'anonymous*' || extract(epoch from now())),
+p_session_id,
 p_ip_address,
 p_user_agent,
 p_page_url,
@@ -2363,16 +2369,25 @@ NOW()
 )
 ON CONFLICT (user_id, session_id)
 DO UPDATE SET
-last_activity = NOW(),
-page_url = EXCLUDED.page_url,
 ip_address = EXCLUDED.ip_address,
-user_agent = EXCLUDED.user_agent;
+user_agent = EXCLUDED.user_agent,
+page_url = EXCLUDED.page_url,
+is_authenticated = EXCLUDED.is_authenticated,
+last_activity = NOW();
+
+-- Clean up old sessions for this user if they have multiple sessions
+IF p_user_id IS NOT NULL THEN
+DELETE FROM online_users
+WHERE user_id = p_user_id
+AND session_id != p_session_id
+AND last_activity < NOW() - INTERVAL '1 hour';
+END IF;
 END;
 
 $$
-LANGUAGE plpgsql;
+LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function to get online users count
+-- Enhanced function to get online users count with proper authentication filtering
 CREATE OR REPLACE FUNCTION get_online_users_count()
 RETURNS TABLE (
   total_online INTEGER,
@@ -2382,32 +2397,106 @@ RETURNS TABLE (
 $$
 
 BEGIN
+-- Clean up expired sessions first
+DELETE FROM online_users
+WHERE last_activity < NOW() - INTERVAL '15 minutes';
+
 RETURN QUERY
+WITH online_stats AS (
 SELECT
-COUNT(\*)::INTEGER as total_online,
-COUNT(CASE WHEN is_authenticated THEN 1 END)::INTEGER as authenticated_users,
-COUNT(CASE WHEN NOT is_authenticated THEN 1 END)::INTEGER as anonymous_users
+COUNT(\*) as total,
+COUNT(CASE WHEN user_id IS NOT NULL AND is_authenticated = true THEN 1 END) as authenticated,
+COUNT(CASE WHEN user_id IS NULL OR is_authenticated = false THEN 1 END) as anonymous
 FROM online_users
-WHERE last_activity > NOW() - INTERVAL '5 minutes';
+WHERE last_activity >= NOW() - INTERVAL '5 minutes'
+)
+SELECT
+total::INTEGER,
+authenticated::INTEGER,
+anonymous::INTEGER
+FROM online_stats;
 END;
 
 $$
-LANGUAGE plpgsql;
+LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function to clean old online users
+-- Function to get recent online users with profile information
+CREATE OR REPLACE FUNCTION get_recent_online_users(p_limit INTEGER DEFAULT 10)
+RETURNS TABLE (
+  user_id UUID,
+  session_id TEXT,
+  last_activity TIMESTAMPTZ,
+  is_authenticated BOOLEAN,
+  page_url TEXT,
+  user_name TEXT
+) AS
+$$
+
+BEGIN
+-- Clean up expired sessions first
+DELETE FROM online_users
+WHERE last_activity < NOW() - INTERVAL '15 minutes';
+
+RETURN QUERY
+SELECT
+ou.user_id,
+ou.session_id,
+ou.last_activity,
+ou.is_authenticated,
+ou.page_url,
+COALESCE(p.full_name, 'Anonymous') as user_name
+FROM online_users ou
+LEFT JOIN profiles p ON ou.user_id = p.id
+WHERE ou.last_activity >= NOW() - INTERVAL '5 minutes'
+ORDER BY ou.last_activity DESC
+LIMIT p_limit;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Enhanced cleanup function for online users
 CREATE OR REPLACE FUNCTION cleanup_online_users()
-RETURNS VOID AS
+RETURNS INTEGER AS
+$$
+
+DECLARE
+deleted_count INTEGER;
+BEGIN
+-- Delete sessions inactive for more than 15 minutes
+DELETE FROM online_users
+WHERE last_activity < NOW() - INTERVAL '15 minutes';
+
+GET DIAGNOSTICS deleted_count = ROW_COUNT;
+
+RETURN deleted_count;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to remove specific user session
+CREATE OR REPLACE FUNCTION remove_user_session(
+  p_session_id TEXT,
+  p_user_id UUID DEFAULT NULL
+)
+RETURNS BOOLEAN AS
 $$
 
 BEGIN
 DELETE FROM online_users
-WHERE last_activity < NOW() - INTERVAL '15 minutes';
+WHERE session_id = p_session_id
+AND (p_user_id IS NULL OR user_id = p_user_id);
+
+RETURN FOUND;
 END;
 
 $$
-LANGUAGE plpgsql;
+LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function to mark notification as read
+
+
+-- Enhanced function to mark notification as read with proper handling
 CREATE OR REPLACE FUNCTION mark_notification_read(
   p_notification_id INTEGER,
   p_user_id UUID
@@ -2415,30 +2504,155 @@ CREATE OR REPLACE FUNCTION mark_notification_read(
 RETURNS BOOLEAN AS
 $$
 
+DECLARE
+notification_record RECORD;
 BEGIN
--- For global notifications, use notification_recipients table
-IF EXISTS (SELECT 1 FROM notifications WHERE id = p_notification_id AND is_global = true) THEN
+-- Get the notification details
+SELECT id, is_global, user_id INTO notification_record
+FROM notifications
+WHERE id = p_notification_id;
+
+IF NOT FOUND THEN
+RETURN FALSE;
+END IF;
+
+-- Handle global notifications
+IF notification_record.is_global = true THEN
+-- Insert or update recipient record
 INSERT INTO notification_recipients (notification_id, user_id, is_read, read_at)
 VALUES (p_notification_id, p_user_id, true, NOW())
 ON CONFLICT (notification_id, user_id)
-DO UPDATE SET is_read = true, read_at = NOW();
+DO UPDATE SET
+is_read = true,
+read_at = NOW();
 ELSE
--- For user-specific notifications, update directly
+-- Handle user-specific notifications
+IF notification_record.user_id = p_user_id OR notification_record.user_id IS NULL THEN
 UPDATE notifications
 SET is_read = true, updated_at = NOW()
-WHERE id = p_notification_id AND (user_id = p_user_id OR user_id IS NULL);
+WHERE id = p_notification_id;
+ELSE
+RETURN FALSE; -- User doesn't have permission to mark this notification as read
+END IF;
 END IF;
 
-RETURN FOUND;
+RETURN TRUE;
 END;
 
 $$
-LANGUAGE plpgsql;
+LANGUAGE plpgsql SECURITY DEFINER;
+
 
 -- Grant permissions
 GRANT EXECUTE ON FUNCTION update_online_user(UUID, TEXT, INET, TEXT, TEXT, BOOLEAN) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_online_users_count() TO authenticated;
+
 GRANT EXECUTE ON FUNCTION mark_notification_read(INTEGER, UUID) TO authenticated;
+
+
+-- Function to get notifications with proper read status for a user
+CREATE OR REPLACE FUNCTION get_user_notifications(
+  p_user_id UUID,
+  p_limit INTEGER DEFAULT 10
+)
+RETURNS TABLE (
+  id INTEGER,
+  title TEXT,
+  message TEXT,
+  type TEXT,
+  priority TEXT,
+  icon TEXT,
+  action_url TEXT,
+  action_label TEXT,
+  is_global BOOLEAN,
+  metadata JSONB,
+  created_at TIMESTAMPTZ,
+  is_read BOOLEAN
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+WITH user_notifications AS (
+-- Get all notifications for the user
+SELECT
+n.id,
+n.title,
+n.message,
+n.type,
+n.priority,
+n.icon,
+n.action_url,
+n.action_label,
+n.is_global,
+n.metadata,
+n.created_at,
+CASE
+WHEN n.is_global THEN
+COALESCE(nr.is_read, false)
+ELSE
+COALESCE(n.is_read, false)
+END as is_read
+FROM notifications n
+LEFT JOIN notification_recipients nr ON (
+n.id = nr.notification_id
+AND nr.user_id = p_user_id
+AND n.is_global = true
+)
+WHERE
+n.is_global = true
+OR n.user_id = p_user_id
+OR n.user_id IS NULL
+)
+SELECT \* FROM user_notifications
+ORDER BY created_at DESC
+LIMIT p_limit;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION get_user_notifications(UUID, INTEGER) TO authenticated;
+
+-- Function to get unread notification count for a user
+CREATE OR REPLACE FUNCTION get_unread_notification_count(p_user_id UUID)
+RETURNS INTEGER AS
+$$
+
+DECLARE
+unread_count INTEGER;
+BEGIN
+SELECT COUNT(\*) INTO unread_count
+FROM (
+SELECT
+n.id,
+CASE
+WHEN n.is_global THEN
+COALESCE(nr.is_read, false)
+ELSE
+COALESCE(n.is_read, false)
+END as is_read
+FROM notifications n
+LEFT JOIN notification_recipients nr ON (
+n.id = nr.notification_id
+AND nr.user_id = p_user_id
+AND n.is_global = true
+)
+WHERE
+(n.is_global = true OR n.user_id = p_user_id OR n.user_id IS NULL)
+AND n.created_at > NOW() - INTERVAL '30 days' -- Only check recent notifications
+) filtered_notifications
+WHERE is_read = false;
+
+RETURN COALESCE(unread_count, 0);
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION get_unread_notification_count(UUID) TO authenticated;
 
 -- Create indexes for performance
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
@@ -2449,4 +2663,149 @@ CREATE INDEX idx_notification_recipients_user_id ON notification_recipients(user
 CREATE INDEX idx_system_analytics_metric_date ON system_analytics(metric_name, date_key);
 
 ----------
+$$
+
+-- Enhanced analytics functions with better performance
+CREATE OR REPLACE FUNCTION get_enhanced_analytics_summary(days_count INTEGER DEFAULT 30)
+RETURNS TABLE (
+total_posts INTEGER,
+total_projects INTEGER,
+total_users INTEGER,
+total_post_views BIGINT,
+total_project_views BIGINT,
+total_messages INTEGER,
+avg_daily_views NUMERIC,
+growth_rate NUMERIC,
+online_users_count INTEGER
+) AS $$
+DECLARE
+start_date DATE := CURRENT_DATE - (days_count - 1);
+current_views BIGINT;
+previous_views BIGINT;
+previous_start_date DATE := CURRENT_DATE - (days_count \* 2 - 1);
+previous_end_date DATE := CURRENT_DATE - days_count;
+BEGIN
+-- Get current period views
+SELECT
+COALESCE(SUM(pv.view_count), 0) + COALESCE(SUM(prv.view_count), 0)
+INTO current_views
+FROM (
+SELECT COALESCE(SUM(view_count), 0) as view_count
+FROM post_views
+WHERE view_date >= start_date
+) pv,
+(
+SELECT COALESCE(SUM(view_count), 0) as view_count
+FROM project_views
+WHERE view_date >= start_date
+) prv;
+
+-- Get previous period views for growth calculation
+SELECT
+COALESCE(SUM(pv.view_count), 0) + COALESCE(SUM(prv.view_count), 0)
+INTO previous_views
+FROM (
+SELECT COALESCE(SUM(view_count), 0) as view_count
+FROM post_views
+WHERE view_date >= previous_start_date AND view_date <= previous_end_date
+) pv,
+(
+SELECT COALESCE(SUM(view_count), 0) as view_count
+FROM project_views
+WHERE view_date >= previous_start_date AND view_date <= previous_end_date
+) prv;
+
+RETURN QUERY
+SELECT
+(SELECT COUNT(_)::INTEGER FROM posts WHERE published = true) AS total_posts,
+(SELECT COUNT(_)::INTEGER FROM projects WHERE is*active = true AND is_public = true) AS total_projects,
+(SELECT COUNT(*)::INTEGER FROM profiles) AS total*users,
+(SELECT COALESCE(SUM(view_count), 0) FROM post_views WHERE view_date >= start_date) AS total_post_views,
+(SELECT COALESCE(SUM(view_count), 0) FROM project_views WHERE view_date >= start_date) AS total_project_views,
+(SELECT COUNT(*)::INTEGER FROM contact*messages WHERE created_at >= start_date::timestamp) AS total_messages,
+ROUND(current_views::NUMERIC / days_count, 2) AS avg_daily_views,
+CASE
+WHEN previous_views > 0 THEN ROUND(((current_views - previous_views)::NUMERIC / previous_views) * 100, 2)
+ELSE 0
+END AS growth*rate,
+(SELECT COUNT(*)::INTEGER FROM online_users WHERE last_activity >= NOW() - INTERVAL '5 minutes') AS online_users_count;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+
+$$
+
+-- Function to get combined views data with proper date handling
+CREATE OR REPLACE FUNCTION get_views_analytics(days_count INTEGER DEFAULT 30)
+RETURNS TABLE (
+view_date DATE,
+post_views INTEGER,
+project_views INTEGER,
+total_views INTEGER
+) AS $$
+BEGIN
+RETURN QUERY
+WITH date_series AS (
+SELECT generate_series(
+CURRENT_DATE - (days_count - 1),
+CURRENT_DATE,
+'1 day'::interval
+)::date AS date_val
+),
+post_views_agg AS (
+SELECT
+view_date,
+SUM(view_count) AS total_views
+FROM post_views
+WHERE view_date >= CURRENT_DATE - (days_count - 1)
+GROUP BY view_date
+),
+project_views_agg AS (
+SELECT
+view_date,
+SUM(view_count) AS total_views
+FROM project_views
+WHERE view_date >= CURRENT_DATE - (days_count - 1)
+GROUP BY view_date
+)
+SELECT
+ds.date_val AS view_date,
+COALESCE(pv.total_views, 0)::INTEGER AS post_views,
+COALESCE(prv.total_views, 0)::INTEGER AS project_views,
+(COALESCE(pv.total_views, 0) + COALESCE(prv.total_views, 0))::INTEGER AS total_views
+FROM date_series ds
+LEFT JOIN post_views_agg pv ON pv.view_date = ds.date_val
+LEFT JOIN project_views_agg prv ON prv.view_date = ds.date_val
+ORDER BY ds.date_val;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant permissions for all functions
+GRANT EXECUTE ON FUNCTION update_online_user(UUID, TEXT, INET, TEXT, TEXT, BOOLEAN) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_online_users_count() TO authenticated;
+GRANT EXECUTE ON FUNCTION get_recent_online_users(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION cleanup_online_users() TO authenticated;
+GRANT EXECUTE ON FUNCTION remove_user_session(TEXT, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_enhanced_analytics_summary(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_views_analytics(INTEGER) TO authenticated;
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_online_users_last_activity ON online_users(last_activity);
+CREATE INDEX IF NOT EXISTS idx_online_users_session_id ON online_users(session_id);
+CREATE INDEX IF NOT EXISTS idx_online_users_user_id ON online_users(user_id);
+CREATE INDEX IF NOT EXISTS idx_online_users_is_authenticated ON online_users(is_authenticated);
+
+-- Create a scheduled job to clean up old online users (if using pg_cron)
+-- Uncomment if you have pg_cron enabled
+/*
+SELECT cron.schedule(
+  'cleanup-online-users',
+  '*/5 * * * *', -- Every 5 minutes
+  'SELECT cleanup_online_users();'
+);
+*/
 $$

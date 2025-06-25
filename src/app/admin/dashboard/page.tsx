@@ -23,6 +23,7 @@ import {
   Target,
   TrendingDown,
   TrendingUp,
+  Users,
   Zap,
 } from "lucide-react";
 import Image from "next/image";
@@ -100,16 +101,24 @@ interface DashboardStats {
     status: string;
     priority: string;
   }>;
-  contentDistribution: Array<{
-    name: string;
-    value: number;
-    color: string;
-  }>;
+  onlineUsers: {
+    total_online: number;
+    authenticated_users: number;
+    anonymous_users: number;
+    recent_users: Array<{
+      id?: string;
+      session_id: string;
+      last_activity: string;
+      is_authenticated: boolean;
+      page_url: string;
+      user_name?: string;
+    }>;
+  };
   monthlyStats: Array<{
     month: string;
     posts: number;
     projects: number;
-    views: number;
+    total_content: number;
   }>;
 }
 
@@ -119,8 +128,6 @@ const TIME_PERIODS = [
   { key: "7d" as TimePeriod, label: "7D", days: 7 },
   { key: "30d" as TimePeriod, label: "30D", days: 30 },
   { key: "90d" as TimePeriod, label: "3M", days: 90 },
-  { key: "180d" as TimePeriod, label: "6M", days: 180 },
-  { key: "365d" as TimePeriod, label: "12M", days: 365 },
 ];
 
 const CHART_COLORS = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444"];
@@ -146,7 +153,12 @@ export default function DashboardPage() {
       usersGrowth: 0,
     },
     recentMessages: [],
-    contentDistribution: [],
+    onlineUsers: {
+      total_online: 0,
+      authenticated_users: 0,
+      anonymous_users: 0,
+      recent_users: [],
+    },
     monthlyStats: [],
   });
   const [loading, setLoading] = useState(true);
@@ -293,7 +305,46 @@ export default function DashboardPage() {
         .sort((a, b) => b.views - a.views)
         .slice(0, 8);
 
-      // Calculate growth metrics (you can implement actual previous period comparison)
+      // Fetch online users with enhanced data
+      const { data: onlineUsersData } = await supabase
+        .from("online_users")
+        .select(
+          `
+          user_id,
+          session_id,
+          last_activity,
+          is_authenticated,
+          page_url,
+          profiles!left(full_name)
+        `
+        )
+        .gte(
+          "last_activity",
+          new Date(Date.now() - 5 * 60 * 1000).toISOString()
+        )
+        .order("last_activity", { ascending: false });
+
+      const onlineUsers = {
+        total_online: onlineUsersData?.length || 0,
+        authenticated_users:
+          onlineUsersData?.filter((u) => u.is_authenticated).length || 0,
+        anonymous_users:
+          onlineUsersData?.filter((u) => !u.is_authenticated).length || 0,
+        recent_users:
+          onlineUsersData?.slice(0, 10).map((user) => ({
+            id: user.user_id,
+            session_id: user.session_id,
+            last_activity: user.last_activity,
+            is_authenticated: user.is_authenticated,
+            page_url: user.page_url,
+            user_name:
+              Array.isArray(user.profiles) && user.profiles.length > 0
+                ? user.profiles[0].full_name
+                : "Anonymous",
+          })) || [],
+      };
+
+      // Calculate growth metrics (simplified for demo)
       const growthMetrics = {
         postsGrowth: Math.floor(Math.random() * 20) + 5,
         projectsGrowth: Math.floor(Math.random() * 15) + 3,
@@ -301,31 +352,21 @@ export default function DashboardPage() {
         usersGrowth: Math.floor(Math.random() * 10) + 2,
       };
 
-      // Content distribution for pie chart
-      const contentDistribution = [
-        { name: "Blog Posts", value: totalPosts || 0, color: "#3b82f6" },
-        { name: "Projects", value: totalProjects || 0, color: "#8b5cf6" },
-        { name: "Users", value: totalUsers || 0, color: "#10b981" },
-        { name: "Messages", value: totalMessages || 0, color: "#f59e0b" },
-      ];
-
-      // Monthly stats for the last 6 months
+      // Monthly stats for the last 6 months (Fixed: removed views column)
       const monthlyStats = [];
       for (let i = 5; i >= 0; i--) {
         const date = new Date();
         date.setMonth(date.getMonth() - i);
-        const monthStart = new Date(date.getFullYear(), date.getMonth(), 1)
-          .toISOString()
-          .split("T")[0];
-        const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0)
-          .toISOString()
-          .split("T")[0];
+
+        // For demo purposes, using estimated data
+        const posts = Math.floor(Math.random() * 10) + 1;
+        const projects = Math.floor(Math.random() * 5) + 1;
 
         monthlyStats.push({
           month: format(date, "MMM yyyy"),
-          posts: Math.floor(Math.random() * 10) + 1,
-          projects: Math.floor(Math.random() * 5) + 1,
-          views: Math.floor(Math.random() * 1000) + 100,
+          posts,
+          projects,
+          total_content: posts + projects, // Combined instead of views
         });
       }
 
@@ -344,7 +385,7 @@ export default function DashboardPage() {
         topContent,
         growthMetrics,
         recentMessages: recentMessages || [],
-        contentDistribution,
+        onlineUsers,
         monthlyStats,
       });
     } catch (error) {
@@ -434,6 +475,27 @@ export default function DashboardPage() {
     } catch {
       return dateStr;
     }
+  };
+
+  // Custom tooltip for views chart
+  const ViewsTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const date = parseISO(label);
+      return (
+        <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+          <p className="font-medium">{format(date, "EEEE, MMMM d, yyyy")}</p>
+          {payload.map((entry: any, index: number) => (
+            <p key={index} className="text-sm" style={{ color: entry.color }}>
+              {entry.dataKey === "post_views" && `Blog Views: ${entry.value}`}
+              {entry.dataKey === "project_views" &&
+                `Project Views: ${entry.value}`}
+              {entry.dataKey === "total_views" && `Total Views: ${entry.value}`}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
   };
 
   const StatCard = ({
@@ -658,6 +720,140 @@ export default function DashboardPage() {
           />
         </div>
 
+        {/* Enhanced Online Users Overview */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Online Users Pie Chart */}
+          <Card className="border-0 shadow-xl bg-gradient-to-br from-white via-white to-slate-50/50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-lg">
+                  <Users className="w-5 h-5" />
+                </div>
+                Online Users
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-center h-48">
+                {stats.onlineUsers.total_online > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          {
+                            name: "Authenticated",
+                            value: stats.onlineUsers.authenticated_users,
+                            color: "#3b82f6",
+                          },
+                          {
+                            name: "Anonymous",
+                            value: stats.onlineUsers.anonymous_users,
+                            color: "#94a3b8",
+                          },
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={80}
+                        dataKey="value"
+                      >
+                        <Cell fill="#3b82f6" />
+                        <Cell fill="#94a3b8" />
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-center text-muted-foreground">
+                    <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>No online users</p>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-around mt-4 text-center">
+                <div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {stats.onlineUsers.authenticated_users}
+                  </div>
+                  <div className="text-xs text-slate-500">Authenticated</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-slate-500">
+                    {stats.onlineUsers.anonymous_users}
+                  </div>
+                  <div className="text-xs text-slate-500">Anonymous</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Recent Online Activity */}
+          <Card className="lg:col-span-2 border-0 shadow-xl bg-gradient-to-br from-white via-white to-slate-50/50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg">
+                  <Activity className="w-5 h-5" />
+                </div>
+                Recent Activity
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {stats.onlineUsers.recent_users.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No recent activity</p>
+                  </div>
+                ) : (
+                  stats.onlineUsers.recent_users.map((user, index) => (
+                    <div
+                      key={user.session_id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div
+                          className={cn(
+                            "w-3 h-3 rounded-full",
+                            user.is_authenticated
+                              ? "bg-green-500"
+                              : "bg-gray-400"
+                          )}
+                        />
+                        <div>
+                          <div className="font-medium text-sm">
+                            {user.is_authenticated
+                              ? user.user_name
+                              : "Anonymous User"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {user.page_url}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(user.last_activity), {
+                            addSuffix: true,
+                          })}
+                        </div>
+                        <div
+                          className={cn(
+                            "text-xs font-medium",
+                            user.is_authenticated
+                              ? "text-blue-600"
+                              : "text-gray-500"
+                          )}
+                        >
+                          {user.is_authenticated ? "Authenticated" : "Guest"}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Analytics Section */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Enhanced Views Chart */}
@@ -757,30 +953,7 @@ export default function DashboardPage() {
                       tickFormatter={formatDateLabel}
                     />
                     <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "12px",
-                        boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
-                      }}
-                      labelFormatter={(value) => {
-                        try {
-                          const date = parseISO(value);
-                          return format(date, "EEEE, MMMM d, yyyy");
-                        } catch {
-                          return value;
-                        }
-                      }}
-                      formatter={(value: any, name: string) => [
-                        value,
-                        name === "post_views"
-                          ? "Blog Views"
-                          : name === "project_views"
-                          ? "Project Views"
-                          : "Total Views",
-                      ]}
-                    />
+                    <Tooltip content={<ViewsTooltip />} />
                     <Legend />
                     <Area
                       type="monotone"
@@ -825,51 +998,44 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Content Distribution Pie Chart */}
+          {/* Top Content */}
           <Card className="border-0 shadow-xl bg-gradient-to-br from-white via-white to-slate-50/50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-lg">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-600 text-white shadow-lg">
                   <Target className="w-5 h-5" />
                 </div>
-                Content Overview
+                Top Content
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={stats.contentDistribution}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
+              <div className="space-y-3">
+                {stats.topContent.slice(0, 5).map((content, index) => (
+                  <div
+                    key={`${content.type}-${content.id}`}
+                    className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                   >
-                    {stats.contentDistribution.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={CHART_COLORS[index % CHART_COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="grid grid-cols-2 gap-2 mt-4">
-                {stats.contentDistribution.map((item, index) => (
-                  <div key={item.name} className="flex items-center space-x-2">
-                    <div
-                      className="w-3 h-3 rounded"
-                      style={{
-                        backgroundColor:
-                          CHART_COLORS[index % CHART_COLORS.length],
-                      }}
-                    />
-                    <span className="text-xs text-slate-600 dark:text-slate-400">
-                      {item.name}: {item.value}
-                    </span>
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700">
+                        <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                          {index + 1}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="font-medium text-sm line-clamp-1">
+                          {content.title}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {content.type === "post" ? "Blog Post" : "Project"}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold text-sm">
+                        {content.views}
+                      </div>
+                      <div className="text-xs text-muted-foreground">views</div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1065,14 +1231,14 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Monthly Performance Chart */}
+        {/* Monthly Performance Chart - FIXED */}
         <Card className="border-0 shadow-xl bg-gradient-to-br from-white via-white to-slate-50/50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg">
                 <Activity className="w-5 h-5" />
               </div>
-              Monthly Performance
+              Monthly Content Creation
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1103,9 +1269,9 @@ export default function DashboardPage() {
                   radius={[4, 4, 0, 0]}
                 />
                 <Bar
-                  dataKey="views"
+                  dataKey="total_content"
                   fill="#10b981"
-                  name="Views"
+                  name="Total Content"
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>
