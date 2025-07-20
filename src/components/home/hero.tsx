@@ -1,14 +1,13 @@
+// src/components/home/hero.tsx
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase/client";
 import { motion } from "framer-motion";
 import { ArrowDown, Github, Linkedin, Mail, Sparkles } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
-// Define the HeroSettings interface
+// Define the interfaces
 interface HeroSettings {
   id: number;
   title: string;
@@ -23,7 +22,6 @@ interface HeroSettings {
   highlight_words: string[];
 }
 
-// Define the SocialLink interface
 interface SocialLink {
   id: number;
   platform: string;
@@ -33,50 +31,15 @@ interface SocialLink {
   updated_at?: string;
 }
 
-export default function Hero() {
-  const [heroSettings, setHeroSettings] = useState<HeroSettings | null>(null);
-  const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
-  const [loading, setLoading] = useState(true);
+interface HeroProps {
+  heroSettings: HeroSettings | null;
+  socialLinks?: SocialLink[]; // Make this optional with ?
+}
 
-  useEffect(() => {
-    const fetchHeroData = async () => {
-      try {
-        // Fetch hero settings
-        const { data: heroData, error: heroError } = await supabase
-          .from("hero_settings")
-          .select("*")
-          .eq("is_active", true)
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .single();
-
-        if (heroError && heroError.code !== "PGRST116") {
-          console.error("Error fetching hero settings:", heroError);
-        } else if (heroData) {
-          setHeroSettings(heroData);
-        }
-
-        // Fetch social links
-        const { data: socialData, error: socialError } = await supabase
-          .from("social_links")
-          .select("*")
-          .order("id");
-
-        if (socialError) {
-          console.error("Error fetching social links:", socialError);
-        } else {
-          setSocialLinks(socialData || []);
-        }
-      } catch (error) {
-        console.error("Error fetching hero data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchHeroData();
-  }, []);
-
+export default function Hero({
+  heroSettings = null,
+  socialLinks = [],
+}: HeroProps) {
   const getSocialIcon = (platform: string) => {
     const iconProps = { size: 20 };
 
@@ -111,18 +74,6 @@ export default function Hero() {
 
     return highlightedText;
   };
-
-  if (loading) {
-    return (
-      <section className="relative min-h-screen flex items-center py-16">
-        <div className="container mx-auto px-4 z-10">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
-          </div>
-        </div>
-      </section>
-    );
-  }
 
   // Fallback content if no hero settings found
   const fallbackSettings: HeroSettings = {
@@ -388,7 +339,7 @@ export default function Hero() {
             </motion.div>
 
             {/* Social links */}
-            {socialLinks.length > 0 && (
+            {socialLinks && socialLinks.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -411,8 +362,7 @@ export default function Hero() {
                 ))}
               </motion.div>
             )}
-          </motion.div>
-
+          </motion.div>{" "}
           {/* Image Section */}
           <motion.div
             initial={{ opacity: 0, x: 50 }}

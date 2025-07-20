@@ -8,67 +8,20 @@ interface ProjectPageProps {
   params: { slug: string };
 }
 
-// Define the expected return type from the database function
-interface ProjectWithDetails {
-  id: number;
-  title: string;
-  slug: string;
-  subtitle?: string;
-  description?: string;
-  content?: any;
-  featured_image_url?: string;
-  hero_image_url?: string;
-  gallery_images?: any;
-  video_url?: string;
-  demo_video_url?: string;
-  github_url?: string;
-  demo_url?: string;
-  case_study_url?: string;
-  documentation_url?: string;
-  api_docs_url?: string;
-  category_name?: string;
-  category_slug?: string;
-  category_color?: string;
-  project_type?: string;
-  status?: string;
-  start_date?: string;
-  end_date?: string;
-  duration_months?: number;
-  client_name?: string;
-  client_url?: string;
-  team_size?: number;
-  my_role?: string;
-  platform?: string;
-  target_audience?: string;
-  key_features?: any;
-  challenges_faced?: any;
-  solutions_implemented?: any;
-  results_achieved?: any;
-  user_feedback?: any;
-  development_methodology?: string;
-  version_control?: string;
-  deployment_platform?: string;
-  hosting_provider?: string;
-  featured: boolean;
-  priority: number;
-  view_count: number;
-  like_count: number;
-  share_count: number;
-  technologies?: any;
-  awards?: any;
-  created_at: string;
-  updated_at?: string;
-}
-
 export async function generateMetadata({
   params,
 }: ProjectPageProps): Promise<Metadata> {
   const supabase = createServerSupabaseClient();
 
   try {
+    // Simple query for metadata - no complex joins
     const { data: project, error } = await supabase
-      .rpc("get_project_with_details", { project_slug: params.slug })
-      .single();
+      .from("projects")
+      .select("title, description, featured_image_url")
+      .eq("slug", params.slug)
+      .eq("is_public", true)
+      .eq("is_active", true)
+      .maybeSingle();
 
     if (error || !project) {
       return {
@@ -77,31 +30,20 @@ export async function generateMetadata({
       };
     }
 
-    const projectData = project as ProjectWithDetails;
-
-    if (!projectData.title) {
-      return {
-        title: "Project Not Found | Raihan Sharif",
-        description: "The requested project could not be found.",
-      };
-    }
-
     return {
-      title: `${projectData.title} | Raihan Sharif`,
+      title: `${project.title} | Raihan Sharif`,
       description:
-        projectData.description ||
-        projectData.subtitle ||
-        `${projectData.title} - A project by Raihan Sharif`,
+        project.description || `${project.title} - A project by Raihan Sharif`,
       openGraph: {
-        title: projectData.title,
-        description: projectData.description || projectData.subtitle || "",
-        images: projectData.featured_image_url
+        title: project.title,
+        description: project.description || "",
+        images: project.featured_image_url
           ? [
               {
-                url: projectData.featured_image_url,
+                url: project.featured_image_url,
                 width: 1200,
                 height: 630,
-                alt: projectData.title,
+                alt: project.title,
               },
             ]
           : [],
@@ -120,33 +62,86 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   const supabase = createServerSupabaseClient();
 
   try {
-    // Get project details using the database function
-    const { data: project, error: projectError } = await supabase
-      .rpc("get_project_with_details", { project_slug: params.slug })
-      .single();
+    // First, get the basic project data to get the ID
+    const { data: basicProject, error: basicError } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("slug", params.slug)
+      .eq("is_public", true)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (basicError || !basicProject) {
+      console.error("Project not found:", basicError);
+      notFound();
+    }
+
+    // Now fetch all data with the project ID
+    const [
+      { data: project, error: projectError },
+      { data: projectTechnologies, error: techError },
+      { data: projectAwards, error: awardsError },
+    ] = await Promise.all([
+      // Main project data with category
+      supabase
+        .from("projects")
+        .select(
+          `
+          *,
+          category:project_categories(*)
+        `
+        )
+        .eq("id", basicProject.id)
+        .maybeSingle(),
+
+      // Technologies separately
+      supabase
+        .from("project_technologies")
+        .select(
+          `
+          technology:technologies(*),
+          proficiency_level,
+          is_primary,
+          display_order
+        `
+        )
+        .eq("project_id", basicProject.id)
+        .order("display_order"),
+
+      // Awards separately
+      supabase
+        .from("project_awards")
+        .select("*")
+        .eq("project_id", basicProject.id)
+        .order("display_order"),
+    ]);
 
     if (projectError || !project) {
-      console.error("Project not found:", projectError);
+      console.error("Project details not found:", projectError);
       notFound();
     }
 
-    const projectData = project as ProjectWithDetails;
+    // Process technologies data
+    const technologies =
+      projectTechnologies?.map((pt: any) => ({
+        ...pt.technology,
+        is_primary: pt.is_primary || false,
+        proficiency_level: pt.proficiency_level,
+      })) || [];
 
-    if (!projectData.title) {
-      console.error("Project data incomplete:", projectData);
-      notFound();
-    }
+    // Process awards data
+    const awards = projectAwards || [];
 
-    // First, get the category information to find related projects
-    const { data: projectWithCategory } = await supabase
-      .from("projects")
-      .select("category_id")
-      .eq("slug", params.slug)
-      .single();
+    // Build the complete project object
+    const processedProject = {
+      ...project,
+      technologies,
+      awards,
+    };
 
-    // Fetch related projects from the same category (if category exists)
+    // Fetch related projects (optimized - fewer fields)
     let relatedProjects: any[] = [];
-    if (projectWithCategory?.category_id) {
+    if (project.category_id) {
       const { data: related } = await supabase
         .from("projects")
         .select(
@@ -164,8 +159,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           featured
         `
         )
-        .eq("category_id", projectWithCategory.category_id)
-        .neq("id", projectData.id)
+        .eq("category_id", project.category_id)
+        .neq("id", project.id)
         .eq("is_public", true)
         .eq("is_active", true)
         .order("featured", { ascending: false })
@@ -175,7 +170,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       relatedProjects = related || [];
     }
 
-    // If no related projects found or no category, get recent projects
+    // If no related projects, get recent ones
     if (relatedProjects.length === 0) {
       const { data: recent } = await supabase
         .from("projects")
@@ -194,7 +189,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           featured
         `
         )
-        .neq("id", projectData.id)
+        .neq("id", project.id)
         .eq("is_public", true)
         .eq("is_active", true)
         .order("created_at", { ascending: false })
@@ -203,25 +198,10 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       relatedProjects = recent || [];
     }
 
-    // Process the project data to ensure technologies and awards are properly formatted
-    const processedProject = {
-      ...projectData,
-      category: projectData.category_name
-        ? {
-            id: 0, // We don't have the ID from the function
-            name: projectData.category_name,
-            slug: projectData.category_slug || "",
-            color: projectData.category_color,
-          }
-        : undefined,
-      technologies: projectData.technologies || [],
-      awards: projectData.awards || [],
-    };
-
     return (
       <ProjectDetailPage
         project={processedProject}
-        relatedProjects={relatedProjects || []}
+        relatedProjects={relatedProjects}
       />
     );
   } catch (error) {

@@ -1,3 +1,4 @@
+// src/components/home/contact.tsx
 "use client";
 
 import { Badge } from "@/components/ui/badge";
@@ -40,9 +41,9 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-// Keep all the same interfaces as before
+// Interfaces
 interface ContactInfo {
   id: number;
   type: string;
@@ -74,6 +75,12 @@ interface AvailabilityStatus {
   color_class: string;
 }
 
+interface ContactProps {
+  contactInfo: ContactInfo[];
+  businessHours: BusinessHours[];
+  availability: AvailabilityStatus | null;
+}
+
 const getIcon = (iconName: string, size: number = 20) => {
   const iconProps = { size };
   switch (iconName) {
@@ -92,14 +99,11 @@ const getIcon = (iconName: string, size: number = 20) => {
   }
 };
 
-export default function Contact() {
-  const [contactInfo, setContactInfo] = useState<ContactInfo[]>([]);
-  const [businessHours, setBusinessHours] = useState<BusinessHours[]>([]);
-  const [availability, setAvailability] = useState<AvailabilityStatus | null>(
-    null
-  );
-  const [loading, setLoading] = useState(true);
-
+export default function Contact({
+  contactInfo,
+  businessHours,
+  availability,
+}: ContactProps) {
   // Form state
   const [formData, setFormData] = useState({
     name: "",
@@ -118,55 +122,7 @@ export default function Contact() {
   }>({});
   const [phoneError, setPhoneError] = useState<string>("");
 
-  useEffect(() => {
-    fetchContactData();
-  }, []);
-
-  const fetchContactData = async () => {
-    try {
-      setLoading(true);
-
-      const [
-        { data: contactData, error: contactError },
-        { data: hoursData, error: hoursError },
-        { data: availabilityData, error: availabilityError },
-      ] = await Promise.all([
-        supabase
-          .from("contact_info")
-          .select("*")
-          .eq("is_active", true)
-          .order("display_order")
-          .limit(3), // Only show top 3 for home page
-        supabase
-          .from("business_hours")
-          .select("*")
-          .eq("is_active", true)
-          .order("day_of_week"),
-        supabase
-          .from("availability_status")
-          .select("*")
-          .eq("is_current", true)
-          .eq("is_active", true)
-          .single(),
-      ]);
-
-      if (contactError) throw contactError;
-      if (hoursError) throw hoursError;
-      if (availabilityError && availabilityError.code !== "PGRST116") {
-        throw availabilityError;
-      }
-
-      setContactInfo(contactData || []);
-      setBusinessHours(hoursData || []);
-      setAvailability(availabilityData);
-    } catch (error) {
-      console.error("Error fetching contact data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Keep all the same form handler functions...
+  // Form handlers (keep the same logic as your original)
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -293,6 +249,10 @@ export default function Contact() {
   };
 
   const getCurrentDayStatus = () => {
+    if (!businessHours || businessHours.length === 0) {
+      return { isOpen: false, text: "Contact anytime", color: "bg-blue-500" };
+    }
+
     const today = new Date().getDay();
     const todayHours = businessHours.find((h) => h.day_of_week === today);
 
@@ -322,18 +282,6 @@ export default function Contact() {
     }
   };
 
-  if (loading) {
-    return (
-      <section className={`${SPACING.section} ${GRADIENTS.background}`}>
-        <div className={SPACING.container}>
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
   const dayStatus = getCurrentDayStatus();
 
   return (
@@ -344,6 +292,7 @@ export default function Contact() {
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-20 right-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-20 left-20 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-500/5 rounded-full blur-2xl animate-pulse delay-500"></div>
       </div>
 
       <div className={`${SPACING.container} relative z-10`}>
@@ -446,55 +395,57 @@ export default function Contact() {
             )}
 
             {/* Contact Methods */}
-            <Card className="bg-card/60 backdrop-blur-sm border-white/10 hover:shadow-lg transition-all duration-300">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageCircle className="w-5 h-5 text-primary" />
-                  Contact Methods
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {contactInfo.map((contact, index) => (
-                  <motion.div
-                    key={contact.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 * (index + 1) }}
-                    className="flex items-center gap-4 p-4 rounded-lg border bg-white/5 hover:bg-white/10 transition-all duration-200 cursor-pointer group"
-                    onClick={() => handleContactClick(contact)}
-                  >
-                    <div className="flex-shrink-0 p-3 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
-                      <div className="text-primary">
-                        {getIcon(contact.icon || "Mail")}
+            {contactInfo && contactInfo.length > 0 && (
+              <Card className="bg-card/60 backdrop-blur-sm border-white/10 hover:shadow-lg transition-all duration-300">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageCircle className="w-5 h-5 text-primary" />
+                    Contact Methods
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {contactInfo.map((contact, index) => (
+                    <motion.div
+                      key={contact.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.1 * (index + 1) }}
+                      className="flex items-center gap-4 p-4 rounded-lg border bg-white/5 hover:bg-white/10 transition-all duration-200 cursor-pointer group"
+                      onClick={() => handleContactClick(contact)}
+                    >
+                      <div className="flex-shrink-0 p-3 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                        <div className="text-primary">
+                          {getIcon(contact.icon || "Mail")}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium flex items-center gap-2">
-                        {contact.label}
-                        {contact.is_primary && (
-                          <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                        )}
-                        {contact.is_whatsapp && (
-                          <Badge
-                            variant="secondary"
-                            className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                          >
-                            WhatsApp
-                          </Badge>
-                        )}
-                      </h3>
-                      <p className="text-muted-foreground text-sm group-hover:text-primary transition-colors">
-                        {contact.value}
-                      </p>
-                    </div>
-                    <ExternalLink className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </motion.div>
-                ))}
-              </CardContent>
-            </Card>
+                      <div className="flex-1">
+                        <h3 className="font-medium flex items-center gap-2">
+                          {contact.label}
+                          {contact.is_primary && (
+                            <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                          )}
+                          {contact.is_whatsapp && (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                            >
+                              WhatsApp
+                            </Badge>
+                          )}
+                        </h3>
+                        <p className="text-muted-foreground text-sm group-hover:text-primary transition-colors">
+                          {contact.value}
+                        </p>
+                      </div>
+                      <ExternalLink className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </motion.div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Business Hours with Current Day Highlighting */}
-            {businessHours.length > 0 && (
+            {businessHours && businessHours.length > 0 && (
               <Card className="bg-card/60 backdrop-blur-sm border-white/10 hover:shadow-lg transition-all duration-300">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">

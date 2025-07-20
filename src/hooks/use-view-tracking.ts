@@ -68,6 +68,7 @@ export function useViewTracking(
   }, [getSessionKey]);
 
   // Track view in database
+  // Track view in database - optimized for performance
   const trackView = useCallback(async () => {
     if (tracked.current || !enabled || !numericId || isAlreadyTracked()) {
       return;
@@ -84,41 +85,61 @@ export function useViewTracking(
         setState((prev) => ({ ...prev, isTracking: true, error: null }));
         tracked.current = true;
 
-        let error = null;
-
-        if (type === "post") {
-          const { error: postError } = await supabase.rpc(
-            "increment_post_view",
-            {
+        // Fire-and-forget tracking - don't await or block on this
+        const trackingPromise = (async () => {
+          if (type === "post") {
+            return supabase.rpc("increment_post_view", {
               post_id_param: numericId,
-            }
-          );
-          error = postError;
-        } else if (type === "project") {
-          const { error: projectError } = await supabase.rpc(
-            "increment_project_view",
-            {
+            });
+          } else if (type === "project") {
+            return supabase.rpc("increment_project_view", {
               project_id_param: numericId,
+            });
+          }
+        })();
+
+        // Handle the response asynchronously without blocking
+        trackingPromise.then(
+          (result) => {
+            if (result?.error) {
+              console.error(`❌ Error tracking ${type} view:`, result.error);
+              tracked.current = false; // Reset on error to allow retry
+              setState((prev) => ({
+                ...prev,
+                isTracking: false,
+                error: result.error.message || "Failed to track view",
+              }));
+            } else {
+              markAsTracked();
+              setState((prev) => ({
+                ...prev,
+                isTracked: true,
+                isTracking: false,
+                error: null,
+              }));
+              console.log(`✅ ${type} view tracked for ID: ${numericId}`);
             }
-          );
-          error = projectError;
-        }
+          },
+          (error) => {
+            console.error(`❌ Error tracking ${type} view:`, error);
+            tracked.current = false; // Reset on error to allow retry
+            setState((prev) => ({
+              ...prev,
+              isTracking: false,
+              error:
+                error instanceof Error ? error.message : "Failed to track view",
+            }));
+          }
+        );
 
-        if (error) {
-          throw error;
-        }
-
-        markAsTracked();
+        // Immediately mark as tracking started (optimistic)
         setState((prev) => ({
           ...prev,
-          isTracked: true,
-          isTracking: false,
+          isTracking: false, // Don't show loading state for tracking
           error: null,
         }));
-
-        console.log(`✅ ${type} view tracked for ID: ${numericId}`);
       } catch (error) {
-        console.error(`❌ Error tracking ${type} view:`, error);
+        console.error(`❌ Error setting up ${type} view tracking:`, error);
         tracked.current = false; // Reset on error to allow retry
         setState((prev) => ({
           ...prev,

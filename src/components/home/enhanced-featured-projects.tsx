@@ -350,16 +350,24 @@ const EnhancedProjectCard = ({
   const router = useRouter();
   const [isHovered, setIsHovered] = useState(false);
 
-  const handleProjectClick = async () => {
-    try {
-      await supabase.rpc("increment_project_view", {
+  const handleProjectClick = () => {
+    // Navigate immediately for better UX
+    router.push(`/projects/${project.slug}`);
+
+    // Track view in background (fire-and-forget)
+    supabase
+      .rpc("increment_project_view", {
         project_id_param: project.id,
-      });
-      router.push(`/projects/${project.slug}`);
-    } catch (error) {
-      console.error("Error tracking project view:", error);
-      router.push(`/projects/${project.slug}`);
-    }
+      })
+      .then(
+        () => {
+          // Success - no action needed
+        },
+        (error) => {
+          console.error("Error tracking project view:", error);
+          // Continue anyway - don't block user experience
+        }
+      );
   };
 
   return (

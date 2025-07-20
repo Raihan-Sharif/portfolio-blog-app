@@ -4,6 +4,7 @@ import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -117,26 +118,54 @@ export default function RootLayout({
         <meta httpEquiv="Referrer-Policy" content="origin-when-cross-origin" />
       </head>
       <body className={inter.className}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <AuthProvider>
-            {/* Background pattern */}
-            <div className="fixed inset-0 bg-dot-pattern bg-dot-sm opacity-[0.02] dark:opacity-[0.05] pointer-events-none" />
+        <ErrorBoundary>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <AuthProvider>
+              {/* Background pattern */}
+              <div className="fixed inset-0 bg-dot-pattern bg-dot-sm opacity-[0.02] dark:opacity-[0.05] pointer-events-none" />
 
-            <div className="relative flex min-h-screen flex-col">
-              <Navbar />
-              <main className="flex-1 pt-16">{children}</main>
-              <Footer />
-            </div>
+              <div className="relative flex min-h-screen flex-col">
+                <ErrorBoundary
+                  fallback={
+                    <div className="h-16 bg-background border-b border-border flex items-center justify-center">
+                      <span className="text-sm text-muted-foreground">
+                        Navigation temporarily unavailable
+                      </span>
+                    </div>
+                  }
+                >
+                  <Navbar />
+                </ErrorBoundary>
 
-            {/* Global notification manager */}
-            <NotificationManager />
-          </AuthProvider>
-        </ThemeProvider>
+                <ErrorBoundary>
+                  <main className="flex-1 pt-16">{children}</main>
+                </ErrorBoundary>
+
+                <ErrorBoundary
+                  fallback={
+                    <div className="py-8 bg-card border-t border-border text-center">
+                      <span className="text-sm text-muted-foreground">
+                        Footer temporarily unavailable
+                      </span>
+                    </div>
+                  }
+                >
+                  <Footer />
+                </ErrorBoundary>
+              </div>
+
+              {/* Global notification manager */}
+              <ErrorBoundary>
+                <NotificationManager />
+              </ErrorBoundary>
+            </AuthProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
