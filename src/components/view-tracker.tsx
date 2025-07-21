@@ -9,55 +9,23 @@ interface ViewTrackerProps {
   id: number | string | null | undefined;
   enabled?: boolean;
   delay?: number;
-  threshold?: number;
   debug?: boolean;
-  onTrackingStart?: () => void;
-  onTrackingComplete?: () => void;
-  onTrackingError?: (error: string) => void;
 }
 
-/**
- * Client component for view tracking that can be used in server components
- * Handles view tracking with advanced features like debouncing, session management, and error handling
- */
 export function ViewTracker({
   type,
   id,
   enabled = true,
-  delay = 2000,
-  threshold = 3000,
-  debug = false,
-  onTrackingStart,
-  onTrackingComplete,
-  onTrackingError,
+  delay = 3000, // 3 seconds
+  debug = true, // Enable debug by default for now
 }: ViewTrackerProps) {
   const { triggerView, isTracked, isTracking, error, timeSpent } =
     useViewTracking(type, id, {
       enabled: enabled && !!id,
       delay,
-      threshold,
     });
 
-  // Handle tracking state changes
-  useEffect(() => {
-    if (isTracking && onTrackingStart) {
-      onTrackingStart();
-    }
-  }, [isTracking, onTrackingStart]);
-
-  useEffect(() => {
-    if (isTracked && onTrackingComplete) {
-      onTrackingComplete();
-    }
-  }, [isTracked, onTrackingComplete]);
-
-  useEffect(() => {
-    if (error && onTrackingError) {
-      onTrackingError(error);
-    }
-  }, [error, onTrackingError]);
-
-  // Debug logging - improved
+  // Debug logging
   useEffect(() => {
     if (debug && id) {
       console.log(`🔍 ViewTracker Debug - ${type}:${id}`, {
@@ -65,9 +33,8 @@ export function ViewTracker({
         isTracking,
         timeSpent,
         error,
-        enabled,
+        enabled: enabled && !!id,
         delay,
-        threshold,
       });
     }
   }, [
@@ -80,111 +47,37 @@ export function ViewTracker({
     error,
     enabled,
     delay,
-    threshold,
   ]);
 
-  // This component renders nothing - it only handles view tracking
+  // Show debug info in development
+  if (debug && process.env.NODE_ENV === "development" && id) {
+    return (
+      <div className="fixed bottom-4 left-4 z-50 bg-black/80 text-white text-xs p-3 rounded-lg max-w-xs">
+        <div className="font-bold">
+          ViewTracker: {type}:{id}
+        </div>
+        <div>Time: {timeSpent}s</div>
+        <div>Delay: {delay}ms</div>
+        <div>
+          Status:{" "}
+          {isTracking
+            ? "🟡 Tracking..."
+            : isTracked
+            ? "✅ Tracked"
+            : "⏳ Waiting"}
+        </div>
+        {error && <div className="text-red-400">Error: {error}</div>}
+        <button
+          onClick={triggerView}
+          className="mt-2 bg-blue-600 px-2 py-1 rounded text-xs hover:bg-blue-700"
+        >
+          Force Track Now
+        </button>
+      </div>
+    );
+  }
+
   return null;
 }
 
-// Enhanced ViewTracker with visual feedback (optional)
-interface ViewTrackerWithFeedbackProps extends ViewTrackerProps {
-  showFeedback?: boolean;
-  position?: "top-right" | "top-left" | "bottom-right" | "bottom-left";
-}
-
-export function ViewTrackerWithFeedback({
-  showFeedback = false,
-  position = "bottom-right",
-  ...props
-}: ViewTrackerWithFeedbackProps) {
-  const { isTracked, isTracking, timeSpent, error } = useViewTracking(
-    props.type,
-    props.id,
-    {
-      enabled: props.enabled && !!props.id,
-      delay: props.delay,
-      threshold: props.threshold,
-    }
-  );
-
-  const positionClasses = {
-    "top-right": "top-4 right-4",
-    "top-left": "top-4 left-4",
-    "bottom-right": "bottom-4 right-4",
-    "bottom-left": "bottom-4 left-4",
-  };
-
-  if (!showFeedback || !props.id) {
-    return <ViewTracker {...props} />;
-  }
-
-  return (
-    <>
-      <ViewTracker {...props} />
-
-      {/* Visual feedback for development/debug */}
-      {(isTracking || isTracked || error) && (
-        <div
-          className={`fixed ${positionClasses[position]} z-50 transition-all duration-300`}
-          style={{ pointerEvents: "none" }}
-        >
-          <div className="bg-black/80 backdrop-blur-sm text-white text-xs px-3 py-2 rounded-lg shadow-lg">
-            {isTracking && (
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                <span>Tracking view... ({timeSpent}s)</span>
-              </div>
-            )}
-
-            {isTracked && !isTracking && (
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                <span>✅ View tracked ({timeSpent}s)</span>
-              </div>
-            )}
-
-            {error && (
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                <span>❌ {error}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-// Hooks for advanced usage
 export { useViewTracking } from "@/hooks/use-view-tracking";
-
-// Higher-order component for automatic view tracking
-interface WithViewTrackingProps {
-  type: "post" | "project";
-  id: number | string | null | undefined;
-  trackingOptions?: {
-    enabled?: boolean;
-    delay?: number;
-    threshold?: number;
-  };
-}
-
-export function withViewTracking<P extends object>(
-  Component: React.ComponentType<P>,
-  trackingConfig: WithViewTrackingProps
-) {
-  return function WrappedComponent(props: P) {
-    return (
-      <>
-        <ViewTracker
-          type={trackingConfig.type}
-          id={trackingConfig.id}
-          {...trackingConfig.trackingOptions}
-        />
-        <Component {...props} />
-      </>
-    );
-  };
-}

@@ -1,27 +1,22 @@
-// src/app/api/track-view/route.ts
+// src/app/api/test-view-tracking/route.ts
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const supabase = createServerSupabaseClient();
-    const body = await request.json();
-    const { type, id, timeSpent } = body;
+    const { searchParams } = new URL(request.url);
+    const type = searchParams.get("type");
+    const id = searchParams.get("id");
 
     if (!type || !id) {
       return NextResponse.json(
-        { error: "Type and ID are required" },
+        { error: "type and id required" },
         { status: 400 }
       );
     }
 
-    // Only track if user spent enough time (3+ seconds)
-    if (timeSpent < 3000) {
-      return NextResponse.json({
-        success: false,
-        reason: "Insufficient time spent",
-      });
-    }
+    console.log(`Testing ${type} view tracking for ID: ${id}`);
 
     let result;
     if (type === "post") {
@@ -36,25 +31,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
 
+    console.log("RPC Result:", result);
+
     if (result.error) {
-      console.error("Error tracking view:", result.error);
       return NextResponse.json(
-        { error: "Failed to track view" },
+        {
+          success: false,
+          error: result.error.message,
+          details: result.error,
+        },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      result: result.data,
+      message: `Successfully incremented ${type} view`,
+    });
   } catch (error) {
-    console.error("Error in track-view API:", error);
+    console.error("Test API Error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
-}
-
-// Handle preflight requests
-export async function OPTIONS() {
-  return NextResponse.json({}, { status: 200 });
 }

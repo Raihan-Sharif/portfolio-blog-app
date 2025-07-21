@@ -6,9 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UseViewTrackingOptions {
   enabled?: boolean;
-  delay?: number; // Delay before tracking view (in ms)
-  threshold?: number; // Minimum time on page to count as view (in ms)
-  debounceMs?: number; // Debounce multiple calls
+  delay?: number;
 }
 
 interface ViewTrackingState {
@@ -25,9 +23,7 @@ export function useViewTracking(
 ) {
   const {
     enabled = true,
-    delay = 2000, // 2 second delay
-    threshold = 3000, // 3 seconds minimum
-    debounceMs = 500,
+    delay = 3000, // 3 seconds total delay before tracking
   } = options;
 
   const [state, setState] = useState<ViewTrackingState>({
@@ -40,20 +36,18 @@ export function useViewTracking(
   const tracked = useRef(false);
   const startTime = useRef<number>(Date.now());
   const timeoutRef = useRef<NodeJS.Timeout>();
-  const debounceRef = useRef<NodeJS.Timeout>();
   const intervalRef = useRef<NodeJS.Timeout>();
-  const mountedRef = useRef(true);
 
   // Convert id to number for consistency
   const numericId = id ? Number(id) : null;
 
-  // Session key for preventing duplicate tracking
+  // Simple session key for preventing duplicate tracking
   const getSessionKey = useCallback(() => {
     if (!numericId) return null;
-    return `view_tracked_${type}_${numericId}_${new Date().toDateString()}`;
+    return `view_tracked_${type}_${numericId}`;
   }, [type, numericId]);
 
-  // Check if already tracked today
+  // Check if already tracked in this session
   const isAlreadyTracked = useCallback(() => {
     try {
       const sessionKey = getSessionKey();
@@ -76,97 +70,90 @@ export function useViewTracking(
     }
   }, [getSessionKey]);
 
-  // Track view in database - improved reliability
+  // Track view in database - simplified
   const trackView = useCallback(async () => {
-    if (
-      !mountedRef.current ||
-      tracked.current ||
-      !enabled ||
-      !numericId ||
-      isAlreadyTracked()
-    ) {
+    if (tracked.current || !enabled || !numericId) {
+      console.log("❌ Tracking skipped:", {
+        tracked: tracked.current,
+        enabled,
+        numericId,
+      });
       return;
     }
 
-    // Clear any pending debounce
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
+    console.log(`🎯 Starting to track ${type} view for ID: ${numericId}`);
 
-    // Debounce the tracking call
-    debounceRef.current = setTimeout(async () => {
-      if (!mountedRef.current) return;
+    try {
+      setState((prev) => ({ ...prev, isTracking: true, error: null }));
+      tracked.current = true;
 
-      try {
-        setState((prev) => ({ ...prev, isTracking: true, error: null }));
-        tracked.current = true;
+      let result;
+      if (type === "post") {
+        console.log("📝 Calling increment_post_view...");
+        result = await supabase.rpc("increment_post_view", {
+          post_id_param: numericId,
+        });
+      } else if (type === "project") {
+        console.log("🚀 Calling increment_project_view...");
+        result = await supabase.rpc("increment_project_view", {
+          project_id_param: numericId,
+        });
+      }
 
-        let result;
-        if (type === "post") {
-          result = await supabase.rpc("increment_post_view", {
-            post_id_param: numericId,
-          });
-        } else if (type === "project") {
-          result = await supabase.rpc("increment_project_view", {
-            project_id_param: numericId,
-          });
-        }
+      console.log("📊 RPC Result:", result);
 
-        if (!mountedRef.current) return;
-
-        if (result?.error) {
-          console.error(`❌ Error tracking ${type} view:`, result.error);
-          tracked.current = false; // Reset on error to allow retry
-          setState((prev) => ({
-            ...prev,
-            isTracking: false,
-            error: result.error.message || "Failed to track view",
-          }));
-        } else {
-          markAsTracked();
-          setState((prev) => ({
-            ...prev,
-            isTracked: true,
-            isTracking: false,
-            error: null,
-          }));
-          console.log(`✅ ${type} view tracked for ID: ${numericId}`);
-        }
-      } catch (error) {
-        if (!mountedRef.current) return;
-
-        console.error(`❌ Error tracking ${type} view:`, error);
-        tracked.current = false; // Reset on error to allow retry
+      if (result?.error) {
+        console.error(`❌ RPC Error for ${type}:`, result.error);
+        tracked.current = false;
         setState((prev) => ({
           ...prev,
           isTracking: false,
-          error:
-            error instanceof Error ? error.message : "Failed to track view",
+          error: result.error.message || "Failed to track view",
+        }));
+      } else {
+        console.log(
+          `✅ Successfully tracked ${type} view for ID: ${numericId}`
+        );
+        markAsTracked();
+        setState((prev) => ({
+          ...prev,
+          isTracked: true,
+          isTracking: false,
+          error: null,
         }));
       }
-    }, debounceMs);
-  }, [type, numericId, enabled, debounceMs, isAlreadyTracked, markAsTracked]);
+    } catch (error) {
+      console.error(`❌ Exception tracking ${type} view:`, error);
+      tracked.current = false;
+      setState((prev) => ({
+        ...prev,
+        isTracking: false,
+        error: error instanceof Error ? error.message : "Failed to track view",
+      }));
+    }
+  }, [type, numericId, enabled, markAsTracked]);
 
-  // Reset tracking when ID changes
+  // Reset when ID changes
   useEffect(() => {
     if (numericId) {
+      console.log(`🔄 Resetting tracking for ${type}:${numericId}`);
       tracked.current = false;
       startTime.current = Date.now();
       setState((prev) => ({
         ...prev,
         isTracked: isAlreadyTracked(),
+        isTracking: false,
         timeSpent: 0,
         error: null,
       }));
     }
-  }, [numericId, isAlreadyTracked]);
+  }, [numericId, type, isAlreadyTracked]);
 
   // Time tracking
   useEffect(() => {
     if (!enabled || !numericId) return;
 
     intervalRef.current = setInterval(() => {
-      if (!mountedRef.current) return;
       const timeSpent = Date.now() - startTime.current;
       setState((prev) => ({ ...prev, timeSpent }));
     }, 1000);
@@ -178,86 +165,57 @@ export function useViewTracking(
     };
   }, [enabled, numericId]);
 
-  // Main tracking effect - simplified and more reliable
+  // Main tracking effect - FIXED: Use delay as the actual wait time
   useEffect(() => {
-    if (!enabled || !numericId || isAlreadyTracked()) return;
+    if (!enabled || !numericId || isAlreadyTracked()) {
+      console.log("❌ Tracking not started:", {
+        enabled,
+        numericId,
+        alreadyTracked: isAlreadyTracked(),
+      });
+      return;
+    }
+
+    console.log(
+      `⏰ Setting up tracking timer for ${type}:${numericId} (delay: ${delay}ms)`
+    );
 
     // Clear any existing timeout
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
-    // Set up delayed tracking with threshold check
+    // Start tracking after delay - FIXED: Just wait for delay, no threshold check
     timeoutRef.current = setTimeout(() => {
-      if (!mountedRef.current) return;
-
       const timeSpent = Date.now() - startTime.current;
-      if (timeSpent >= threshold) {
-        trackView();
-      }
-    }, Math.max(delay, threshold));
+      console.log(
+        `⏱️ Timer fired for ${type}:${numericId}, time spent: ${timeSpent}ms`
+      );
 
-    // Track on visibility change (when user switches tabs)
-    const handleVisibilityChange = () => {
-      if (!mountedRef.current) return;
-
-      if (document.visibilityState === "hidden") {
-        const timeSpent = Date.now() - startTime.current;
-        if (timeSpent >= threshold && !tracked.current) {
-          trackView();
-        }
-      }
-    };
-
-    // Track on page unload
-    const handleBeforeUnload = () => {
-      const timeSpent = Date.now() - startTime.current;
-      if (timeSpent >= threshold && !tracked.current) {
-        // Use beacon for reliable tracking on page unload
-        try {
-          if (navigator.sendBeacon) {
-            const data = JSON.stringify({
-              type,
-              id: numericId,
-              timeSpent,
-            });
-            navigator.sendBeacon("/api/track-view", data);
-          }
-        } catch (error) {
-          console.warn("Failed to send beacon:", error);
-        }
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("beforeunload", handleBeforeUnload);
+      // Always track when timer fires (no additional threshold check)
+      trackView();
+    }, delay);
 
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [enabled, numericId, delay, threshold, trackView, isAlreadyTracked]);
+  }, [enabled, numericId, delay, trackView, isAlreadyTracked, type]);
 
-  // Manual trigger for view tracking
+  // Manual trigger
   const triggerView = useCallback(() => {
+    console.log(`🔄 Manual trigger for ${type}:${numericId}`);
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
     trackView();
-  }, [trackView]);
+  }, [trackView, type, numericId]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      mountedRef.current = false;
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, []);

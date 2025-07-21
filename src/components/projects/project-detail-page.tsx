@@ -388,13 +388,21 @@ export default function ProjectDetailPage({
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/30 to-background">
       {/* View Tracker - Client Component for tracking project views */}
+
       <ViewTracker
         type="project"
         id={project.id}
-        delay={2000}
-        threshold={5000}
-        debug={process.env.NODE_ENV === "development"}
+        delay={3000} // 3 seconds total delay
+        debug={true} // Enable debug mode
       />
+      {/* <ViewTracker
+        type="project"
+        id={project.id}
+        delay={1000} // 1 second delay
+        threshold={2000} // 2 second minimum
+        debug={true} // Enable debug mode
+        // debug={process.env.NODE_ENV === "development"}
+      /> */}
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 right-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
