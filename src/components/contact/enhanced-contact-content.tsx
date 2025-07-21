@@ -484,9 +484,12 @@ export default function EnhancedContactContent({
                               <span className="font-medium flex items-center gap-1">
                                 {hours.day_name}
                                 {isToday && (
-                                  <span className="text-xs font-semibold text-primary/80 ml-1">
-                                    (Today)
-                                  </span>
+                                  <Badge
+                                    variant="secondary"
+                                    className="ml-2 text-xs bg-primary/20 text-primary"
+                                  >
+                                    Today
+                                  </Badge>
                                 )}
                               </span>
                               <span className="text-muted-foreground">
