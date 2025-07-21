@@ -25,7 +25,7 @@ export function useViewTracking(
 ) {
   const {
     enabled = true,
-    delay = 1000, // 1 second delay
+    delay = 2000, // 2 second delay
     threshold = 3000, // 3 seconds minimum
     debounceMs = 500,
   } = options;
@@ -42,6 +42,7 @@ export function useViewTracking(
   const timeoutRef = useRef<NodeJS.Timeout>();
   const debounceRef = useRef<NodeJS.Timeout>();
   const intervalRef = useRef<NodeJS.Timeout>();
+  const mountedRef = useRef(true);
 
   // Convert id to number for consistency
   const numericId = id ? Number(id) : null;
@@ -54,23 +55,36 @@ export function useViewTracking(
 
   // Check if already tracked today
   const isAlreadyTracked = useCallback(() => {
-    const sessionKey = getSessionKey();
-    if (!sessionKey) return false;
-    return sessionStorage.getItem(sessionKey) === "true";
+    try {
+      const sessionKey = getSessionKey();
+      if (!sessionKey) return false;
+      return sessionStorage.getItem(sessionKey) === "true";
+    } catch (error) {
+      return false;
+    }
   }, [getSessionKey]);
 
   // Mark as tracked in session
   const markAsTracked = useCallback(() => {
-    const sessionKey = getSessionKey();
-    if (sessionKey) {
-      sessionStorage.setItem(sessionKey, "true");
+    try {
+      const sessionKey = getSessionKey();
+      if (sessionKey) {
+        sessionStorage.setItem(sessionKey, "true");
+      }
+    } catch (error) {
+      console.warn("Could not save to sessionStorage:", error);
     }
   }, [getSessionKey]);
 
-  // Track view in database
-  // Track view in database - optimized for performance
+  // Track view in database - improved reliability
   const trackView = useCallback(async () => {
-    if (tracked.current || !enabled || !numericId || isAlreadyTracked()) {
+    if (
+      !mountedRef.current ||
+      tracked.current ||
+      !enabled ||
+      !numericId ||
+      isAlreadyTracked()
+    ) {
       return;
     }
 
@@ -81,65 +95,47 @@ export function useViewTracking(
 
     // Debounce the tracking call
     debounceRef.current = setTimeout(async () => {
+      if (!mountedRef.current) return;
+
       try {
         setState((prev) => ({ ...prev, isTracking: true, error: null }));
         tracked.current = true;
 
-        // Fire-and-forget tracking - don't await or block on this
-        const trackingPromise = (async () => {
-          if (type === "post") {
-            return supabase.rpc("increment_post_view", {
-              post_id_param: numericId,
-            });
-          } else if (type === "project") {
-            return supabase.rpc("increment_project_view", {
-              project_id_param: numericId,
-            });
-          }
-        })();
+        let result;
+        if (type === "post") {
+          result = await supabase.rpc("increment_post_view", {
+            post_id_param: numericId,
+          });
+        } else if (type === "project") {
+          result = await supabase.rpc("increment_project_view", {
+            project_id_param: numericId,
+          });
+        }
 
-        // Handle the response asynchronously without blocking
-        trackingPromise.then(
-          (result) => {
-            if (result?.error) {
-              console.error(`❌ Error tracking ${type} view:`, result.error);
-              tracked.current = false; // Reset on error to allow retry
-              setState((prev) => ({
-                ...prev,
-                isTracking: false,
-                error: result.error.message || "Failed to track view",
-              }));
-            } else {
-              markAsTracked();
-              setState((prev) => ({
-                ...prev,
-                isTracked: true,
-                isTracking: false,
-                error: null,
-              }));
-              console.log(`✅ ${type} view tracked for ID: ${numericId}`);
-            }
-          },
-          (error) => {
-            console.error(`❌ Error tracking ${type} view:`, error);
-            tracked.current = false; // Reset on error to allow retry
-            setState((prev) => ({
-              ...prev,
-              isTracking: false,
-              error:
-                error instanceof Error ? error.message : "Failed to track view",
-            }));
-          }
-        );
+        if (!mountedRef.current) return;
 
-        // Immediately mark as tracking started (optimistic)
-        setState((prev) => ({
-          ...prev,
-          isTracking: false, // Don't show loading state for tracking
-          error: null,
-        }));
+        if (result?.error) {
+          console.error(`❌ Error tracking ${type} view:`, result.error);
+          tracked.current = false; // Reset on error to allow retry
+          setState((prev) => ({
+            ...prev,
+            isTracking: false,
+            error: result.error.message || "Failed to track view",
+          }));
+        } else {
+          markAsTracked();
+          setState((prev) => ({
+            ...prev,
+            isTracked: true,
+            isTracking: false,
+            error: null,
+          }));
+          console.log(`✅ ${type} view tracked for ID: ${numericId}`);
+        }
       } catch (error) {
-        console.error(`❌ Error setting up ${type} view tracking:`, error);
+        if (!mountedRef.current) return;
+
+        console.error(`❌ Error tracking ${type} view:`, error);
         tracked.current = false; // Reset on error to allow retry
         setState((prev) => ({
           ...prev,
@@ -170,6 +166,7 @@ export function useViewTracking(
     if (!enabled || !numericId) return;
 
     intervalRef.current = setInterval(() => {
+      if (!mountedRef.current) return;
       const timeSpent = Date.now() - startTime.current;
       setState((prev) => ({ ...prev, timeSpent }));
     }, 1000);
@@ -181,7 +178,7 @@ export function useViewTracking(
     };
   }, [enabled, numericId]);
 
-  // Main tracking effect
+  // Main tracking effect - simplified and more reliable
   useEffect(() => {
     if (!enabled || !numericId || isAlreadyTracked()) return;
 
@@ -190,22 +187,20 @@ export function useViewTracking(
       clearTimeout(timeoutRef.current);
     }
 
-    // Set up delayed tracking
+    // Set up delayed tracking with threshold check
     timeoutRef.current = setTimeout(() => {
-      trackView();
-    }, delay);
+      if (!mountedRef.current) return;
 
-    // Track when user leaves the page if they've been here long enough
-    const handleBeforeUnload = () => {
       const timeSpent = Date.now() - startTime.current;
-      if (timeSpent >= threshold && !tracked.current) {
-        // Use sendBeacon for reliable tracking on page unload
+      if (timeSpent >= threshold) {
         trackView();
       }
-    };
+    }, Math.max(delay, threshold));
 
-    // Track when user switches tabs or loses focus
+    // Track on visibility change (when user switches tabs)
     const handleVisibilityChange = () => {
+      if (!mountedRef.current) return;
+
       if (document.visibilityState === "hidden") {
         const timeSpent = Date.now() - startTime.current;
         if (timeSpent >= threshold && !tracked.current) {
@@ -214,17 +209,28 @@ export function useViewTracking(
       }
     };
 
-    // Track on scroll (user engagement)
-    const handleScroll = () => {
+    // Track on page unload
+    const handleBeforeUnload = () => {
       const timeSpent = Date.now() - startTime.current;
       if (timeSpent >= threshold && !tracked.current) {
-        trackView();
+        // Use beacon for reliable tracking on page unload
+        try {
+          if (navigator.sendBeacon) {
+            const data = JSON.stringify({
+              type,
+              id: numericId,
+              timeSpent,
+            });
+            navigator.sendBeacon("/api/track-view", data);
+          }
+        } catch (error) {
+          console.warn("Failed to send beacon:", error);
+        }
       }
     };
 
-    window.addEventListener("beforeunload", handleBeforeUnload);
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
       if (timeoutRef.current) {
@@ -233,9 +239,8 @@ export function useViewTracking(
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
-      window.removeEventListener("beforeunload", handleBeforeUnload);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [enabled, numericId, delay, threshold, trackView, isAlreadyTracked]);
 
@@ -250,6 +255,7 @@ export function useViewTracking(
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (intervalRef.current) clearInterval(intervalRef.current);

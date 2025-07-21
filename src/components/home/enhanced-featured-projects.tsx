@@ -697,16 +697,25 @@ const EnhancedProjectListItem = ({
 }) => {
   const router = useRouter();
 
-  const handleProjectClick = async () => {
-    try {
-      await supabase.rpc("increment_project_view", {
-        project_id_param: project.id,
-      });
-      router.push(`/projects/${project.slug}`);
-    } catch (error) {
-      console.error("Error tracking project view:", error);
-      router.push(`/projects/${project.slug}`);
-    }
+  // const handleProjectClick = async () => {
+  //   try {
+  //     await supabase.rpc("increment_project_view", {
+  //       project_id_param: project.id,
+  //     });
+  //     router.push(`/projects/${project.slug}`);
+  //   } catch (error) {
+  //     console.error("Error tracking project view:", error);
+  //     router.push(`/projects/${project.slug}`);
+  //   }
+  // };
+
+  // Update the handleProjectClick function in EnhancedProjectCard component
+  const handleProjectClick = () => {
+    // Navigate immediately for better UX (optimistic navigation)
+    router.push(`/projects/${project.slug}`);
+
+    // NO view tracking here - let the detail page handle it
+    // This prevents double tracking and conflicts
   };
 
   return (

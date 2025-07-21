@@ -25,7 +25,7 @@ export function ViewTracker({
   id,
   enabled = true,
   delay = 2000,
-  threshold = 5000,
+  threshold = 3000,
   debug = false,
   onTrackingStart,
   onTrackingComplete,
@@ -57,17 +57,31 @@ export function ViewTracker({
     }
   }, [error, onTrackingError]);
 
-  // Debug logging
+  // Debug logging - improved
   useEffect(() => {
     if (debug && id) {
-      console.log(`📊 ViewTracker Debug - ${type}:${id}`, {
+      console.log(`🔍 ViewTracker Debug - ${type}:${id}`, {
         isTracked,
         isTracking,
         timeSpent,
         error,
+        enabled,
+        delay,
+        threshold,
       });
     }
-  }, [debug, type, id, isTracked, isTracking, timeSpent, error]);
+  }, [
+    debug,
+    type,
+    id,
+    isTracked,
+    isTracking,
+    timeSpent,
+    error,
+    enabled,
+    delay,
+    threshold,
+  ]);
 
   // This component renders nothing - it only handles view tracking
   return null;
@@ -119,21 +133,21 @@ export function ViewTrackerWithFeedback({
             {isTracking && (
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                <span>Tracking view...</span>
+                <span>Tracking view... ({timeSpent}s)</span>
               </div>
             )}
 
             {isTracked && !isTracking && (
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                <span>View tracked ({timeSpent}s)</span>
+                <span>✅ View tracked ({timeSpent}s)</span>
               </div>
             )}
 
             {error && (
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                <span>Tracking failed</span>
+                <span>❌ {error}</span>
               </div>
             )}
           </div>
