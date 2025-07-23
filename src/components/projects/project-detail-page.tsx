@@ -424,7 +424,7 @@ export default function ProjectDetailPage({
                 title={project.title}
                 description={project.subtitle || project.description}
                 variant="inline"
-                size="md"
+                size="sm"
               />
               <Button
                 variant="outline"
