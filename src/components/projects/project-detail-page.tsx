@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
+import { ConfettiAwardsSection } from "./confetti-awards-section";
 
 import {
   ArrowLeft,
@@ -701,92 +702,9 @@ export default function ProjectDetailPage({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Awards Section */}
+              {/* Enhanced Awards Section with Confetti */}
               {project.awards && project.awards.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6 }}
-                >
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Trophy className="w-5 h-5 text-yellow-500" />
-                        Awards & Recognition
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {project.awards.map((award, idx) => (
-                          <div
-                            key={idx}
-                            className="group relative overflow-hidden bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 border border-yellow-200/50 dark:border-yellow-800/50 rounded-xl p-6 hover:shadow-lg transition-all duration-300"
-                          >
-                            {/* Award Image */}
-                            {award.award_image_url && (
-                              <div className="relative w-16 h-16 mx-auto mb-4 rounded-full overflow-hidden bg-white shadow-lg">
-                                <Image
-                                  src={award.award_image_url}
-                                  alt={award.title}
-                                  fill
-                                  className="object-cover"
-                                />
-                              </div>
-                            )}
-
-                            {/* Award Content */}
-                            <div className="text-center">
-                              <h4 className="font-bold text-lg mb-2 text-yellow-800 dark:text-yellow-200">
-                                {award.title}
-                              </h4>
-
-                              {award.awarded_by && (
-                                <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300 mb-2">
-                                  by {award.awarded_by}
-                                </p>
-                              )}
-
-                              {award.award_date && (
-                                <p className="text-xs text-yellow-600 dark:text-yellow-400 mb-3">
-                                  {new Date(
-                                    award.award_date
-                                  ).toLocaleDateString("en-US", {
-                                    year: "numeric",
-                                    month: "long",
-                                  })}
-                                </p>
-                              )}
-
-                              {award.description && (
-                                <p className="text-sm text-muted-foreground mb-4">
-                                  {award.description}
-                                </p>
-                              )}
-
-                              {award.award_url && (
-                                <a
-                                  href={award.award_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                                >
-                                  <ExternalLink className="w-3 h-3" />
-                                  View Award
-                                </a>
-                              )}
-                            </div>
-
-                            {/* Decorative Trophy Icon */}
-                            <div className="absolute top-3 right-3 opacity-20">
-                              <Trophy className="w-6 h-6 text-yellow-600" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                <ConfettiAwardsSection awards={project.awards} />
               )}
 
               {/* Key Features */}
