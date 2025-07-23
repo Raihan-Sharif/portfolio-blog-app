@@ -57,13 +57,13 @@ const RealisticConfettiParticle = ({
   const randomColor = colors[Math.floor(Math.random() * colors.length)];
   const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
 
-  // Enhanced physics parameters for longer animation
-  const initialVelocityX = (Math.random() - 0.5) * 700; // Wider horizontal spread
-  const initialVelocityY = -Math.random() * 400 - 300; // Higher upward velocity
-  const gravity = 650; // Slightly reduced gravity for longer flight
+  // Enhanced physics parameters for slower, longer-lasting animation
+  const initialVelocityX = (Math.random() - 0.5) * 600; // Slightly reduced spread for slower motion
+  const initialVelocityY = -Math.random() * 380 - 280; // Moderate upward velocity
+  const gravity = 500; // Reduced gravity for much slower falling
   const size = Math.random() * 12 + 4; // 4-16px particles
-  const rotationSpeed = (Math.random() - 0.5) * 540; // More rotation
-  const duration = 6.5 + Math.random() * 1; // 6.5-7.5 second duration
+  const rotationSpeed = (Math.random() - 0.5) * 300; // Slower rotation
+  const duration = 8 + Math.random() * 2; // 8-10 second duration for extended visibility
 
   // Calculate realistic trajectory
   const calculatePosition = (time: number) => {
@@ -72,9 +72,9 @@ const RealisticConfettiParticle = ({
     return { x, y };
   };
 
-  // Generate smooth trajectory points for longer duration
+  // Generate smooth trajectory points for slower, longer duration
   const trajectory = [];
-  const steps = 70; // More steps for 7-second smooth animation
+  const steps = 90; // More steps for 8-10 second ultra-smooth animation
   for (let i = 0; i <= steps; i++) {
     const t = (i / steps) * duration;
     const pos = calculatePosition(t);
@@ -134,8 +134,8 @@ const RealisticConfettiParticle = ({
         x: trajectory.map((p) => p.x),
         y: trajectory.map((p) => p.y),
         rotate: rotationSpeed,
-        opacity: [1, 1, 1, 1, 0.8, 0.5, 0.2, 0], // Extended fade over 7 seconds
-        scale: [0.3, 1, 0.95, 0.9, 0.7, 0.5, 0.3, 0.1], // Gradual scale down
+        opacity: [1, 1, 1, 1, 1, 0.9, 0.7, 0.5, 0.3, 0], // Extended gradual fade over 8-10 seconds
+        scale: [0.3, 1, 0.98, 0.95, 0.9, 0.8, 0.6, 0.4, 0.2, 0.1], // Very gradual scale reduction
       }}
       transition={{
         duration: duration,
@@ -173,7 +173,7 @@ const ConfettiCannon = ({
       {Array.from({ length: particleCount }).map((_, i) => (
         <RealisticConfettiParticle
           key={i}
-          delay={delay + i * 0.008} // Faster stagger
+          delay={delay + i * 0.012} // Slightly slower stagger for more relaxed release
           index={i}
         />
       ))}
@@ -202,16 +202,16 @@ const EpicConfettiBurst = ({ trigger }: { trigger: boolean }) => {
           position={position}
           trigger={trigger}
           particleCount={35 + Math.random() * 15} // 35-50 particles
-          delay={index * 0.05} // Quick succession
+          delay={index * 0.08} // Slightly slower succession for more relaxed effect
         />
       ))}
 
-      {/* Center mega burst */}
+      {/* Center mega burst with delayed timing */}
       <ConfettiCannon
         position={{ x: 50, y: 50 }}
         trigger={trigger}
         particleCount={60}
-        delay={0.1}
+        delay={0.15} // Slightly delayed for extended effect
       />
     </div>
   );
@@ -507,7 +507,7 @@ export function ConfettiAwardsSection({ awards }: ConfettiAwardsSectionProps) {
     if (isInView && !hasTriggeredConfetti) {
       const timer = setTimeout(() => {
         setHasTriggeredConfetti(true);
-      }, 200);
+      }, 300); // Slightly longer pause before the slower confetti begins
 
       return () => clearTimeout(timer);
     }
