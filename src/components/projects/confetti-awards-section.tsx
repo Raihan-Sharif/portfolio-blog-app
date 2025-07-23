@@ -57,24 +57,24 @@ const RealisticConfettiParticle = ({
   const randomColor = colors[Math.floor(Math.random() * colors.length)];
   const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
 
-  // Enhanced physics parameters for slower, longer-lasting animation
-  const initialVelocityX = (Math.random() - 0.5) * 600; // Slightly reduced spread for slower motion
-  const initialVelocityY = -Math.random() * 380 - 280; // Moderate upward velocity
-  const gravity = 500; // Reduced gravity for much slower falling
-  const size = Math.random() * 12 + 4; // 4-16px particles
-  const rotationSpeed = (Math.random() - 0.5) * 300; // Slower rotation
-  const duration = 8 + Math.random() * 2; // 8-10 second duration for extended visibility
+  // Restored beautiful physics with smart optimization
+  const initialVelocityX = (Math.random() - 0.5) * 600; // Wide horizontal spread restored
+  const initialVelocityY = -Math.random() * 350 - 250; // Strong UPWARD blast restored
+  const gravity = 600; // Balanced gravity for natural fall
+  const size = Math.random() * 10 + 4; // 4-14px particles
+  const rotationSpeed = (Math.random() - 0.5) * 360; // Full rotation restored
+  const duration = 7; // 7 seconds for beautiful long fall
 
-  // Calculate realistic trajectory
+  // Restored realistic trajectory calculation (optimized)
   const calculatePosition = (time: number) => {
     const x = initialVelocityX * time;
     const y = initialVelocityY * time + 0.5 * gravity * time * time;
     return { x, y };
   };
 
-  // Generate smooth trajectory points for slower, longer duration
+  // Smart optimization: fewer steps but still smooth
   const trajectory = [];
-  const steps = 90; // More steps for 8-10 second ultra-smooth animation
+  const steps = 40; // Reduced from 90 but still smooth enough
   for (let i = 0; i <= steps; i++) {
     const t = (i / steps) * duration;
     const pos = calculatePosition(t);
@@ -123,6 +123,10 @@ const RealisticConfettiParticle = ({
   return (
     <motion.div
       className="absolute pointer-events-none"
+      style={{
+        ...getShapeStyle(),
+        willChange: "transform, opacity", // Keep performance optimization
+      }}
       initial={{
         x: 0,
         y: 0,
@@ -134,25 +138,24 @@ const RealisticConfettiParticle = ({
         x: trajectory.map((p) => p.x),
         y: trajectory.map((p) => p.y),
         rotate: rotationSpeed,
-        opacity: [1, 1, 1, 1, 1, 0.9, 0.7, 0.5, 0.3, 0], // Extended gradual fade over 8-10 seconds
-        scale: [0.3, 1, 0.98, 0.95, 0.9, 0.8, 0.6, 0.4, 0.2, 0.1], // Very gradual scale reduction
+        opacity: [1, 1, 1, 1, 0.8, 0.5, 0.2, 0], // Beautiful gradual fade restored
+        scale: [0.3, 1, 0.9, 0.8, 0.6, 0.4, 0.2, 0.1], // Gradual scale restored
       }}
       transition={{
         duration: duration,
         delay: delay,
-        ease: "linear",
+        ease: "linear", // Linear for realistic physics
         times: trajectory.map((_, i) => i / (trajectory.length - 1)),
       }}
-      style={getShapeStyle()}
     />
   );
 };
 
-// Confetti cannon with burst pattern
+// Restored confetti cannon with balanced particle count
 const ConfettiCannon = ({
   position,
   trigger,
-  particleCount = 30,
+  particleCount = 30, // Restored good particle count
   delay = 0,
 }: {
   position: { x: number; y: number };
@@ -173,7 +176,7 @@ const ConfettiCannon = ({
       {Array.from({ length: particleCount }).map((_, i) => (
         <RealisticConfettiParticle
           key={i}
-          delay={delay + i * 0.012} // Slightly slower stagger for more relaxed release
+          delay={delay + i * 0.01} // Restored natural stagger timing
           index={i}
         />
       ))}
@@ -181,17 +184,17 @@ const ConfettiCannon = ({
   );
 };
 
-// Epic confetti system with multiple cannons
+// Restored epic confetti system (smart optimization)
 const EpicConfettiBurst = ({ trigger }: { trigger: boolean }) => {
   if (!trigger) return null;
 
-  // Strategic cannon positions for realistic burst
+  // Restored multiple cannons for spectacular effect
   const cannonPositions = [
-    { x: 20, y: 60 }, // Left
-    { x: 40, y: 55 }, // Left-center
+    { x: 25, y: 60 }, // Left
+    { x: 45, y: 55 }, // Left-center
     { x: 50, y: 50 }, // Center
-    { x: 60, y: 55 }, // Right-center
-    { x: 80, y: 60 }, // Right
+    { x: 55, y: 55 }, // Right-center
+    { x: 75, y: 60 }, // Right
   ];
 
   return (
@@ -201,17 +204,17 @@ const EpicConfettiBurst = ({ trigger }: { trigger: boolean }) => {
           key={index}
           position={position}
           trigger={trigger}
-          particleCount={35 + Math.random() * 15} // 35-50 particles
-          delay={index * 0.08} // Slightly slower succession for more relaxed effect
+          particleCount={30} // Balanced count
+          delay={index * 0.06} // Quick succession for epic burst
         />
       ))}
 
-      {/* Center mega burst with delayed timing */}
+      {/* Center mega burst restored */}
       <ConfettiCannon
         position={{ x: 50, y: 50 }}
         trigger={trigger}
-        particleCount={60}
-        delay={0.15} // Slightly delayed for extended effect
+        particleCount={50} // Restored impressive center burst
+        delay={0.12}
       />
     </div>
   );
@@ -253,20 +256,23 @@ const CelebrationAwardCard = ({
         transformStyle: "preserve-3d",
       }}
     >
-      {/* Animated background gradient */}
+      {/* Restored beautiful background gradient */}
       <motion.div
         className="absolute inset-0 bg-gradient-to-r from-yellow-400/10 via-orange-400/10 to-red-400/10 rounded-2xl"
+        style={{
+          willChange: "opacity",
+        }}
         animate={
           hasTriggered
             ? {
-                opacity: [0.1, 0.3, 0.1],
+                opacity: [0.1, 0.25, 0.1], // Restored beautiful intensity
               }
             : {}
         }
         transition={{
-          duration: 4, // Extended background animation
-          delay: hasTriggered ? index * 0.25 + 2.5 : 0, // Adjusted timing
-          repeat: hasTriggered ? Infinity : 0,
+          duration: 3, // Restored longer beautiful cycle
+          delay: hasTriggered ? index * 0.25 + 2.5 : 0,
+          repeat: hasTriggered ? 5 : 0, // Limited but visible repeats
           repeatType: "reverse",
         }}
       />
