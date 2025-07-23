@@ -1,5 +1,6 @@
 // src/app/layout.tsx
 import { NotificationManager } from "@/components/admin/notification-manager";
+import ConditionalLayout from "@/components/layout/conditional-layout";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { AuthProvider } from "@/components/providers/auth-provider";
@@ -129,35 +130,37 @@ export default function RootLayout({
               {/* Background pattern */}
               <div className="fixed inset-0 bg-dot-pattern bg-dot-sm opacity-[0.02] dark:opacity-[0.05] pointer-events-none" />
 
-              <div className="relative flex min-h-screen flex-col">
-                <ErrorBoundary
-                  fallback={
-                    <div className="h-16 bg-background border-b border-border flex items-center justify-center">
-                      <span className="text-sm text-muted-foreground">
-                        Navigation temporarily unavailable
-                      </span>
-                    </div>
-                  }
-                >
-                  <Navbar />
-                </ErrorBoundary>
-
-                <ErrorBoundary>
-                  <main className="flex-1 pt-16">{children}</main>
-                </ErrorBoundary>
-
-                <ErrorBoundary
-                  fallback={
-                    <div className="py-8 bg-card border-t border-border text-center">
-                      <span className="text-sm text-muted-foreground">
-                        Footer temporarily unavailable
-                      </span>
-                    </div>
-                  }
-                >
-                  <Footer />
-                </ErrorBoundary>
-              </div>
+              {/* FIXED: Use ConditionalLayout to exclude navbar/footer for admin routes */}
+              <ConditionalLayout
+                navbar={
+                  <ErrorBoundary
+                    fallback={
+                      <div className="h-16 bg-background border-b border-border flex items-center justify-center">
+                        <span className="text-sm text-muted-foreground">
+                          Navigation temporarily unavailable
+                        </span>
+                      </div>
+                    }
+                  >
+                    <Navbar />
+                  </ErrorBoundary>
+                }
+                footer={
+                  <ErrorBoundary
+                    fallback={
+                      <div className="py-8 bg-card border-t border-border text-center">
+                        <span className="text-sm text-muted-foreground">
+                          Footer temporarily unavailable
+                        </span>
+                      </div>
+                    }
+                  >
+                    <Footer />
+                  </ErrorBoundary>
+                }
+              >
+                <ErrorBoundary>{children}</ErrorBoundary>
+              </ConditionalLayout>
 
               {/* Global notification manager */}
               <ErrorBoundary>

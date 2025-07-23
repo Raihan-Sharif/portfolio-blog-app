@@ -16,16 +16,19 @@ export default function ConditionalLayout({
   footer,
 }: ConditionalLayoutProps) {
   const pathname = usePathname();
+
+  // Check if current route is an admin route
   const isAdminRoute = pathname?.startsWith("/admin");
 
   if (isAdminRoute) {
-    // For admin routes, render children directly (AdminLayout handles its own layout)
-    return <>{children}</>;
+    // For admin routes, render children directly without navbar/footer
+    // AdminLayout component will handle its own layout structure
+    return <div className="admin-page">{children}</div>;
   }
 
-  // For non-admin routes, use the standard layout
+  // For non-admin routes, use the standard layout with navbar and footer
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="relative flex min-h-screen flex-col">
       {navbar}
       <main className="flex-1 pt-16">{children}</main>
       {footer}

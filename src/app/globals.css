@@ -62,6 +62,48 @@
   }
 }
 
+/* FIXED: Ensure admin pages don't inherit main layout styles */
+.admin-page {
+  /* Reset any inherited layout styles */
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* FIXED: Prevent navbar and footer on admin pages */
+.admin-page .navbar,
+.admin-page .footer {
+  display: none !important;
+}
+
+/* FIXED: Ensure admin layout takes full control */
+.admin-page > * {
+  /* Remove any potential top spacing from admin layout children */
+  margin-top: 0 !important;
+}
+
+/* FIXED: Admin layout should not have the standard main padding */
+.admin-page main {
+  padding-top: 0 !important;
+}
+
+/* FIXED: Ensure no background pattern conflicts */
+.admin-page .bg-dot-pattern {
+  display: none;
+}
+
+/* FIXED: Admin specific body styles */
+body:has(.admin-page) {
+  /* Prevent any scroll issues */
+  overflow-x: hidden;
+}
+
+/* FIXED: Ensure admin layout components have proper z-index stacking */
+.admin-page .admin-layout {
+  position: relative;
+  z-index: 1;
+}
 /* FIXED: Admin layout specific styles */
 .admin-layout {
   /* Ensure admin layout takes full viewport */
