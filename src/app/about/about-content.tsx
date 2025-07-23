@@ -1,5 +1,6 @@
 "use client";
 
+import SharedButton from "@/components/shared/share-button";
 import { Button } from "@/components/ui/button";
 import { motion, useInView, useScroll, useTransform } from "framer-motion";
 import {
@@ -644,6 +645,17 @@ export default function AboutContent({
                       </Button>
                     </motion.div>
                   </Link>
+                  <SharedButton
+                    title={aboutSettings?.title || "Share About Page"}
+                    description={
+                      aboutSettings?.subtitle ||
+                      aboutSettings?.description ||
+                      "Check out my about page!"
+                    }
+                    variant="floating"
+                    size="sm"
+                    showLabel={true}
+                  />
                 </motion.div>
               </motion.div>
             </div>

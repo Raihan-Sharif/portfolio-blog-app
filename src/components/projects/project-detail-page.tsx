@@ -2,12 +2,14 @@
 
 import { ViewTracker } from "@/components/view-tracker";
 
+import ShareButton from "@/components/shared/share-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
+
 import {
   ArrowLeft,
   ArrowRight,
@@ -28,7 +30,6 @@ import {
   Monitor,
   Rocket,
   Server,
-  Share2,
   Shield,
   Smartphone,
   Star,
@@ -419,9 +420,12 @@ export default function ProjectDetailPage({
             </NextLink>
 
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={handleShare}>
-                <Share2 className="w-4 h-4" />
-              </Button>
+              <ShareButton
+                title={project.title}
+                description={project.subtitle || project.description}
+                variant="inline"
+                size="md"
+              />
               <Button
                 variant="outline"
                 size="icon"

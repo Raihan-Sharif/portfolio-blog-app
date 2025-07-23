@@ -1,5 +1,6 @@
 // src/app/blog/[slug]/page.tsx
 import BlogContent from "@/components/blog/blog-content";
+import ShareButton from "@/components/shared/share-button";
 import { Button } from "@/components/ui/button";
 import { ViewTracker } from "@/components/view-tracker";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -12,7 +13,6 @@ import {
   Eye,
   Hash,
   Heart,
-  Share2,
   User,
 } from "lucide-react";
 import { Metadata } from "next";
@@ -152,7 +152,6 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/30 to-background">
       {/* View Tracker - Client Component for tracking views */}
-
       <ViewTracker
         type="post"
         id={post.id}
@@ -182,11 +181,15 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
             {/* Floating action buttons */}
             <div className="absolute bottom-8 right-8 flex gap-3">
-              <button className="p-3 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-all duration-300 group">
-                <Share2 className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
-              </button>
-              <button className="p-3 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-all duration-300 group">
-                <Heart className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
+              <ShareButton
+                title={post.title}
+                description={post.excerpt || textContent.slice(0, 150) + "..."}
+                variant="floating"
+                size="lg"
+                showLabel={false}
+              />
+              <button className="p-3 bg-background/10 hover:bg-background/20 border border-foreground/20 text-foreground backdrop-blur-md shadow-lg rounded-full transition-all duration-300 hover:scale-105">
+                <Heart className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -195,7 +198,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-4xl mx-auto">
             {/* Navigation */}
-            <div className="mb-8">
+            <div className="mb-8 flex items-center justify-between">
               <Link href="/blog">
                 <Button
                   variant="outline"
@@ -205,6 +208,23 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                   Back to Blog
                 </Button>
               </Link>
+
+              {/* Share button for posts without cover image */}
+              {!post.cover_image_url && (
+                <div className="flex items-center gap-3">
+                  <ShareButton
+                    title={post.title}
+                    description={
+                      post.excerpt || textContent.slice(0, 150) + "..."
+                    }
+                    variant="inline"
+                    size="md"
+                  />
+                  <button className="p-2 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary rounded-full transition-all duration-300 hover:scale-105">
+                    <Heart className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Category Badge */}
@@ -239,7 +259,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
               <div className="flex items-center gap-2">
                 <User size={16} />
-                <span>{post.author?.full_name || "Anonymous"}</span>
+                <span>{post.author?.full_name || "Raihan Sharif"}</span>
               </div>
 
               <div className="flex items-center gap-2">
@@ -253,122 +273,97 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
               </div>
             </div>
 
-            {/* Excerpt */}
-            {post.excerpt && (
-              <div className="mb-12">
-                <div className="p-6 bg-gradient-to-r from-primary/5 to-purple-500/5 border-l-4 border-primary rounded-lg">
-                  <p className="text-xl text-muted-foreground italic leading-relaxed">
-                    {post.excerpt}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Content */}
+            {/* Article Content */}
             <div className="prose prose-lg dark:prose-invert max-w-none mb-12">
               <BlogContent content={post.content} />
             </div>
 
             {/* Tags */}
-            {tags.length > 0 && (
-              <div className="mb-12 p-6 bg-card/50 rounded-xl border">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <Hash className="w-5 h-5 text-primary" />
-                  Tags
-                </h3>
-                <div className="flex flex-wrap gap-3">
-                  {tags.map((tag: any) => (
-                    <Link
-                      key={tag.id}
-                      href={`/blog?tag=${tag.slug}`}
-                      className="group"
-                    >
-                      <div className="inline-flex items-center px-4 py-2 bg-accent hover:bg-primary/10 rounded-full text-sm transition-all duration-300 hover:shadow-lg group-hover:scale-105">
-                        <Hash size={12} className="mr-2" />
-                        {tag.name}
-                      </div>
-                    </Link>
-                  ))}
+            {tags && tags.length > 0 && (
+              <div className="mb-12 flex flex-wrap gap-2">
+                <div className="flex items-center gap-2 mr-3">
+                  <Hash size={16} className="text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Tags:
+                  </span>
                 </div>
+                {tags.map((tag: any) => (
+                  <Link
+                    key={tag.id}
+                    href={`/blog?tag=${tag.slug}`}
+                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-all duration-300 hover:shadow-md"
+                  >
+                    {tag.name}
+                  </Link>
+                ))}
               </div>
             )}
 
-            {/* Author */}
-            {post.author && (
-              <div className="mb-12 p-6 bg-gradient-to-r from-card/80 to-card rounded-xl border shadow-lg">
-                <h3 className="text-lg font-semibold mb-4">About the Author</h3>
-                <div className="flex items-start gap-6">
-                  {post.author.avatar_url && (
-                    <div className="relative w-16 h-16 rounded-full overflow-hidden ring-4 ring-primary/20">
-                      <Image
-                        src={post.author.avatar_url}
-                        alt={post.author.full_name}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-lg mb-2">
-                      {post.author.full_name}
-                    </h4>
-                    {post.author.bio && (
-                      <p className="text-muted-foreground leading-relaxed">
-                        {post.author.bio}
-                      </p>
-                    )}
-                  </div>
+            {/* Inline Share Section */}
+            <div className="border-t border-b border-border py-8 mb-12">
+              <div className="flex items-center justify-between">
+                <div className="text-lg font-semibold">
+                  Found this helpful? Share it!
                 </div>
+                <ShareButton
+                  title={post.title}
+                  description={
+                    post.excerpt || textContent.slice(0, 150) + "..."
+                  }
+                  variant="default"
+                  size="lg"
+                />
               </div>
-            )}
+            </div>
 
             {/* Related Posts */}
             {relatedPosts && relatedPosts.length > 0 && (
-              <div className="mb-12">
-                <h3 className="text-2xl font-bold mb-8">Related Posts</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {relatedPosts.map((relatedPost) => {
+              <div className="mt-16">
+                <h2 className="text-2xl font-bold mb-8">Related Articles</h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {relatedPosts.map((relatedPost: any) => {
                     const relatedReadTime = getReadTime(
                       extractTextContent(relatedPost.content)
                     );
-
                     return (
                       <Link
                         key={relatedPost.id}
                         href={`/blog/${relatedPost.slug}`}
                         className="group"
                       >
-                        <div className="bg-card rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 group-hover:scale-105">
-                          <div className="relative h-48 w-full">
-                            {relatedPost.cover_image_url ? (
+                        <div className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 group-hover:-translate-y-1">
+                          {relatedPost.cover_image_url && (
+                            <div className="relative h-48 overflow-hidden">
                               <Image
                                 src={relatedPost.cover_image_url}
                                 alt={relatedPost.title}
                                 fill
-                                className="object-cover group-hover:scale-110 transition-transform duration-500"
+                                className="object-cover group-hover:scale-105 transition-transform duration-300"
                               />
-                            ) : (
-                              <div className="w-full h-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
-                                <span className="text-muted-foreground">
-                                  No image
+                            </div>
+                          )}
+                          <div className="p-6">
+                            <h3 className="font-bold mb-2 group-hover:text-primary transition-colors">
+                              {relatedPost.title}
+                            </h3>
+                            {relatedPost.excerpt && (
+                              <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
+                                {relatedPost.excerpt}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Calendar size={12} />
+                                <span>
+                                  {formatDistanceToNow(
+                                    new Date(relatedPost.created_at),
+                                    { addSuffix: true }
+                                  )}
                                 </span>
                               </div>
-                            )}
-                          </div>
-                          <div className="p-6">
-                            <h4 className="font-semibold text-lg group-hover:text-primary transition-colors mb-3 line-clamp-2">
-                              {relatedPost.title}
-                            </h4>
-                            <div className="flex items-center justify-between text-sm text-muted-foreground">
-                              <span>
-                                {formatDistanceToNow(
-                                  new Date(relatedPost.created_at),
-                                  { addSuffix: true }
-                                )}
-                              </span>
                               <div className="flex items-center gap-1">
                                 <Clock size={12} />
-                                <span>{relatedReadTime} min</span>
+                                <span>{relatedReadTime} min read</span>
                               </div>
                             </div>
                           </div>
