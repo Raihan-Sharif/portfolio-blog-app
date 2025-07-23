@@ -497,7 +497,7 @@ export function ConfettiAwardsSection({ awards }: ConfettiAwardsSectionProps) {
   const sectionRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(sectionRef, {
     once: true,
-    threshold: 0.3,
+    amount: 0.3,
     margin: "-50px",
   });
 
