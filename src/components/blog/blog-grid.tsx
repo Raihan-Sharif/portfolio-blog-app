@@ -1,5 +1,6 @@
 "use client";
 
+import { TrendingPosts } from "@/components/blog/blog-sidebar-components";
 import { Button } from "@/components/ui/button";
 import { getReadTime } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -15,7 +16,6 @@ import {
   LayoutGrid,
   List,
   Search,
-  TrendingUp,
   User,
 } from "lucide-react";
 import Image from "next/image";
@@ -23,7 +23,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-// Post interface
+// Post interface for main posts
 interface Post {
   id: number;
   title: string;
@@ -38,6 +38,7 @@ interface Post {
   } | null;
   category_id?: number;
   category?: {
+    id: number;
     name: string;
     slug: string;
   } | null;
@@ -55,6 +56,22 @@ interface Tag {
   created_at: string;
 }
 
+// Simplified interface for trending posts sidebar
+interface TrendingPostData {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt?: string;
+  cover_image_url?: string;
+  created_at: string;
+  view_count: number;
+  category?: {
+    id: number;
+    name: string;
+    slug: string;
+  } | null;
+}
+
 interface BlogGridProps {
   posts: Post[];
   tags: Tag[];
@@ -62,6 +79,7 @@ interface BlogGridProps {
   totalPages: number;
   selectedTag?: string;
   searchQuery?: string;
+  trendingPosts?: TrendingPostData[];
 }
 
 // Helper function to extract text content
@@ -97,6 +115,7 @@ export default function BlogGrid({
   totalPages,
   selectedTag,
   searchQuery,
+  trendingPosts = [],
 }: BlogGridProps) {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -134,7 +153,7 @@ export default function BlogGrid({
               </div>
 
               {/* View Toggle */}
-              <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg p-1">
+              <div className="flex items-center gap-2 bg-card/80 dark:bg-card/80 backdrop-blur-sm border border-border/50 rounded-lg p-1">
                 <Button
                   variant={viewMode === "grid" ? "default" : "ghost"}
                   size="sm"
@@ -212,9 +231,9 @@ export default function BlogGrid({
                   >
                     {viewMode === "grid" ? (
                       /* Grid Card */
-                      <div className="relative h-full overflow-hidden rounded-2xl backdrop-blur-sm border border-white/20 shadow-xl bg-gradient-to-br from-white/80 via-white/60 to-white/40 dark:from-gray-900/80 dark:via-gray-900/60 dark:to-gray-900/40 hover:shadow-2xl transition-all duration-500">
+                      <div className="relative h-full overflow-hidden rounded-2xl bg-card/80 dark:bg-card/80 backdrop-blur-sm border border-border/50 shadow-xl hover:shadow-2xl transition-all duration-500">
                         {/* Glass overlay effect */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                         {/* Image */}
                         <div className="relative h-48 overflow-hidden">
@@ -240,7 +259,7 @@ export default function BlogGrid({
                                 className="inline-block"
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                <div className="px-3 py-1 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md text-primary rounded-full text-xs font-semibold border border-white/20 hover:bg-white dark:hover:bg-gray-800 transition-all duration-300 shadow-lg">
+                                <div className="px-3 py-1 bg-background/90 dark:bg-background/90 backdrop-blur-md text-primary rounded-full text-xs font-semibold border border-border/20 hover:bg-accent/80 transition-all duration-300 shadow-lg">
                                   {post.category.name}
                                 </div>
                               </Link>
@@ -250,7 +269,7 @@ export default function BlogGrid({
 
                         {/* Content */}
                         <div className="p-6 relative z-10">
-                          <h3 className="text-xl font-bold mb-3 line-clamp-2 group-hover:text-primary transition-colors duration-300 leading-tight">
+                          <h3 className="text-xl font-bold mb-3 line-clamp-2 group-hover:text-primary transition-colors duration-300 leading-tight text-foreground">
                             {post.title}
                           </h3>
 
@@ -298,9 +317,9 @@ export default function BlogGrid({
                       </div>
                     ) : (
                       /* List Card */
-                      <div className="relative overflow-hidden rounded-3xl backdrop-blur-sm border border-white/20 shadow-xl bg-gradient-to-br from-white/80 via-white/60 to-white/40 dark:from-gray-900/80 dark:via-gray-900/60 dark:to-gray-900/40 hover:shadow-2xl transition-all duration-500">
+                      <div className="relative overflow-hidden rounded-3xl bg-card/80 dark:bg-card/80 backdrop-blur-sm border border-border/50 shadow-xl hover:shadow-2xl transition-all duration-500">
                         {/* Glass overlay effect */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                         <div className="flex flex-col md:flex-row">
                           {/* Image */}
@@ -327,7 +346,7 @@ export default function BlogGrid({
                                   className="inline-block"
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  <div className="px-3 py-1 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md text-primary rounded-full text-xs font-semibold border border-white/20 hover:bg-white dark:hover:bg-gray-800 transition-all duration-300 shadow-lg">
+                                  <div className="px-3 py-1 bg-background/90 dark:bg-background/90 backdrop-blur-md text-primary rounded-full text-xs font-semibold border border-border/20 hover:bg-accent/80 transition-all duration-300 shadow-lg">
                                     {post.category.name}
                                   </div>
                                 </Link>
@@ -337,7 +356,7 @@ export default function BlogGrid({
 
                           {/* Content */}
                           <div className="flex-1 p-8 relative z-10">
-                            <h3 className="text-2xl font-bold mb-4 line-clamp-2 group-hover:text-primary transition-colors duration-300 leading-tight">
+                            <h3 className="text-2xl font-bold mb-4 line-clamp-2 group-hover:text-primary transition-colors duration-300 leading-tight text-foreground">
                               {post.title}
                             </h3>
 
@@ -414,7 +433,7 @@ export default function BlogGrid({
                   <Link href={`/blog?page=${currentPage - 1}`}>
                     <Button
                       variant="outline"
-                      className="gap-2 backdrop-blur-sm bg-white/20 border-white/30 hover:bg-white/30 transition-all duration-300"
+                      className="gap-2 bg-card/80 dark:bg-card/80 border-border/50 hover:bg-accent/80 transition-all duration-300"
                     >
                       <ArrowLeft size={16} />
                       Previous
@@ -442,7 +461,7 @@ export default function BlogGrid({
                         className={`w-10 h-10 transition-all duration-300 ${
                           currentPage === page
                             ? "bg-primary text-primary-foreground shadow-lg"
-                            : "backdrop-blur-sm bg-white/20 border-white/30 hover:bg-white/30"
+                            : "bg-card/80 dark:bg-card/80 border-border/50 hover:bg-accent/80"
                         }`}
                       >
                         {page}
@@ -455,7 +474,7 @@ export default function BlogGrid({
                   <Link href={`/blog?page=${currentPage + 1}`}>
                     <Button
                       variant="outline"
-                      className="gap-2 backdrop-blur-sm bg-white/20 border-white/30 hover:bg-white/30 transition-all duration-300"
+                      className="gap-2 bg-card/80 dark:bg-card/80 border-border/50 hover:bg-accent/80 transition-all duration-300"
                     >
                       Next
                       <ArrowRight size={16} />
@@ -476,11 +495,11 @@ export default function BlogGrid({
             className="sticky top-8 space-y-8"
           >
             {/* Popular Tags */}
-            <div className="relative overflow-hidden rounded-2xl backdrop-blur-sm border border-white/20 shadow-xl bg-gradient-to-br from-white/80 via-white/60 to-white/40 dark:from-gray-900/80 dark:via-gray-900/60 dark:to-gray-900/40 p-6">
+            <div className="relative overflow-hidden rounded-2xl bg-card/80 dark:bg-card/80 backdrop-blur-sm border border-border/50 shadow-xl p-6">
               <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-primary/10 to-transparent rounded-full blur-2xl" />
 
               <div className="relative z-10">
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-foreground">
                   <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
                     <Hash className="w-4 h-4 text-white" />
                   </div>
@@ -496,7 +515,7 @@ export default function BlogGrid({
                         className={`inline-flex items-center px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 backdrop-blur-sm shadow-lg hover:shadow-xl ${
                           selectedTag === tag.slug
                             ? "bg-primary text-primary-foreground border border-primary/30"
-                            : "bg-white/20 hover:bg-white/30 border border-white/20 text-foreground hover:text-primary"
+                            : "bg-background/50 dark:bg-background/50 hover:bg-accent/80 border border-border/30 text-foreground hover:text-primary"
                         }`}
                       >
                         <Hash size={12} className="mr-1" />
@@ -508,46 +527,12 @@ export default function BlogGrid({
               </div>
             </div>
 
-            {/* Featured Content */}
-            <div className="relative overflow-hidden rounded-2xl backdrop-blur-sm border border-white/20 shadow-xl bg-gradient-to-br from-white/80 via-white/60 to-white/40 dark:from-gray-900/80 dark:via-gray-900/60 dark:to-gray-900/40 p-6">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-purple-500/10 to-transparent rounded-full blur-2xl" />
-
-              <div className="relative z-10">
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
-                    <TrendingUp className="w-4 h-4 text-white" />
-                  </div>
-                  Trending Now
-                </h3>
-
-                <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-white/20 backdrop-blur-sm border border-white/20 hover:bg-white/30 transition-all duration-300">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Latest in Web Development
-                    </p>
-                    <h4 className="font-semibold text-sm">
-                      Next.js 14 Features
-                    </h4>
-                  </div>
-                  <div className="p-4 rounded-xl bg-white/20 backdrop-blur-sm border border-white/20 hover:bg-white/30 transition-all duration-300">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      React Best Practices
-                    </p>
-                    <h4 className="font-semibold text-sm">
-                      Component Architecture
-                    </h4>
-                  </div>
-                  <div className="p-4 rounded-xl bg-white/20 backdrop-blur-sm border border-white/20 hover:bg-white/30 transition-all duration-300">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Backend Development
-                    </p>
-                    <h4 className="font-semibold text-sm">
-                      API Design Patterns
-                    </h4>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Trending Posts - Using Shareable Component */}
+            <TrendingPosts
+              posts={trendingPosts}
+              showRanking={true}
+              className=""
+            />
           </motion.div>
         </div>
       </div>

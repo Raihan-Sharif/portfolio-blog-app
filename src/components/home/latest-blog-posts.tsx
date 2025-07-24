@@ -152,9 +152,9 @@ export default function LatestBlogPosts({ posts }: LatestBlogPostsProps) {
                 onClick={(e) => handleCardClick(post.slug, e)}
                 className="group cursor-pointer h-full"
               >
-                <div className="relative h-full rounded-2xl overflow-hidden backdrop-blur-sm border border-white/20 shadow-xl bg-gradient-to-br from-white/80 via-white/60 to-white/40 dark:from-gray-900/80 dark:via-gray-900/60 dark:to-gray-900/40 hover:shadow-2xl transition-all duration-500">
+                <div className="relative h-full rounded-2xl overflow-hidden backdrop-blur-sm border border-border/50 shadow-xl bg-card/80 dark:bg-card/80 hover:shadow-2xl transition-all duration-500">
                   {/* Glass overlay effect */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                   {/* Enhanced Image Container */}
                   <div className="relative h-52 overflow-hidden">
@@ -181,7 +181,7 @@ export default function LatestBlogPosts({ posts }: LatestBlogPostsProps) {
                           className="inline-block"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <div className="px-3 py-1 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md text-primary rounded-full text-xs font-semibold border border-white/20 hover:bg-white dark:hover:bg-gray-800 transition-all duration-300 shadow-lg">
+                          <div className="px-3 py-1 bg-background/90 dark:bg-background/90 backdrop-blur-md text-primary rounded-full text-xs font-semibold border border-border/20 hover:bg-accent/80 transition-all duration-300 shadow-lg">
                             {post.category.name}
                           </div>
                         </Link>
@@ -191,7 +191,7 @@ export default function LatestBlogPosts({ posts }: LatestBlogPostsProps) {
 
                   {/* Enhanced Content */}
                   <div className="p-6 relative z-10">
-                    <h3 className="text-xl font-bold mb-3 line-clamp-2 group-hover:text-primary transition-colors duration-300 leading-tight">
+                    <h3 className="text-xl font-bold mb-3 line-clamp-2 group-hover:text-primary transition-colors duration-300 leading-tight text-foreground">
                       {post.title}
                     </h3>
 

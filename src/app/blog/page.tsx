@@ -1,200 +1,257 @@
+// Fixed Main Blog Page - Works with existing components
+// File: src/app/blog/page.tsx
+
 import BlogGrid from "@/components/blog/blog-grid";
 import BlogHeader from "@/components/blog/blog-header";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { Metadata } from "next";
 
-// Define the types locally instead of importing from @/types
-interface Category {
-  id: number;
-  name: string;
-  slug: string;
-  description?: string;
-  created_at: string;
-}
-
-interface Post {
-  id: number;
-  title: string;
-  slug: string;
-  excerpt?: string;
-  content?: any;
-  cover_image_url?: string;
-  published: boolean;
-  author_id: string;
-  author?: any;
-  category_id?: number;
-  category?: Category;
-  view_count: number;
-  created_at: string;
-  updated_at?: string;
-}
-
-interface Tag {
-  id: number;
-  name: string;
-  slug: string;
-  created_at: string;
-}
-
 export const metadata: Metadata = {
   title: "Blog | Raihan Sharif",
   description:
-    "Read articles about web development, technology, and software engineering by Raihan Sharif.",
+    "Read the latest articles about web development, technology trends, and software engineering best practices.",
+  openGraph: {
+    title: "Blog | Raihan Sharif",
+    description:
+      "Read the latest articles about web development, technology trends, and software engineering best practices.",
+    type: "website",
+  },
 };
 
-export const revalidate = 3600; // Revalidate every hour
+interface BlogPageProps {
+  searchParams: {
+    page?: string;
+    category?: string;
+    tag?: string;
+    search?: string;
+  };
+}
 
-export default async function BlogPage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+const POSTS_PER_PAGE = 9;
+
+export default async function BlogPage({ searchParams }: BlogPageProps) {
   const supabase = createServerSupabaseClient();
 
-  // Get the current page from query params or default to 1
-  const page =
-    typeof searchParams.page === "string" ? parseInt(searchParams.page) : 1;
-  const category =
-    typeof searchParams.category === "string"
-      ? searchParams.category
-      : undefined;
-  const tag =
-    typeof searchParams.tag === "string" ? searchParams.tag : undefined;
-  const search =
-    typeof searchParams.search === "string" ? searchParams.search : undefined;
+  // Parse search parameters
+  const currentPage = parseInt(searchParams.page || "1", 10);
+  const selectedCategory = searchParams.category;
+  const selectedTag = searchParams.tag;
+  const searchQuery = searchParams.search;
 
-  const postsPerPage = 9;
-  const from = (page - 1) * postsPerPage;
-  const to = from + postsPerPage - 1;
+  try {
+    // Get categories for header
+    const { data: categories } = await supabase
+      .from("categories")
+      .select("*")
+      .order("name");
 
-  // Build the query
-  let query = supabase
-    .from("posts")
-    .select(
+    // Get tags for sidebar
+    const { data: tags } = await supabase
+      .from("tags")
+      .select("*")
+      .order("name");
+
+    // Get trending posts for sidebar (most viewed) - Simple approach
+    const { data: trendingPostsData } = await supabase
+      .from("posts")
+      .select(
+        `
+        id,
+        title,
+        slug,
+        excerpt,
+        cover_image_url,
+        created_at,
+        view_count,
+        category_id
       `
-      *,
-      author:profiles(*),
-      category:categories(*)
-    `
-    )
-    .eq("published", true)
-    .order("created_at", { ascending: false })
-    .range(from, to);
+      )
+      .eq("published", true)
+      .order("view_count", { ascending: false })
+      .limit(8);
 
-  // Apply filters if provided
-  if (category) {
-    const { data: categoryData } = await supabase
-      .from("categories")
-      .select("id")
-      .eq("slug", category)
-      .single();
+    // Get categories for trending posts
+    const categoryIds = [
+      ...new Set(trendingPostsData?.map((p) => p.category_id).filter(Boolean)),
+    ];
+    const { data: trendingCategories } =
+      categoryIds.length > 0
+        ? await supabase
+            .from("categories")
+            .select("id, name, slug")
+            .in("id", categoryIds)
+        : { data: [] };
 
-    if (categoryData) {
-      query = query.eq("category_id", categoryData.id);
-    }
-  }
+    // Map categories to trending posts
+    const trendingPosts: {
+      id: number;
+      title: string;
+      slug: string;
+      excerpt?: string;
+      cover_image_url?: string;
+      created_at: string;
+      view_count: number;
+      category?: {
+        id: number;
+        name: string;
+        slug: string;
+      } | null;
+    }[] = (trendingPostsData || []).map((p) => ({
+      id: p.id,
+      title: p.title,
+      slug: p.slug,
+      excerpt: p.excerpt || undefined,
+      cover_image_url: p.cover_image_url || undefined,
+      created_at: p.created_at,
+      view_count: p.view_count || 0,
+      category: trendingCategories?.find((c) => c.id === p.category_id) || null,
+    }));
 
-  if (tag) {
-    const { data: tagData } = await supabase
-      .from("tags")
-      .select("id")
-      .eq("slug", tag)
-      .single();
+    // Build the posts query with all necessary joins
+    let postsQuery = supabase
+      .from("posts")
+      .select(
+        `
+        *,
+        author:profiles(*),
+        category:categories(*)
+      `
+      )
+      .eq("published", true)
+      .order("created_at", { ascending: false });
 
-    if (tagData) {
-      // Get post IDs that have this tag
-      const { data: postTags } = await supabase
-        .from("post_tags")
-        .select("post_id")
-        .eq("tag_id", tagData.id);
+    // Apply category filter if provided
+    if (selectedCategory) {
+      const { data: categoryData } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("slug", selectedCategory)
+        .single();
 
-      if (postTags && postTags.length > 0) {
-        const postIds = postTags.map((pt) => pt.post_id);
-        query = query.in("id", postIds);
+      if (categoryData) {
+        postsQuery = postsQuery.eq("category_id", categoryData.id);
       }
     }
-  }
 
-  if (search) {
-    query = query.or(`title.ilike.%${search}%,excerpt.ilike.%${search}%`);
-  }
-
-  // Execute the query
-  const { data: posts, error } = await query;
-  if (error) {
-    console.error("Error fetching posts:", error);
-  }
-  // Get count for pagination
-  let countQuery = supabase
-    .from("posts")
-    .select("id", { count: "exact" })
-    .eq("published", true);
-
-  // Apply the same filters to count query
-  if (category) {
-    const { data: categoryData } = await supabase
-      .from("categories")
-      .select("id")
-      .eq("slug", category)
-      .single();
-
-    if (categoryData) {
-      countQuery = countQuery.eq("category_id", categoryData.id);
+    // Apply search filter if provided
+    if (searchQuery) {
+      postsQuery = postsQuery.ilike("title", `%${searchQuery}%`);
     }
-  }
 
-  if (tag) {
-    const { data: tagData } = await supabase
-      .from("tags")
-      .select("id")
-      .eq("slug", tag)
-      .single();
+    // Get total count for pagination (with same filters)
+    let countQuery = supabase
+      .from("posts")
+      .select("*", { count: "exact", head: true })
+      .eq("published", true);
 
-    if (tagData) {
-      // Get post IDs that have this tag
-      const { data: postTags } = await supabase
-        .from("post_tags")
-        .select("post_id")
-        .eq("tag_id", tagData.id);
+    if (selectedCategory) {
+      const { data: categoryData } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("slug", selectedCategory)
+        .single();
 
-      if (postTags && postTags.length > 0) {
-        const postIds = postTags.map((pt) => pt.post_id);
-        countQuery = countQuery.in("id", postIds);
+      if (categoryData) {
+        countQuery = countQuery.eq("category_id", categoryData.id);
       }
     }
-  }
 
-  if (search) {
-    countQuery = countQuery.or(
-      `title.ilike.%${search}%,excerpt.ilike.%${search}%`
+    if (searchQuery) {
+      countQuery = countQuery.ilike("title", `%${searchQuery}%`);
+    }
+
+    const { count: totalCount } = await countQuery;
+    const totalPages = Math.ceil((totalCount || 0) / POSTS_PER_PAGE);
+
+    // Calculate pagination
+    const offset = (currentPage - 1) * POSTS_PER_PAGE;
+
+    // Get posts for current page
+    const { data: posts } = await postsQuery.range(
+      offset,
+      offset + POSTS_PER_PAGE - 1
+    );
+
+    // Handle tag filtering (post-query filtering since it involves joins)
+    let filteredPosts = posts || [];
+    if (selectedTag) {
+      const { data: taggedPosts } = await supabase
+        .from("post_tags")
+        .select(
+          `
+          post_id,
+          tags!inner(slug)
+        `
+        )
+        .eq("tags.slug", selectedTag);
+
+      if (taggedPosts) {
+        const taggedPostIds = taggedPosts.map((pt) => pt.post_id);
+        filteredPosts = filteredPosts.filter((post) =>
+          taggedPostIds.includes(post.id)
+        );
+      } else {
+        filteredPosts = [];
+      }
+    }
+
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Blog Header */}
+        <BlogHeader
+          categories={categories || []}
+          selectedCategory={selectedCategory}
+          search={searchQuery}
+        />
+
+        {/* Blog Grid with proper data */}
+        <BlogGrid
+          posts={filteredPosts}
+          tags={tags || []}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          selectedTag={selectedTag}
+          searchQuery={searchQuery}
+          trendingPosts={trendingPosts}
+        />
+      </div>
+    );
+  } catch (error) {
+    console.error("Error in blog page:", error);
+
+    // Fallback: Return page with empty data instead of throwing error
+    const emptyTrendingPosts: {
+      id: number;
+      title: string;
+      slug: string;
+      excerpt?: string;
+      cover_image_url?: string;
+      created_at: string;
+      view_count: number;
+      category?: {
+        id: number;
+        name: string;
+        slug: string;
+      } | null;
+    }[] = [];
+
+    return (
+      <div className="min-h-screen bg-background">
+        <BlogHeader
+          categories={[]}
+          selectedCategory={selectedCategory}
+          search={searchQuery}
+        />
+        <BlogGrid
+          posts={[]}
+          tags={[]}
+          currentPage={1}
+          totalPages={1}
+          selectedTag={selectedTag}
+          searchQuery={searchQuery}
+          trendingPosts={emptyTrendingPosts}
+        />
+      </div>
     );
   }
-
-  const { count } = await countQuery;
-  const totalPages = count ? Math.ceil(count / postsPerPage) : 0;
-
-  // Get all categories and tags for filters
-  const { data: categories } = await supabase
-    .from("categories")
-    .select("*")
-    .order("name");
-
-  const { data: tags } = await supabase.from("tags").select("*").order("name");
-
-  return (
-    <div className="min-h-screen">
-      <BlogHeader
-        categories={(categories as Category[]) || []}
-        selectedCategory={category}
-        search={search}
-      />
-      <BlogGrid
-        posts={(posts as Post[]) || []}
-        currentPage={page}
-        totalPages={totalPages}
-        tags={(tags as Tag[]) || []}
-        selectedTag={tag}
-      />
-    </div>
-  );
 }

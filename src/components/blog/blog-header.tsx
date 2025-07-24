@@ -65,7 +65,7 @@ export default function BlogHeader({
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-xl mb-8"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-background/90 dark:bg-background/90 backdrop-blur-md border border-border/50 shadow-xl mb-8"
           >
             <BookOpen className="w-5 h-5 text-primary" />
             <span className="text-sm font-semibold text-primary">
@@ -115,7 +115,7 @@ export default function BlogHeader({
                 placeholder="Search articles, topics, or technologies..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-20 py-4 text-lg bg-white/20 backdrop-blur-md border border-white/30 rounded-2xl shadow-xl focus:bg-white/30 focus:border-primary/50 transition-all duration-300 placeholder:text-muted-foreground/60"
+                className="w-full pl-12 pr-20 py-4 text-lg bg-background/90 dark:bg-background/90 backdrop-blur-md border border-border/50 rounded-2xl shadow-xl focus:bg-background/95 focus:border-primary/50 transition-all duration-300 placeholder:text-muted-foreground/60 text-foreground"
               />
               <Search
                 size={20}
@@ -124,7 +124,7 @@ export default function BlogHeader({
               <Button
                 type="submit"
                 size="sm"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-primary hover:bg-primary/90 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl px-6"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-primary hover:bg-primary/90 text-primary-foreground border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl px-6"
               >
                 <Search size={16} />
               </Button>
@@ -156,7 +156,7 @@ export default function BlogHeader({
               className={`px-6 py-3 rounded-full text-sm font-semibold transition-all duration-300 backdrop-blur-md border shadow-lg hover:shadow-xl ${
                 !selectedCategory
                   ? "bg-primary text-primary-foreground border-primary/30 shadow-primary/20"
-                  : "bg-white/10 hover:bg-white/20 border-white/20 text-foreground hover:text-primary"
+                  : "bg-background/90 dark:bg-background/90 hover:bg-accent/80 border-border/50 text-foreground hover:text-primary"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -178,7 +178,7 @@ export default function BlogHeader({
                 className={`px-6 py-3 rounded-full text-sm font-semibold transition-all duration-300 backdrop-blur-md border shadow-lg hover:shadow-xl ${
                   selectedCategory === category.slug
                     ? "bg-primary text-primary-foreground border-primary/30 shadow-primary/20"
-                    : "bg-white/10 hover:bg-white/20 border-white/20 text-foreground hover:text-primary"
+                    : "bg-background/90 dark:bg-background/90 hover:bg-accent/80 border-border/50 text-foreground hover:text-primary"
                 }`}
               >
                 {category.name}
