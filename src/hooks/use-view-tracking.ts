@@ -16,107 +16,78 @@ interface ViewTrackingState {
   timeSpent: number;
 }
 
-// Enhanced storage manager for Firefox compatibility
-class ViewTrackingStorage {
-  private static instance: ViewTrackingStorage;
-  private memoryStore = new Map<string, boolean>();
-  private storageAvailable: boolean = false;
+// Global tracking cache to prevent double increments across components
+const globalTrackingCache = new Map<string, boolean>();
+
+// Simplified storage manager with global cache integration
+class ViewStorage {
+  private static instance: ViewStorage;
+  private memoryCache = new Map<string, boolean>();
+  private storageEnabled = false;
 
   private constructor() {
-    // Test storage availability on initialization
-    this.storageAvailable = this.testStorageAvailability();
-  }
-
-  static getInstance(): ViewTrackingStorage {
-    if (!ViewTrackingStorage.instance) {
-      ViewTrackingStorage.instance = new ViewTrackingStorage();
-    }
-    return ViewTrackingStorage.instance;
-  }
-
-  private testStorageAvailability(): boolean {
     try {
-      const testKey = "__storage_test__";
-      sessionStorage.setItem(testKey, "test");
-      const retrieved = sessionStorage.getItem(testKey);
-      sessionStorage.removeItem(testKey);
-      return retrieved === "test";
+      if (typeof window !== "undefined" && window.sessionStorage) {
+        const testKey = "__vt_test";
+        sessionStorage.setItem(testKey, "1");
+        sessionStorage.removeItem(testKey);
+        this.storageEnabled = true;
+      }
     } catch {
-      return false;
+      this.storageEnabled = false;
     }
   }
 
-  setItem(key: string, value: boolean): void {
-    // Always store in memory for immediate access
-    this.memoryStore.set(key, value);
+  static getInstance(): ViewStorage {
+    if (!ViewStorage.instance) {
+      ViewStorage.instance = new ViewStorage();
+    }
+    return ViewStorage.instance;
+  }
 
-    // Try to store in sessionStorage if available
-    if (this.storageAvailable) {
+  set(key: string, value: boolean): void {
+    // Update all caches
+    this.memoryCache.set(key, value);
+    globalTrackingCache.set(key, value);
+
+    if (this.storageEnabled) {
       try {
-        sessionStorage.setItem(key, value.toString());
-      } catch (error) {
-        console.warn("SessionStorage failed, using memory only:", error);
-        this.storageAvailable = false;
+        sessionStorage.setItem(key, value ? "1" : "0");
+      } catch {
+        // Silent fail
       }
     }
   }
 
-  getItem(key: string): boolean {
-    // Check memory first for speed
-    if (this.memoryStore.has(key)) {
-      return this.memoryStore.get(key)!;
+  get(key: string): boolean {
+    // Check global cache first (most reliable for preventing duplicates)
+    if (globalTrackingCache.has(key)) {
+      return globalTrackingCache.get(key)!;
     }
 
-    // Fallback to sessionStorage if available
-    if (this.storageAvailable) {
+    // Check memory cache
+    if (this.memoryCache.has(key)) {
+      const value = this.memoryCache.get(key)!;
+      globalTrackingCache.set(key, value);
+      return value;
+    }
+
+    // Check session storage
+    if (this.storageEnabled) {
       try {
         const stored = sessionStorage.getItem(key);
         if (stored !== null) {
-          const value = stored === "true";
-          this.memoryStore.set(key, value); // Cache in memory
+          const value = stored === "1";
+          this.memoryCache.set(key, value);
+          globalTrackingCache.set(key, value);
           return value;
         }
-      } catch (error) {
-        console.warn("SessionStorage read failed:", error);
-        this.storageAvailable = false;
+      } catch {
+        // Silent fail
       }
     }
 
     return false;
-  }
-
-  hasItem(key: string): boolean {
-    return (
-      this.memoryStore.has(key) ||
-      (this.storageAvailable && sessionStorage.getItem(key) !== null)
-    );
-  }
-
-  removeItem(key: string): void {
-    this.memoryStore.delete(key);
-    if (this.storageAvailable) {
-      try {
-        sessionStorage.removeItem(key);
-      } catch (error) {
-        console.warn("SessionStorage remove failed:", error);
-      }
-    }
-  }
-
-  clear(): void {
-    this.memoryStore.clear();
-    if (this.storageAvailable) {
-      try {
-        // Only clear our tracking keys
-        Object.keys(sessionStorage).forEach((key) => {
-          if (key.startsWith("view_tracked_")) {
-            sessionStorage.removeItem(key);
-          }
-        });
-      } catch (error) {
-        console.warn("SessionStorage clear failed:", error);
-      }
-    }
   }
 }
 
@@ -125,10 +96,7 @@ export function useViewTracking(
   id: number | string | null | undefined,
   options: UseViewTrackingOptions = {}
 ) {
-  const {
-    enabled = true,
-    delay = 3000, // 3 seconds total delay before tracking
-  } = options;
+  const { enabled = true, delay = 3000 } = options;
 
   const [state, setState] = useState<ViewTrackingState>({
     isTracked: false,
@@ -137,176 +105,152 @@ export function useViewTracking(
     timeSpent: 0,
   });
 
-  // Use refs to prevent race conditions
+  // Single ref for all tracking state
   const trackingRef = useRef({
-    hasTracked: false,
-    isCurrentlyTracking: false,
-    startTime: Date.now(),
+    hasExecuted: false,
+    isExecuting: false,
     timeoutId: null as NodeJS.Timeout | null,
     intervalId: null as NodeJS.Timeout | null,
-    numericId: null as number | null,
+    startTime: Date.now(),
+    currentId: null as number | null,
   });
 
-  const storageManager = ViewTrackingStorage.getInstance();
+  const storage = ViewStorage.getInstance();
 
-  // Convert id to number for consistency
-  const numericId = id
-    ? typeof id === "string"
-      ? parseInt(id, 10)
-      : Number(id)
-    : null;
+  // Convert ID to number safely
+  const numericId = (() => {
+    if (!id) return null;
+    const parsed = typeof id === "string" ? parseInt(id, 10) : Number(id);
+    return isNaN(parsed) ? null : parsed;
+  })();
 
-  // Stable session key generation
-  const getSessionKey = useCallback(() => {
-    if (!numericId) return null;
-    return `view_tracked_${type}_${numericId}`;
-  }, [type, numericId]);
+  // Generate unique tracking key
+  const trackingKey = numericId ? `vt_${type}_${numericId}` : null;
 
-  // Check if already tracked with fallback strategies
+  // Check if already tracked (multiple levels of protection)
   const isAlreadyTracked = useCallback(() => {
-    const sessionKey = getSessionKey();
-    if (!sessionKey) return false;
-    return storageManager.getItem(sessionKey);
-  }, [getSessionKey, storageManager]);
+    if (!trackingKey) return false;
+    return storage.get(trackingKey);
+  }, [trackingKey, storage]);
 
-  // Mark as tracked with enhanced reliability
-  const markAsTracked = useCallback(() => {
-    const sessionKey = getSessionKey();
-    if (sessionKey) {
-      storageManager.setItem(sessionKey, true);
-    }
-  }, [getSessionKey, storageManager]);
+  // Core tracking function with bulletproof duplicate prevention
+  const executeTracking = useCallback(async () => {
+    if (!numericId || !enabled || !trackingKey) return;
 
-  // Enhanced database tracking with proper state management
-  const trackView = useCallback(async () => {
-    const sessionKey = getSessionKey();
-
-    // Prevent duplicate tracking with multiple checks
+    // Multi-level duplicate prevention
     if (
-      trackingRef.current.hasTracked ||
-      trackingRef.current.isCurrentlyTracking ||
-      !enabled ||
-      !numericId ||
-      (sessionKey && storageManager.getItem(sessionKey))
+      trackingRef.current.hasExecuted ||
+      trackingRef.current.isExecuting ||
+      globalTrackingCache.get(trackingKey) ||
+      storage.get(trackingKey)
     ) {
-      console.log("❌ Tracking prevented:", {
-        hasTracked: trackingRef.current.hasTracked,
-        isCurrentlyTracking: trackingRef.current.isCurrentlyTracking,
-        enabled,
-        numericId,
-        alreadyStored: sessionKey ? storageManager.getItem(sessionKey) : false,
-      });
+      setState((prev) => ({ ...prev, isTracked: true }));
       return;
     }
 
-    console.log(`🎯 Starting to track ${type} view for ID: ${numericId}`);
+    // Lock execution immediately
+    trackingRef.current.isExecuting = true;
+    trackingRef.current.hasExecuted = true;
+    globalTrackingCache.set(trackingKey, true);
+
+    setState((prev) => ({ ...prev, isTracking: true, error: null }));
 
     try {
-      // Set tracking flags immediately
-      trackingRef.current.isCurrentlyTracking = true;
-      trackingRef.current.hasTracked = true;
-
-      // Update state to show tracking in progress
-      setState((prev) => ({
-        ...prev,
-        isTracking: true,
-        error: null,
-      }));
-
       let result;
+
+      // Use the correct function names that exist in your database
       if (type === "post") {
-        console.log("📝 Calling increment_post_view...");
         result = await supabase.rpc("increment_post_view", {
           post_id_param: numericId,
         });
       } else if (type === "project") {
-        console.log("🚀 Calling increment_project_view...");
         result = await supabase.rpc("increment_project_view", {
           project_id_param: numericId,
         });
       }
 
-      console.log("📊 RPC Result:", result);
-
       if (result?.error) {
-        console.error(`❌ RPC Error for ${type}:`, result.error);
-
-        // Reset tracking flags on error
-        trackingRef.current.hasTracked = false;
-        trackingRef.current.isCurrentlyTracking = false;
-
-        setState((prev) => ({
-          ...prev,
-          isTracking: false,
-          error: result.error.message || "Failed to track view",
-        }));
-      } else {
-        console.log(
-          `✅ Successfully tracked ${type} view for ID: ${numericId}`
-        );
-
-        // Mark as successfully tracked
-        markAsTracked();
-
-        setState((prev) => ({
-          ...prev,
-          isTracked: true,
-          isTracking: false,
-          error: null,
-        }));
+        throw new Error(result.error.message);
       }
-    } catch (error) {
-      console.error(`❌ Exception tracking ${type} view:`, error);
 
-      // Reset tracking flags on exception
-      trackingRef.current.hasTracked = false;
-      trackingRef.current.isCurrentlyTracking = false;
+      // Mark as successfully tracked in all caches
+      storage.set(trackingKey, true);
 
       setState((prev) => ({
         ...prev,
+        isTracked: true,
         isTracking: false,
-        error: error instanceof Error ? error.message : "Failed to track view",
+        error: null,
+      }));
+    } catch (error) {
+      // On error, reset flags to allow retry
+      trackingRef.current.hasExecuted = false;
+      trackingRef.current.isExecuting = false;
+      globalTrackingCache.delete(trackingKey);
+
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to track view";
+      setState((prev) => ({
+        ...prev,
+        isTracking: false,
+        error: errorMessage,
       }));
     } finally {
-      // Always clear the currently tracking flag
-      trackingRef.current.isCurrentlyTracking = false;
+      trackingRef.current.isExecuting = false;
     }
-  }, [type, numericId, enabled, markAsTracked, getSessionKey, storageManager]);
+  }, [numericId, enabled, type, trackingKey, storage]);
 
-  // Reset tracking when ID changes (with proper cleanup)
+  // Manual trigger for testing (clears all caches first)
+  const triggerView = useCallback(() => {
+    if (!trackingKey) return;
+
+    // Clear timeout
+    if (trackingRef.current.timeoutId) {
+      clearTimeout(trackingRef.current.timeoutId);
+      trackingRef.current.timeoutId = null;
+    }
+
+    // Reset all tracking flags and caches
+    trackingRef.current.hasExecuted = false;
+    trackingRef.current.isExecuting = false;
+    globalTrackingCache.delete(trackingKey);
+    storage.set(trackingKey, false);
+
+    // Execute immediately
+    executeTracking();
+  }, [executeTracking, trackingKey, storage]);
+
+  // Reset when ID changes
   useEffect(() => {
-    if (numericId !== trackingRef.current.numericId) {
-      console.log(`🔄 Resetting tracking for ${type}:${numericId}`);
-
-      // Clear any existing timers
+    if (numericId !== trackingRef.current.currentId) {
+      // Clear timers
       if (trackingRef.current.timeoutId) {
         clearTimeout(trackingRef.current.timeoutId);
         trackingRef.current.timeoutId = null;
       }
 
       // Reset tracking state
-      trackingRef.current.hasTracked = false;
-      trackingRef.current.isCurrentlyTracking = false;
+      trackingRef.current.hasExecuted = false;
+      trackingRef.current.isExecuting = false;
       trackingRef.current.startTime = Date.now();
-      trackingRef.current.numericId = numericId;
+      trackingRef.current.currentId = numericId;
 
-      // Update component state
+      // Check if already tracked
       const alreadyTracked = isAlreadyTracked();
       setState((prev) => ({
         ...prev,
         isTracked: alreadyTracked,
         isTracking: false,
-        timeSpent: 0,
         error: null,
+        timeSpent: 0,
       }));
     }
-  }, [numericId, type, isAlreadyTracked]);
+  }, [numericId, isAlreadyTracked]);
 
-  // Time tracking with improved interval management
+  // Time tracking
   useEffect(() => {
     if (!enabled || !numericId) return;
 
-    // Clear any existing interval
     if (trackingRef.current.intervalId) {
       clearInterval(trackingRef.current.intervalId);
     }
@@ -326,48 +270,37 @@ export function useViewTracking(
     };
   }, [enabled, numericId]);
 
-  // Main tracking effect with Firefox-specific improvements
+  // Main tracking effect with React StrictMode protection
   useEffect(() => {
-    if (!enabled || !numericId) {
+    if (
+      !enabled ||
+      !numericId ||
+      trackingRef.current.hasExecuted ||
+      isAlreadyTracked()
+    ) {
+      if (isAlreadyTracked()) {
+        setState((prev) => ({ ...prev, isTracked: true }));
+      }
       return;
     }
 
-    // Don't start tracking if already tracked
-    if (isAlreadyTracked()) {
-      console.log("❌ Tracking not started - already tracked:", {
-        enabled,
-        numericId,
-        alreadyTracked: true,
-      });
-      setState((prev) => ({ ...prev, isTracked: true }));
-      return;
-    }
-
-    console.log(
-      `⏰ Setting up tracking timer for ${type}:${numericId} (delay: ${delay}ms)`
-    );
-
-    // Clear any existing timeout
+    // Clear existing timeout
     if (trackingRef.current.timeoutId) {
       clearTimeout(trackingRef.current.timeoutId);
     }
 
-    // Use requestAnimationFrame for better Firefox compatibility
-    const scheduleTracking = () => {
-      trackingRef.current.timeoutId = setTimeout(() => {
-        // Double-check conditions before tracking
-        if (enabled && numericId && !isAlreadyTracked()) {
-          const timeSpent = Date.now() - trackingRef.current.startTime;
-          console.log(
-            `⏱️ Timer fired for ${type}:${numericId}, time spent: ${timeSpent}ms`
-          );
-          trackView();
-        }
-      }, delay);
-    };
-
-    // Use requestAnimationFrame to ensure DOM is ready (Firefox compatibility)
-    requestAnimationFrame(scheduleTracking);
+    // Schedule tracking with delay
+    trackingRef.current.timeoutId = setTimeout(() => {
+      // Final check before execution (prevents React StrictMode double calls)
+      if (
+        enabled &&
+        numericId &&
+        !trackingRef.current.hasExecuted &&
+        !isAlreadyTracked()
+      ) {
+        executeTracking();
+      }
+    }, delay);
 
     return () => {
       if (trackingRef.current.timeoutId) {
@@ -375,39 +308,17 @@ export function useViewTracking(
         trackingRef.current.timeoutId = null;
       }
     };
-  }, [enabled, numericId, delay, trackView, type]); // Removed isAlreadyTracked from deps to prevent race conditions
+  }, [enabled, numericId, delay, executeTracking, isAlreadyTracked]);
 
-  // Manual trigger for testing
-  const triggerView = useCallback(() => {
-    console.log(`🔄 Manual trigger for ${type}:${numericId}`);
-
-    // Clear timeout and force track
-    if (trackingRef.current.timeoutId) {
-      clearTimeout(trackingRef.current.timeoutId);
-      trackingRef.current.timeoutId = null;
-    }
-
-    // Reset tracking flags to allow manual trigger
-    trackingRef.current.hasTracked = false;
-    trackingRef.current.isCurrentlyTracking = false;
-
-    trackView();
-  }, [trackView, type, numericId]);
-
-  // Enhanced cleanup on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // Clear all timers
       if (trackingRef.current.timeoutId) {
         clearTimeout(trackingRef.current.timeoutId);
       }
       if (trackingRef.current.intervalId) {
         clearInterval(trackingRef.current.intervalId);
       }
-
-      // Reset tracking state
-      trackingRef.current.hasTracked = false;
-      trackingRef.current.isCurrentlyTracking = false;
     };
   }, []);
 

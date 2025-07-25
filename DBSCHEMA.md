@@ -403,31 +403,13 @@ created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 UNIQUE (post_id, view_date)
 );
 
--- Create a function to increment view count properly
-CREATE OR REPLACE FUNCTION increment_post_view(post_id_param INTEGER)
-RETURNS VOID AS $$
-BEGIN
--- First update the main posts table total view count
-UPDATE posts
-SET view_count = view_count + 1
-WHERE id = post_id_param;
-
--- Then, update or insert the daily view count
-INSERT INTO post_views (post_id, view_date, view_count)
-VALUES (post_id_param, CURRENT_DATE, 1)
-ON CONFLICT (post_id, view_date)
-DO UPDATE SET view_count = post_views.view_count + 1;
-END;
-
-$$
-LANGUAGE plpgsql;
-
 -- Create a function to get post views per day for the last N days
 CREATE OR REPLACE FUNCTION get_post_views_by_day(post_id_param INTEGER, days_count INTEGER)
 RETURNS TABLE (
-  view_date DATE,
-  count INTEGER
+view_date DATE,
+count INTEGER
 ) AS
+
 $$
 
 BEGIN
@@ -447,15 +429,18 @@ LEFT JOIN post_views pv ON pv.view_date = days.day AND pv.post_id = post_id_para
 ORDER BY days.day;
 END;
 
+
 $$
+
 LANGUAGE plpgsql;
 
 -- Create a function to get total views per day across all posts
 CREATE OR REPLACE FUNCTION get_total_views_by_day(days_count INTEGER)
 RETURNS TABLE (
-  view_date DATE,
-  count INTEGER
+view_date DATE,
+count INTEGER
 ) AS
+
 $$
 
 BEGIN
@@ -476,9 +461,10 @@ GROUP BY days.day
 ORDER BY days.day;
 END;
 
-$$
-LANGUAGE plpgsql;
 
+$$
+
+LANGUAGE plpgsql;
 
 $$
 
@@ -486,7 +472,9 @@ $$
 -- This function handles the delete/insert atomically to prevent conflicts
 
 CREATE OR REPLACE FUNCTION update_user_role(p_user_id UUID, p_new_role_id INTEGER)
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN AS
+$$
+
 DECLARE
 existing_role_id INTEGER;
 BEGIN
@@ -1359,21 +1347,7 @@ INSERT INTO technologies (name, slug, description, icon, category, official_url,
 CREATE OR REPLACE FUNCTION increment_project_view(project_id_param INTEGER)
 RETURNS VOID AS $$
 BEGIN
--- Update main projects table
-UPDATE projects
-SET view_count = view_count + 1, updated_at = NOW()
-WHERE id = project_id_param;
 
--- Update/insert daily view count
-INSERT INTO project_views (project_id, view_date, view_count)
-VALUES (project_id_param, CURRENT_DATE, 1)
-ON CONFLICT (project_id, view_date)
-DO UPDATE SET view_count = project_views.view_count + 1;
-END;
-
-$$
-LANGUAGE plpgsql;
-----------
 $$
 
 -- Project Awards Table
@@ -1467,7 +1441,9 @@ technologies JSONB,
 awards JSONB,
 created_at TIMESTAMPTZ,
 updated_at TIMESTAMPTZ
-) AS $$
+) AS
+$$
+
 BEGIN
 RETURN QUERY
 SELECT
@@ -2006,17 +1982,137 @@ $$
 
 LANGUAGE plpgsql;
 
--- 4. Function to safely increment view counts (prevents SQL injection and errors)
+-- 6. Create a materialized view for faster analytics (refresh periodically)
+CREATE MATERIALIZED VIEW IF NOT EXISTS analytics_summary AS
+SELECT
+COUNT(CASE WHEN p.published = true THEN 1 END) as total_posts,
+COUNT(CASE WHEN pr.is_active = true AND pr.is_public = true THEN 1 END) as total_projects,
+(SELECT COUNT(\*) FROM profiles) as total_users,
+COALESCE(SUM(pv.view_count), 0) as total_post_views,
+COALESCE(SUM(prv.view_count), 0) as total_project_views,
+CURRENT_DATE as last_updated
+FROM posts p
+FULL OUTER JOIN projects pr ON false -- Force cross join
+LEFT JOIN post_views pv ON true
+LEFT JOIN project_views prv ON true;
+
+-- Create index on materialized view
+CREATE UNIQUE INDEX IF NOT EXISTS idx_analytics_summary_date ON analytics_summary(last_updated);
+
+-- 7. Function to refresh analytics (call this periodically)
+CREATE OR REPLACE FUNCTION refresh_analytics_summary()
+RETURNS VOID AS
+
+$$
+
+BEGIN
+REFRESH MATERIALIZED VIEW CONCURRENTLY analytics_summary;
+END;
+
+
+$$
+
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Updated and improved view tracking functions
+-- Run these in your Supabase SQL editor
+
+-- 1. Enhanced increment_post_view function with better error handling
+CREATE OR REPLACE FUNCTION increment_post_view(post_id_param INTEGER)
+RETURNS VOID AS $$
+BEGIN
+-- Validate input
+IF post_id_param IS NULL OR post_id_param <= 0 THEN
+RAISE EXCEPTION 'Invalid post_id: %', post_id_param;
+END IF;
+
+-- Check if post exists and is published
+IF NOT EXISTS (
+SELECT 1 FROM posts
+WHERE id = post_id_param AND published = true
+) THEN
+RAISE EXCEPTION 'Post not found or not published: %', post_id_param;
+END IF;
+
+-- Update main posts table
+UPDATE posts
+SET view_count = view_count + 1, updated_at = NOW()
+WHERE id = post_id_param;
+
+-- Update/insert daily view count
+INSERT INTO post_views (post_id, view_date, view_count)
+VALUES (post_id_param, CURRENT_DATE, 1)
+ON CONFLICT (post_id, view_date)
+DO UPDATE SET view_count = post_views.view_count + 1;
+
+EXCEPTION
+WHEN OTHERS THEN
+-- Log error but don't fail silently
+RAISE NOTICE 'Error incrementing post view for ID %: %', post_id_param, SQLERRM;
+RAISE;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 2. Enhanced increment_project_view function with better error handling
+CREATE OR REPLACE FUNCTION increment_project_view(project_id_param INTEGER)
+RETURNS VOID AS
+$$
+
+BEGIN
+-- Validate input
+IF project_id_param IS NULL OR project_id_param <= 0 THEN
+RAISE EXCEPTION 'Invalid project_id: %', project_id_param;
+END IF;
+
+-- Check if project exists and is active/public
+IF NOT EXISTS (
+SELECT 1 FROM projects
+WHERE id = project_id_param
+AND is_active = true
+AND is_public = true
+) THEN
+RAISE EXCEPTION 'Project not found or not public: %', project_id_param;
+END IF;
+
+-- Update main projects table
+UPDATE projects
+SET view_count = view_count + 1, updated_at = NOW()
+WHERE id = project_id_param;
+
+-- Update/insert daily view count
+INSERT INTO project_views (project_id, view_date, view_count)
+VALUES (project_id_param, CURRENT_DATE, 1)
+ON CONFLICT (project_id, view_date)
+DO UPDATE SET view_count = project_views.view_count + 1;
+
+EXCEPTION
+WHEN OTHERS THEN
+-- Log error but don't fail silently
+RAISE NOTICE 'Error incrementing project view for ID %: %', project_id_param, SQLERRM;
+RAISE;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3. Safe versions that return boolean (optional - for better error handling)
 CREATE OR REPLACE FUNCTION safe_increment_post_view(post_id_param INTEGER)
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN AS
+$$
+
 BEGIN
 -- Validate input
 IF post_id_param IS NULL OR post_id_param <= 0 THEN
 RETURN FALSE;
 END IF;
 
--- Check if post exists
-IF NOT EXISTS (SELECT 1 FROM posts WHERE id = post_id_param) THEN
+-- Check if post exists and is published
+IF NOT EXISTS (
+SELECT 1 FROM posts
+WHERE id = post_id_param AND published = true
+) THEN
 RETURN FALSE;
 END IF;
 
@@ -2032,6 +2128,7 @@ ON CONFLICT (post_id, view_date)
 DO UPDATE SET view_count = post_views.view_count + 1;
 
 RETURN TRUE;
+
 EXCEPTION
 WHEN OTHERS THEN
 RETURN FALSE;
@@ -2040,7 +2137,7 @@ END;
 $$
 LANGUAGE plpgsql SECURITY DEFINER;
 
--- 5. Function to safely increment project view counts
+-- 4. Safe project view increment function
 CREATE OR REPLACE FUNCTION safe_increment_project_view(project_id_param INTEGER)
 RETURNS BOOLEAN AS
 $$
@@ -2051,7 +2148,7 @@ IF project_id_param IS NULL OR project_id_param <= 0 THEN
 RETURN FALSE;
 END IF;
 
--- Check if project exists and is public
+-- Check if project exists and is active/public
 IF NOT EXISTS (
 SELECT 1 FROM projects
 WHERE id = project_id_param
@@ -2073,6 +2170,7 @@ ON CONFLICT (project_id, view_date)
 DO UPDATE SET view_count = project_views.view_count + 1;
 
 RETURN TRUE;
+
 EXCEPTION
 WHEN OTHERS THEN
 RETURN FALSE;
@@ -2081,45 +2179,52 @@ END;
 $$
 LANGUAGE plpgsql SECURITY DEFINER;
 
--- 6. Create a materialized view for faster analytics (refresh periodically)
-CREATE MATERIALIZED VIEW IF NOT EXISTS analytics_summary AS
-SELECT
-  COUNT(CASE WHEN p.published = true THEN 1 END) as total_posts,
-  COUNT(CASE WHEN pr.is_active = true AND pr.is_public = true THEN 1 END) as total_projects,
-  (SELECT COUNT(*) FROM profiles) as total_users,
-  COALESCE(SUM(pv.view_count), 0) as total_post_views,
-  COALESCE(SUM(prv.view_count), 0) as total_project_views,
-  CURRENT_DATE as last_updated
-FROM posts p
-FULL OUTER JOIN projects pr ON false -- Force cross join
-LEFT JOIN post_views pv ON true
-LEFT JOIN project_views prv ON true;
+-- 5. Grant proper permissions
+GRANT EXECUTE ON FUNCTION increment_post_view(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION increment_project_view(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION safe_increment_post_view(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION safe_increment_project_view(INTEGER) TO authenticated;
 
--- Create index on materialized view
-CREATE UNIQUE INDEX IF NOT EXISTS idx_analytics_summary_date ON analytics_summary(last_updated);
+-- 6. Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_post_views_post_id_date ON post_views(post_id, view_date);
+CREATE INDEX IF NOT EXISTS idx_project_views_project_id_date ON project_views(project_id, view_date);
 
--- 7. Function to refresh analytics (call this periodically)
-CREATE OR REPLACE FUNCTION refresh_analytics_summary()
-RETURNS VOID AS
+-- 7. Add function to check if view was already tracked today (for debugging)
+CREATE OR REPLACE FUNCTION check_view_tracked_today(content_type TEXT, content_id INTEGER)
+RETURNS BOOLEAN AS
 $$
 
 BEGIN
-REFRESH MATERIALIZED VIEW CONCURRENTLY analytics_summary;
+IF content_type = 'post' THEN
+RETURN EXISTS (
+SELECT 1 FROM post_views
+WHERE post_id = content_id AND view_date = CURRENT_DATE
+);
+ELSIF content_type = 'project' THEN
+RETURN EXISTS (
+SELECT 1 FROM project_views
+WHERE project_id = content_id AND view_date = CURRENT_DATE
+);
+END IF;
+
+RETURN FALSE;
 END;
 
 $$
 LANGUAGE plpgsql SECURITY DEFINER;
 
+GRANT EXECUTE ON FUNCTION check_view_tracked_today(TEXT, INTEGER) TO authenticated;
+
 -- 8. Grant permissions
 GRANT EXECUTE ON FUNCTION get_optimized_analytics_summary(INTEGER) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_optimized_daily_views(INTEGER) TO authenticated;
-GRANT EXECUTE ON FUNCTION safe_increment_post_view(INTEGER) TO authenticated;
-GRANT EXECUTE ON FUNCTION safe_increment_project_view(INTEGER) TO authenticated;
 GRANT SELECT ON analytics_summary TO authenticated;
 
 -- 9. Create a function to clean up old view data (run monthly)
 CREATE OR REPLACE FUNCTION cleanup_old_view_data(days_to_keep INTEGER DEFAULT 365)
 RETURNS INTEGER AS
+
+
 $$
 
 DECLARE
@@ -2146,28 +2251,31 @@ RETURN deleted_count;
 END;
 
 $$
+
 LANGUAGE plpgsql SECURITY DEFINER;
 
--- SELECT cleanup_old_view_data(365); -- Keeps 1 year of data
+-- SELECT cleanup*old_view_data(365); -- Keeps 1 year of data
 -- Schedule to run on the 1st of every month at 3 AM
 /*
 SELECT cron.schedule(
-  'cleanup_old_views',
-  '0 3 1 * *',
-  'SELECT cleanup_old_view_data(180);'
+'cleanup*old_views',
+'0 3 1 * \*',
+'SELECT cleanup_old_view_data(180);'
 );
 
-*/
+\*/
 -- 10. Create extension for better performance if not exists
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 
 -- 11. Create a monitoring function for performance
 CREATE OR REPLACE FUNCTION get_performance_stats()
 RETURNS TABLE (
-  total_queries BIGINT,
-  avg_exec_time NUMERIC,
-  slow_queries_count BIGINT
+total_queries BIGINT,
+avg_exec_time NUMERIC,
+slow_queries_count BIGINT
 ) AS
+
+
 $$
 
 BEGIN
@@ -2181,9 +2289,12 @@ WHERE query NOT LIKE '%pg_stat_statements%';
 END;
 
 $$
+
 LANGUAGE plpgsql SECURITY DEFINER;
 
----------
+---
+
+
 $$
 
 -- Add to your DBSCHEMA.md file
@@ -2296,7 +2407,10 @@ WHERE ur.user_id = auth.uid() AND r.name = 'admin'
 
 -- Functions for Notifications
 CREATE OR REPLACE FUNCTION create_contact_notification()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER AS
+
+$$
+
 BEGIN
 INSERT INTO notifications (
 title,
@@ -2323,24 +2437,27 @@ jsonb_build_object('contact_message_id', NEW.id, 'sender_name', NEW.name)
 RETURN NEW;
 END;
 
+
 $$
+
 LANGUAGE plpgsql;
 
 -- Trigger for contact messages
 CREATE TRIGGER on_contact_message_created
-  AFTER INSERT ON contact_messages
-  FOR EACH ROW EXECUTE FUNCTION create_contact_notification();
+AFTER INSERT ON contact_messages
+FOR EACH ROW EXECUTE FUNCTION create_contact_notification();
 
 -- Enhanced function to update online user with better authentication tracking
 CREATE OR REPLACE FUNCTION update_online_user(
-  p_user_id UUID DEFAULT NULL,
-  p_session_id TEXT DEFAULT NULL,
-  p_ip_address INET DEFAULT NULL,
-  p_user_agent TEXT DEFAULT NULL,
-  p_page_url TEXT DEFAULT NULL,
-  p_is_authenticated BOOLEAN DEFAULT FALSE
+p_user_id UUID DEFAULT NULL,
+p_session_id TEXT DEFAULT NULL,
+p_ip_address INET DEFAULT NULL,
+p_user_agent TEXT DEFAULT NULL,
+p_page_url TEXT DEFAULT NULL,
+p_is_authenticated BOOLEAN DEFAULT FALSE
 )
 RETURNS VOID AS
+
 $$
 
 BEGIN
@@ -2384,16 +2501,19 @@ AND last_activity < NOW() - INTERVAL '1 hour';
 END IF;
 END;
 
+
 $$
+
 LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Enhanced function to get online users count with proper authentication filtering
 CREATE OR REPLACE FUNCTION get_online_users_count()
 RETURNS TABLE (
-  total_online INTEGER,
-  authenticated_users INTEGER,
-  anonymous_users INTEGER
+total_online INTEGER,
+authenticated_users INTEGER,
+anonymous_users INTEGER
 ) AS
+
 $$
 
 BEGIN
@@ -2417,19 +2537,22 @@ anonymous::INTEGER
 FROM online_stats;
 END;
 
+
 $$
+
 LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to get recent online users with profile information
 CREATE OR REPLACE FUNCTION get_recent_online_users(p_limit INTEGER DEFAULT 10)
 RETURNS TABLE (
-  user_id UUID,
-  session_id TEXT,
-  last_activity TIMESTAMPTZ,
-  is_authenticated BOOLEAN,
-  page_url TEXT,
-  user_name TEXT
+user_id UUID,
+session_id TEXT,
+last_activity TIMESTAMPTZ,
+is_authenticated BOOLEAN,
+page_url TEXT,
+user_name TEXT
 ) AS
+
 $$
 
 BEGIN
@@ -2452,12 +2575,15 @@ ORDER BY ou.last_activity DESC
 LIMIT p_limit;
 END;
 
+
 $$
+
 LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Enhanced cleanup function for online users
 CREATE OR REPLACE FUNCTION cleanup_online_users()
 RETURNS INTEGER AS
+
 $$
 
 DECLARE
@@ -2472,15 +2598,18 @@ GET DIAGNOSTICS deleted_count = ROW_COUNT;
 RETURN deleted_count;
 END;
 
+
 $$
+
 LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to remove specific user session
 CREATE OR REPLACE FUNCTION remove_user_session(
-  p_session_id TEXT,
-  p_user_id UUID DEFAULT NULL
+p_session_id TEXT,
+p_user_id UUID DEFAULT NULL
 )
 RETURNS BOOLEAN AS
+
 $$
 
 BEGIN
@@ -2491,17 +2620,18 @@ AND (p_user_id IS NULL OR user_id = p_user_id);
 RETURN FOUND;
 END;
 
+
 $$
+
 LANGUAGE plpgsql SECURITY DEFINER;
-
-
 
 -- Enhanced function to mark notification as read with proper handling
 CREATE OR REPLACE FUNCTION mark_notification_read(
-  p_notification_id INTEGER,
-  p_user_id UUID
+p_notification_id INTEGER,
+p_user_id UUID
 )
 RETURNS BOOLEAN AS
+
 $$
 
 DECLARE
@@ -2539,9 +2669,10 @@ END IF;
 RETURN TRUE;
 END;
 
-$$
-LANGUAGE plpgsql SECURITY DEFINER;
 
+$$
+
+LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Grant permissions
 GRANT EXECUTE ON FUNCTION update_online_user(UUID, TEXT, INET, TEXT, TEXT, BOOLEAN) TO authenticated;
@@ -2549,26 +2680,26 @@ GRANT EXECUTE ON FUNCTION get_online_users_count() TO authenticated;
 
 GRANT EXECUTE ON FUNCTION mark_notification_read(INTEGER, UUID) TO authenticated;
 
-
 -- Function to get notifications with proper read status for a user
 CREATE OR REPLACE FUNCTION get_user_notifications(
-  p_user_id UUID,
-  p_limit INTEGER DEFAULT 10
+p_user_id UUID,
+p_limit INTEGER DEFAULT 10
 )
 RETURNS TABLE (
-  id INTEGER,
-  title TEXT,
-  message TEXT,
-  type TEXT,
-  priority TEXT,
-  icon TEXT,
-  action_url TEXT,
-  action_label TEXT,
-  is_global BOOLEAN,
-  metadata JSONB,
-  created_at TIMESTAMPTZ,
-  is_read BOOLEAN
+id INTEGER,
+title TEXT,
+message TEXT,
+type TEXT,
+priority TEXT,
+icon TEXT,
+action_url TEXT,
+action_label TEXT,
+is_global BOOLEAN,
+metadata JSONB,
+created_at TIMESTAMPTZ,
+is_read BOOLEAN
 ) AS
+
 $$
 
 BEGIN
@@ -2609,7 +2740,9 @@ ORDER BY created_at DESC
 LIMIT p_limit;
 END;
 
+
 $$
+
 LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Grant execute permission
@@ -2618,6 +2751,7 @@ GRANT EXECUTE ON FUNCTION get_user_notifications(UUID, INTEGER) TO authenticated
 -- Function to get unread notification count for a user
 CREATE OR REPLACE FUNCTION get_unread_notification_count(p_user_id UUID)
 RETURNS INTEGER AS
+
 $$
 
 DECLARE
@@ -2648,7 +2782,9 @@ WHERE is_read = false;
 RETURN COALESCE(unread_count, 0);
 END;
 
+
 $$
+
 LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Grant execute permission
@@ -2662,7 +2798,8 @@ CREATE INDEX idx_online_users_last_activity ON online_users(last_activity);
 CREATE INDEX idx_notification_recipients_user_id ON notification_recipients(user_id);
 CREATE INDEX idx_system_analytics_metric_date ON system_analytics(metric_name, date_key);
 
-----------
+---
+
 $$
 
 -- Enhanced analytics functions with better performance
@@ -2677,7 +2814,9 @@ total_messages INTEGER,
 avg_daily_views NUMERIC,
 growth_rate NUMERIC,
 online_users_count INTEGER
-) AS $$
+) AS
+$$
+
 DECLARE
 start_date DATE := CURRENT_DATE - (days_count - 1);
 current_views BIGINT;
