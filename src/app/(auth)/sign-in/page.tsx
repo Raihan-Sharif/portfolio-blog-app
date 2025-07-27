@@ -1,10 +1,13 @@
+// src/app/(auth)/sign-in/page.tsx
 "use client";
 
+import { useAuth } from "@/components/providers/auth-provider";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/lib/supabase/client";
-import { AlertCircle } from "lucide-react";
+import { resetPassword, signInWithPassword } from "@/lib/auth-utils";
+import { AlertCircle, Eye, EyeOff, Loader2, Mail } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -13,172 +16,258 @@ import { Suspense, useEffect, useState } from "react";
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
   const redirectPath = searchParams?.get("redirect") || "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
+  // Redirect if already authenticated
   useEffect(() => {
-    // Check if user is already logged in
-    const checkUser = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        // User is already logged in, redirect
+    if (!authLoading && user) {
+      // User is already logged in, redirect appropriately
+      if (user.role === "admin") {
+        router.push("/admin/dashboard");
+      } else {
         router.push(redirectPath);
       }
-    };
-
-    checkUser();
-  }, [router, redirectPath]);
+    }
+  }, [user, authLoading, router, redirectPath]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (loading) return;
 
     try {
       setLoading(true);
       setError(null);
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+      if (!email.trim() || !password.trim()) {
+        setError("Please fill in all fields");
+        return;
+      }
+
+      const result = await signInWithPassword({
+        email: email.trim(),
         password,
       });
 
-      if (error) {
-        throw error;
+      if (!result.success) {
+        setError(result.error || "Sign in failed");
+        return;
       }
 
-      if (data?.session) {
-        // After sign-in, check user role
-        const userId = data.session.user.id;
-
-        // Get user roles directly
-        const { data: userRolesData, error: roleError } = await supabase
-          .from("user_roles")
-          .select("role_id")
-          .eq("user_id", userId);
-
-        if (roleError) {
-          console.error("Error fetching user roles:", roleError);
-          // Default to home page if error
-          router.push(redirectPath);
-          return;
-        }
-
-        // Default to viewer role
-        let isAdmin = false;
-
-        if (userRolesData && userRolesData.length > 0) {
-          const roleId = userRolesData[0].role_id;
-
-          // Get the role name
-          const { data: roleData } = await supabase
-            .from("roles")
-            .select("name")
-            .eq("id", roleId)
-            .single();
-
-          if (roleData && roleData.name === "admin") {
-            isAdmin = true;
-          }
-        }
-
-        // If user came from admin and is admin, go back to the admin page
-        // If not, go to the provided redirect or home
-        if (redirectPath.startsWith("/admin") && isAdmin) {
-          router.push(redirectPath);
-        } else if (isAdmin) {
-          router.push("/admin/dashboard");
-        } else {
-          router.push(redirectPath);
-        }
-      }
+      // Sign in was successful - the auth provider will handle the redirect
+      // based on the user's role and the redirect parameter
     } catch (err: any) {
       console.error("Sign in error:", err);
-      setError(err.message || "Failed to sign in. Please try again.");
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-accent/20 px-4">
-      <div className="w-full max-w-md p-8 bg-card rounded-lg shadow-lg border">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold">Sign In</h1>
-          <p className="text-muted-foreground mt-2">
-            Welcome back! Sign in to your account
-          </p>
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError("Please enter your email address first");
+      return;
+    }
+
+    try {
+      setIsResettingPassword(true);
+      setError(null);
+
+      const result = await resetPassword(email.trim());
+
+      if (result.success) {
+        setResetEmailSent(true);
+      } else {
+        setError(result.error || "Failed to send reset email");
+      }
+    } catch (err) {
+      setError("Failed to send reset email. Please try again.");
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Loading...</span>
         </div>
+      </div>
+    );
+  }
 
-        {error && (
-          <div className="bg-destructive/10 text-destructive rounded-md p-4 mb-6 flex items-start">
-            <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
-            <div>{error}</div>
+  // Don't render the form if user is already authenticated
+  if (user) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="bg-white dark:bg-gray-800 shadow-xl rounded-lg p-8">
+          <div className="text-center">
+            <h2 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+              Welcome back
+            </h2>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              Sign in to your account to continue
+            </p>
           </div>
-        )}
 
-        <form onSubmit={handleSignIn} className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="your@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link
-                href="/reset-password"
-                className="text-sm text-primary hover:underline"
+          {resetEmailSent ? (
+            <div className="mt-8 text-center">
+              <div className="rounded-full bg-green-100 dark:bg-green-900 p-3 mx-auto w-16 h-16 flex items-center justify-center mb-4">
+                <Mail className="h-8 w-8 text-green-600 dark:text-green-400" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Check your email
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                We've sent a password reset link to {email}
+              </p>
+              <Button
+                onClick={() => setResetEmailSent(false)}
+                variant="outline"
+                className="w-full"
               >
-                Forgot password?
-              </Link>
+                Back to sign in
+              </Button>
             </div>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
+          ) : (
+            <form className="mt-8 space-y-6" onSubmit={handleSignIn}>
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Signing in..." : "Sign In"}
-          </Button>
-        </form>
+              <div className="space-y-4">
+                <div>
+                  <Label
+                    htmlFor="email"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Email address
+                  </Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="mt-1"
+                    placeholder="Enter your email"
+                    disabled={loading}
+                  />
+                </div>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/sign-up" className="text-primary hover:underline">
-              Sign up
-            </Link>
-          </p>
+                <div>
+                  <Label
+                    htmlFor="password"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Password
+                  </Label>
+                  <div className="mt-1 relative">
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="current-password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={loading}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="text-sm">
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50"
+                    disabled={loading || isResettingPassword}
+                  >
+                    {isResettingPassword ? (
+                      <span className="flex items-center">
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        Sending...
+                      </span>
+                    ) : (
+                      "Forgot password?"
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign in"
+                )}
+              </Button>
+
+              <div className="text-center">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Don't have an account?{" "}
+                  <Link
+                    href="/sign-up"
+                    className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    Sign up
+                  </Link>
+                </span>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// Main page component with Suspense boundary
 export default function SignInPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-accent/20">
-          <div className="text-center">
-            <p>Loading...</p>
-          </div>
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       }
     >

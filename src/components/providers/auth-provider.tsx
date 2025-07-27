@@ -1,9 +1,8 @@
 // src/components/providers/auth-provider.tsx
 "use client";
 
-import { useOnlineTracking } from "@/hooks/use-online-tracking";
 import { supabase } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
+import type { Session, User } from "@supabase/supabase-js";
 import {
   createContext,
   ReactNode,
@@ -13,8 +12,14 @@ import {
   useState,
 } from "react";
 
+interface EnhancedUser extends User {
+  full_name?: string;
+  role?: string;
+}
+
 interface AuthContextType {
-  user: (User & { full_name?: string; role?: string }) | null;
+  user: EnhancedUser | null;
+  session: Session | null;
   loading: boolean;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -24,6 +29,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  session: null,
   loading: true,
   signOut: async () => {},
   refreshUser: async () => {},
@@ -43,111 +49,137 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+// Simple role cache with localStorage
+const ROLE_CACHE_KEY = "user_role_cache";
+const ROLE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+interface RoleCache {
+  role: string;
+  timestamp: number;
+  userId: string;
+}
+
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<
-    (User & { full_name?: string; role?: string }) | null
-  >(null);
+  const [user, setUser] = useState<EnhancedUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditor, setIsEditor] = useState(false);
 
-  // Set up online tracking
-  useOnlineTracking(user, {
-    enabled: true,
-    updateInterval: 30000, // 30 seconds
-  });
-
-  // Enhanced user role checking with caching
-  const checkUserRole = useCallback(async (userId: string) => {
+  // Simple role checking with fallback
+  const checkUserRole = useCallback(async (userId: string): Promise<string> => {
     try {
       // Check cache first
-      const cacheKey = `user_role_${userId}`;
-      const cachedRole = sessionStorage.getItem(cacheKey);
-      const cacheTime = sessionStorage.getItem(`${cacheKey}_time`);
-      const cacheTimeout = 10 * 60 * 1000; // 10 minutes
-
-      if (
-        cachedRole &&
-        cacheTime &&
-        Date.now() - parseInt(cacheTime) < cacheTimeout
-      ) {
-        return cachedRole;
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem(ROLE_CACHE_KEY);
+        if (cached) {
+          const roleCache: RoleCache = JSON.parse(cached);
+          if (
+            roleCache.userId === userId &&
+            Date.now() - roleCache.timestamp < ROLE_CACHE_DURATION
+          ) {
+            return roleCache.role;
+          }
+        }
       }
 
-      // Fetch from database
-      const { data, error } = await supabase.rpc("get_user_with_role", {
-        p_user_id: userId,
-      });
+      // Try new function first, fallback to direct query
+      let role = "viewer"; // Default role
 
-      if (error) {
-        console.error("Error fetching user role:", error);
-        return null;
+      try {
+        const { data, error } = await supabase.rpc("get_user_with_role", {
+          p_user_id: userId,
+        });
+
+        if (!error && data && data.length > 0) {
+          role = data[0].role_name || "viewer";
+        } else {
+          throw new Error("Function not found, using fallback");
+        }
+      } catch (funcError) {
+        // Fallback to direct table query
+        console.log("Using fallback role query");
+        const { data: roleData, error: roleError } = await supabase
+          .from("user_roles")
+          .select(
+            `
+            roles (
+              name
+            )
+          `
+          )
+          .eq("user_id", userId)
+          .single();
+
+        if (!roleError && roleData?.roles) {
+          // Handle both object and array cases
+          const roleObj = Array.isArray(roleData.roles)
+            ? roleData.roles[0]
+            : roleData.roles;
+          role = roleObj?.name || "viewer";
+        }
       }
-
-      const role = data?.[0]?.role_name || null;
 
       // Cache the result
-      if (role) {
-        sessionStorage.setItem(cacheKey, role);
-        sessionStorage.setItem(`${cacheKey}_time`, Date.now().toString());
+      if (typeof window !== "undefined") {
+        const roleCache: RoleCache = {
+          role,
+          timestamp: Date.now(),
+          userId,
+        };
+        localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify(roleCache));
       }
 
       return role;
     } catch (error) {
-      console.error("Error in checkUserRole:", error);
-      return null;
+      console.error("Error checking user role:", error);
+      return "viewer"; // Safe default
     }
   }, []);
 
-  // Refresh user data and role
-  const refreshUser = useCallback(async () => {
-    try {
-      const {
-        data: { user: currentUser },
-      } = await supabase.auth.getUser();
-
-      if (currentUser) {
-        // Get additional user data from profiles table
+  // Update user with role
+  const updateUserWithRole = useCallback(
+    async (sessionUser: User, currentSession: Session) => {
+      try {
+        // Get profile data
         const { data: profileData } = await supabase
           .from("profiles")
           .select("full_name")
-          .eq("id", currentUser.id)
+          .eq("id", sessionUser.id)
           .single();
 
         // Get user role
-        const role = await checkUserRole(currentUser.id);
+        const role = await checkUserRole(sessionUser.id);
 
-        const enhancedUser = {
-          ...currentUser,
+        const enhancedUser: EnhancedUser = {
+          ...sessionUser,
           full_name:
             profileData?.full_name ||
-            currentUser.user_metadata?.full_name ||
+            sessionUser.user_metadata?.full_name ||
+            sessionUser.user_metadata?.name ||
             null,
           role: role,
         };
 
         setUser(enhancedUser);
+        setSession(currentSession);
         setIsAdmin(role === "admin");
         setIsEditor(role === "admin" || role === "editor");
-      } else {
-        setUser(null);
+      } catch (error) {
+        console.error("Error updating user with role:", error);
+        // Set user without role on error
+        setUser({
+          ...sessionUser,
+          full_name: sessionUser.user_metadata?.full_name || null,
+          role: "viewer",
+        });
+        setSession(currentSession);
         setIsAdmin(false);
         setIsEditor(false);
-        // Clear cache when user logs out
-        const keys = Object.keys(sessionStorage);
-        keys.forEach((key) => {
-          if (key.startsWith("user_role_")) {
-            sessionStorage.removeItem(key);
-          }
-        });
       }
-    } catch (error) {
-      console.error("Error refreshing user:", error);
-      setUser(null);
-      setIsAdmin(false);
-      setIsEditor(false);
-    }
-  }, [checkUserRole]);
+    },
+    [checkUserRole]
+  );
 
   // Initialize auth state
   useEffect(() => {
@@ -155,37 +187,43 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const initializeAuth = async () => {
       try {
-        // Get initial session
+        console.log("Initializing auth...");
+
+        // Get current session
         const {
-          data: { session },
+          data: { session: initialSession },
+          error,
         } = await supabase.auth.getSession();
 
-        if (session?.user && mounted) {
-          // Get additional user data
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("full_name")
-            .eq("id", session.user.id)
-            .single();
+        if (error) {
+          console.error("Session error:", error);
+          if (mounted) {
+            setUser(null);
+            setSession(null);
+            setIsAdmin(false);
+            setIsEditor(false);
+          }
+          return;
+        }
 
-          // Get user role
-          const role = await checkUserRole(session.user.id);
-
-          const enhancedUser = {
-            ...session.user,
-            full_name:
-              profileData?.full_name ||
-              session.user.user_metadata?.full_name ||
-              null,
-            role: role,
-          };
-
-          setUser(enhancedUser);
-          setIsAdmin(role === "admin");
-          setIsEditor(role === "admin" || role === "editor");
+        if (initialSession?.user && mounted) {
+          await updateUserWithRole(initialSession.user, initialSession);
+          console.log("Auth initialized with user");
+        } else if (mounted) {
+          setUser(null);
+          setSession(null);
+          setIsAdmin(false);
+          setIsEditor(false);
+          console.log("Auth initialized without user");
         }
       } catch (error) {
-        console.error("Error initializing auth:", error);
+        console.error("Auth initialization error:", error);
+        if (mounted) {
+          setUser(null);
+          setSession(null);
+          setIsAdmin(false);
+          setIsEditor(false);
+        }
       } finally {
         if (mounted) {
           setLoading(false);
@@ -195,128 +233,90 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     initializeAuth();
 
-    // Listen for auth changes
+    return () => {
+      mounted = false;
+    };
+  }, [updateUserWithRole]);
+
+  // Listen for auth changes
+  useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
+    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      console.log("Auth state change:", event);
 
-      if (event === "SIGNED_IN" && session?.user) {
-        // User signed in
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", session.user.id)
-          .single();
+      try {
+        if (event === "SIGNED_IN" && newSession?.user) {
+          await updateUserWithRole(newSession.user, newSession);
+        } else if (event === "SIGNED_OUT") {
+          setUser(null);
+          setSession(null);
+          setIsAdmin(false);
+          setIsEditor(false);
 
-        const role = await checkUserRole(session.user.id);
-
-        const enhancedUser = {
-          ...session.user,
-          full_name:
-            profileData?.full_name ||
-            session.user.user_metadata?.full_name ||
-            null,
-          role: role,
-        };
-
-        setUser(enhancedUser);
-        setIsAdmin(role === "admin");
-        setIsEditor(role === "admin" || role === "editor");
-      } else if (event === "SIGNED_OUT") {
-        // User signed out
-        setUser(null);
-        setIsAdmin(false);
-        setIsEditor(false);
-
-        // Clear all cached data
-        const keys = Object.keys(sessionStorage);
-        keys.forEach((key) => {
-          if (key.startsWith("user_role_") || key.startsWith("user_session_")) {
-            sessionStorage.removeItem(key);
+          // Clear caches
+          if (typeof window !== "undefined") {
+            localStorage.removeItem(ROLE_CACHE_KEY);
           }
-        });
-      } else if (event === "TOKEN_REFRESHED" && session?.user) {
-        // Token refreshed, update user data
-        await refreshUser();
+        } else if (event === "TOKEN_REFRESHED" && newSession?.user) {
+          // Update session but don't refetch user data unnecessarily
+          setSession(newSession);
+          console.log("Token refreshed");
+        }
+      } catch (error) {
+        console.error("Auth state change error:", error);
       }
 
       setLoading(false);
     });
 
     return () => {
-      mounted = false;
       subscription.unsubscribe();
     };
-  }, [checkUserRole, refreshUser]);
+  }, [updateUserWithRole]);
 
-  // Enhanced sign out function
+  // Refresh user data
+  const refreshUser = useCallback(async () => {
+    if (!session?.user) return;
+
+    try {
+      await updateUserWithRole(session.user, session);
+    } catch (error) {
+      console.error("Error refreshing user:", error);
+    }
+  }, [session, updateUserWithRole]);
+
+  // Sign out
   const signOut = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Clear all cached data first
-      const keys = Object.keys(sessionStorage);
-      keys.forEach((key) => {
-        if (
-          key.startsWith("user_role_") ||
-          key.startsWith("user_session_") ||
-          key.startsWith("admin_") ||
-          key.startsWith("navbar_admin_")
-        ) {
-          sessionStorage.removeItem(key);
-        }
-      });
+      // Clear caches
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(ROLE_CACHE_KEY);
+      }
 
-      // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
 
       if (error) {
-        console.error("Error signing out:", error);
-        throw error;
+        console.error("Sign out error:", error);
       }
 
       // Reset state
       setUser(null);
+      setSession(null);
       setIsAdmin(false);
       setIsEditor(false);
     } catch (error) {
-      console.error("Error during sign out:", error);
+      console.error("Sign out error:", error);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Cleanup online tracking on unmount
-  useEffect(() => {
-    return () => {
-      // Cleanup function runs when component unmounts
-      if (user) {
-        // Optional: Send offline status (this might not work on page close)
-        supabase.rpc("cleanup_online_users").then(
-          () => {},
-          (err) => console.error(err)
-        );
-      }
-    };
-  }, [user]);
-
-  // Periodic cleanup of old online users (admin only)
-  useEffect(() => {
-    if (!isAdmin) return;
-
-    const cleanupInterval = setInterval(() => {
-      supabase.rpc("cleanup_online_users").then(
-        () => {},
-        (err) => console.error(err)
-      );
-    }, 5 * 60 * 1000); // Every 5 minutes
-
-    return () => clearInterval(cleanupInterval);
-  }, [isAdmin]);
-
   const value: AuthContextType = {
     user,
+    session,
     loading,
     signOut,
     refreshUser,

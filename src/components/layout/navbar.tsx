@@ -11,28 +11,31 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ModeToggle } from "@/components/ui/mode-toggle";
-import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { LayoutDashboard, LogOut, Menu, User, X } from "lucide-react";
+import {
+  Edit3,
+  Eye,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Settings,
+  Shield,
+  User,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, isAdmin, isEditor } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
 
-  // Simplified admin role management
-  const [isAdmin, setIsAdmin] = useState(false);
-  const adminCache = useRef<
-    Map<string, { status: boolean; timestamp: number }>
-  >(new Map());
-  const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-
+  // Handle scroll effect
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
@@ -45,249 +48,198 @@ export function Navbar() {
   const toggleMenu = () => setIsOpen(!isOpen);
   const closeMenu = () => setIsOpen(false);
 
-  const handleSignOut = async () => {
-    // Clear admin cache
-    if (user?.id) {
-      adminCache.current.delete(user.id);
-      sessionStorage.removeItem(`navbar_admin_${user.id}`);
-      sessionStorage.removeItem(`navbar_admin_${user.id}_time`);
+  // Enhanced sign out with loading state
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const handleSignOut = useCallback(async () => {
+    try {
+      setIsSigningOut(true);
+      closeMenu();
+      await signOut();
+      router.push("/");
+    } catch (error) {
+      console.error("Sign out error:", error);
+    } finally {
+      setIsSigningOut(false);
     }
-    await signOut();
-    router.push("/");
-  };
+  }, [signOut, router]);
 
-  // Simplified admin check with better caching
-  const checkAdminRole = useCallback(
-    async (userId: string) => {
-      // Check memory cache first
-      const cached = adminCache.current.get(userId);
-      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        return cached.status;
-      }
-
-      // If user role is already admin in context, use it directly
-      if (user?.role === "admin") {
-        const adminStatus = true;
-        adminCache.current.set(userId, {
-          status: adminStatus,
-          timestamp: Date.now(),
-        });
-        return adminStatus;
-      }
-
-      // Check sessionStorage
-      const sessionKey = `navbar_admin_${userId}`;
-      const sessionCached = sessionStorage.getItem(sessionKey);
-      const sessionTimestamp = sessionStorage.getItem(`${sessionKey}_time`);
-
-      if (sessionCached && sessionTimestamp) {
-        const timestamp = parseInt(sessionTimestamp);
-        if (Date.now() - timestamp < CACHE_DURATION) {
-          const status = sessionCached === "true";
-          adminCache.current.set(userId, {
-            status,
-            timestamp: Date.now(),
-          });
-          return status;
-        }
-      }
-
-      // Only check database if absolutely necessary
-      try {
-        const { data, error } = await supabase.rpc("get_user_with_role", {
-          p_user_id: userId,
-        });
-
-        const adminStatus =
-          !error && data && data.length > 0 && data[0].role_name === "admin";
-
-        // Cache the result
-        adminCache.current.set(userId, {
-          status: adminStatus,
-          timestamp: Date.now(),
-        });
-        sessionStorage.setItem(sessionKey, adminStatus.toString());
-        sessionStorage.setItem(`${sessionKey}_time`, Date.now().toString());
-
-        return adminStatus;
-      } catch (err) {
-        console.error("Error checking role:", err);
-        return false;
-      }
+  // Navigation items
+  const navigationItems = [
+    { name: "Home", href: "/", current: pathname === "/" },
+    { name: "About", href: "/about", current: pathname === "/about" },
+    {
+      name: "Projects",
+      href: "/projects",
+      current: pathname.startsWith("/projects"),
     },
-    [user?.role, CACHE_DURATION]
-  );
-
-  // Check admin role when user changes, but don't block the UI
-  useEffect(() => {
-    if (!user) {
-      setIsAdmin(false);
-      return;
-    }
-
-    // Quick check from cache first
-    const cached = adminCache.current.get(user.id);
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      setIsAdmin(cached.status);
-      return;
-    }
-
-    // If user role is already admin in context, set it immediately
-    if (user.role === "admin") {
-      setIsAdmin(true);
-      adminCache.current.set(user.id, {
-        status: true,
-        timestamp: Date.now(),
-      });
-      return;
-    }
-
-    // Async check without blocking the UI
-    const checkAsync = async () => {
-      const adminStatus = await checkAdminRole(user.id);
-      setIsAdmin(adminStatus);
-    };
-
-    // Use a small delay to avoid blocking navigation
-    const timeoutId = setTimeout(checkAsync, 100);
-    return () => clearTimeout(timeoutId);
-  }, [user, checkAdminRole, CACHE_DURATION]);
-
-  // Base navigation links
-  const baseNavLinks = [
-    { href: "/", label: "Home" },
-    { href: "/about", label: "About" },
-    { href: "/projects", label: "Projects" },
-    { href: "/skills", label: "Skills" },
-    { href: "/blog", label: "Blog" },
-    { href: "/contact", label: "Contact" },
+    { name: "Blog", href: "/blog", current: pathname.startsWith("/blog") },
+    { name: "Contact", href: "/contact", current: pathname === "/contact" },
   ];
 
-  const navbarClasses = cn("fixed w-full z-50 transition-all duration-300", {
-    "bg-background/80 backdrop-blur-md shadow-md": isScrolled,
-    "bg-transparent": !isScrolled,
-  });
+  // Get user role info
+  const getRoleInfo = () => {
+    if (isAdmin) {
+      return { label: "Admin", color: "text-red-600", icon: Shield };
+    }
+    if (isEditor) {
+      return { label: "Editor", color: "text-blue-600", icon: Edit3 };
+    }
+    return { label: "User", color: "text-gray-600", icon: Eye };
+  };
+
+  const roleInfo = getRoleInfo();
 
   return (
-    <nav className={navbarClasses}>
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+    <nav
+      className={cn(
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+        isScrolled
+          ? "bg-white/90 dark:bg-gray-900/90 backdrop-blur-md shadow-lg"
+          : "bg-transparent"
+      )}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex-shrink-0">
-            <Link href="/" className="flex items-center">
-              <span className="text-xl font-bold">Raihan Sharif</span>
+            <Link href="/" className="text-2xl font-bold text-primary">
+              Portfolio
             </Link>
           </div>
 
           {/* Desktop Navigation */}
           <div className="hidden md:block">
-            <div className="ml-10 flex items-center space-x-4">
-              {baseNavLinks.map((link) => (
+            <div className="ml-10 flex items-baseline space-x-4">
+              {navigationItems.map((item) => (
                 <Link
-                  key={link.href}
-                  href={link.href}
+                  key={item.name}
+                  href={item.href}
                   className={cn(
                     "px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                    pathname === link.href
+                    item.current
                       ? "bg-primary text-primary-foreground"
-                      : "text-foreground hover:bg-accent hover:text-accent-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
                   )}
-                  onClick={closeMenu}
                 >
-                  {link.label}
+                  {item.name}
                 </Link>
               ))}
-
-              {!loading && (
-                <>
-                  {user ? (
-                    <div className="flex items-center gap-2">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex items-center gap-2"
-                          >
-                            <User size={16} />
-                            <span className="hidden lg:inline">
-                              {user.full_name || "Account"}
-                            </span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href="/profile">Profile</Link>
-                          </DropdownMenuItem>
-                          {isAdmin && (
-                            <DropdownMenuItem asChild>
-                              <Link href="/admin/dashboard">
-                                <LayoutDashboard className="mr-2 h-4 w-4" />
-                                <span>Dashboard</span>
-                              </Link>
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={handleSignOut}>
-                            <LogOut className="mr-2 h-4 w-4" />
-                            <span>Sign Out</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  ) : (
-                    <Link href="/sign-in">
-                      <Button variant="outline" size="sm">
-                        Sign In
-                      </Button>
-                    </Link>
-                  )}
-                </>
-              )}
-              <ModeToggle />
             </div>
           </div>
 
-          {/* Mobile menu button */}
-          <div className="flex md:hidden items-center space-x-2">
+          {/* Right side - Auth & Settings */}
+          <div className="hidden md:flex items-center space-x-4">
             <ModeToggle />
-            {!loading && user && (
+
+            {loading ? (
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+              </div>
+            ) : user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 rounded-full"
+                    variant="ghost"
+                    className="relative h-10 w-10 rounded-full"
                   >
-                    <User size={16} />
+                    <div className="flex items-center justify-center w-full h-full rounded-full bg-primary text-primary-foreground">
+                      {user.full_name
+                        ? user.full_name[0].toUpperCase()
+                        : user.email?.[0].toUpperCase() || "U"}
+                    </div>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link href="/profile">Profile</Link>
-                  </DropdownMenuItem>
-                  {isAdmin && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/admin/dashboard">
-                        <LayoutDashboard className="mr-2 h-4 w-4" />
-                        <span>Dashboard</span>
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
+                <DropdownMenuContent className="w-64" align="end" forceMount>
+                  {/* User Info */}
+                  <div className="flex items-center justify-start gap-2 p-4">
+                    <div className="flex flex-col space-y-1 leading-none">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm">
+                          {user.full_name || "Anonymous User"}
+                        </p>
+                        <span
+                          className={cn("text-xs font-medium", roleInfo.color)}
+                        >
+                          {roleInfo.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {user.email}
+                      </p>
+                    </div>
+                  </div>
+
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut}>
+
+                  {/* Navigation Items */}
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile" className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      Profile
+                    </Link>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings" className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Settings
+                    </Link>
+                  </DropdownMenuItem>
+
+                  {(isAdmin || isEditor) && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link
+                          href="/admin/dashboard"
+                          className="cursor-pointer"
+                        >
+                          <LayoutDashboard className="mr-2 h-4 w-4" />
+                          Dashboard
+                          {isAdmin && (
+                            <span className="ml-auto text-xs text-red-600">
+                              Admin
+                            </span>
+                          )}
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+
+                  <DropdownMenuSeparator />
+
+                  {/* Sign Out */}
+                  <DropdownMenuItem
+                    className="cursor-pointer text-red-600 dark:text-red-400"
+                    onClick={handleSignOut}
+                    disabled={isSigningOut}
+                  >
                     <LogOut className="mr-2 h-4 w-4" />
-                    <span>Sign Out</span>
+                    {isSigningOut ? "Signing out..." : "Sign out"}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Button variant="ghost" asChild>
+                  <Link href="/sign-in">Sign In</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/sign-up">Sign Up</Link>
+                </Button>
+              </div>
             )}
+          </div>
+
+          {/* Mobile menu button */}
+          <div className="md:hidden">
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
               onClick={toggleMenu}
-              aria-label="Toggle menu"
+              aria-expanded="false"
             >
+              <span className="sr-only">Open main menu</span>
               {isOpen ? (
                 <X className="h-6 w-6" />
               ) : (
@@ -305,43 +257,106 @@ export function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3 }}
-            className="md:hidden bg-background/95 backdrop-blur-md shadow-lg"
+            transition={{ duration: 0.2 }}
+            className="md:hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t"
           >
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-              {baseNavLinks.map((link) => (
+              {navigationItems.map((item) => (
                 <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={closeMenu}
+                  key={item.name}
+                  href={item.href}
                   className={cn(
-                    "block px-3 py-2 rounded-md text-base font-medium",
-                    pathname === link.href
+                    "block px-3 py-2 rounded-md text-base font-medium transition-colors",
+                    item.current
                       ? "bg-primary text-primary-foreground"
-                      : "text-foreground hover:bg-accent hover:text-accent-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
                   )}
+                  onClick={closeMenu}
                 >
-                  {link.label}
+                  {item.name}
                 </Link>
               ))}
-              {isAdmin && (
-                <Link
-                  href="/admin/dashboard"
-                  onClick={closeMenu}
-                  className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent hover:text-accent-foreground"
-                >
-                  Admin Dashboard
-                </Link>
+
+              {/* Mobile Auth Section */}
+              {user ? (
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+                  <div className="flex items-center px-3 mb-3">
+                    <div className="flex-shrink-0">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-primary-foreground">
+                        {user.full_name
+                          ? user.full_name[0].toUpperCase()
+                          : user.email?.[0].toUpperCase() || "U"}
+                      </div>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="text-base font-medium">
+                          {user.full_name || "Anonymous User"}
+                        </div>
+                        <span
+                          className={cn("text-xs font-medium", roleInfo.color)}
+                        >
+                          {roleInfo.label}
+                        </span>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {user.email}
+                      </div>
+                    </div>
+                  </div>
+
+                  <Link
+                    href="/profile"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-muted-foreground hover:text-foreground hover:bg-accent"
+                    onClick={closeMenu}
+                  >
+                    Profile
+                  </Link>
+
+                  {(isAdmin || isEditor) && (
+                    <Link
+                      href="/admin/dashboard"
+                      className="block px-3 py-2 rounded-md text-base font-medium text-muted-foreground hover:text-foreground hover:bg-accent"
+                      onClick={closeMenu}
+                    >
+                      Dashboard
+                    </Link>
+                  )}
+
+                  <button
+                    onClick={handleSignOut}
+                    disabled={isSigningOut}
+                    className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    {isSigningOut ? "Signing out..." : "Sign out"}
+                  </button>
+                </div>
+              ) : (
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4 space-y-2">
+                  <Link
+                    href="/sign-in"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-muted-foreground hover:text-foreground hover:bg-accent"
+                    onClick={closeMenu}
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/sign-up"
+                    className="block px-3 py-2 rounded-md text-base font-medium bg-primary text-primary-foreground"
+                    onClick={closeMenu}
+                  >
+                    Sign Up
+                  </Link>
+                </div>
               )}
-              {!loading && !user && (
-                <Link
-                  href="/sign-in"
-                  onClick={closeMenu}
-                  className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent hover:text-accent-foreground"
-                >
-                  Sign In
-                </Link>
-              )}
+
+              {/* Mobile Theme Toggle */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4 px-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-base font-medium">Theme</span>
+                  <ModeToggle />
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
