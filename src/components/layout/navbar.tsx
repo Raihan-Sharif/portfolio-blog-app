@@ -14,13 +14,10 @@ import { ModeToggle } from "@/components/ui/mode-toggle";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Edit3,
-  Eye,
   LayoutDashboard,
   LogOut,
   Menu,
   Settings,
-  Shield,
   User,
   X,
 } from "lucide-react";
@@ -76,18 +73,16 @@ export function Navbar() {
     { name: "Contact", href: "/contact", current: pathname === "/contact" },
   ];
 
-  // Get user role info
-  const getRoleInfo = () => {
-    if (isAdmin) {
-      return { label: "Admin", color: "text-red-600", icon: Shield };
-    }
-    if (isEditor) {
-      return { label: "Editor", color: "text-blue-600", icon: Edit3 };
-    }
-    return { label: "User", color: "text-gray-600", icon: Eye };
-  };
-
-  const roleInfo = getRoleInfo();
+  // Get user role info (keeping for future use if needed)
+  // const getRoleInfo = () => {
+  //   if (isAdmin) {
+  //     return { label: "Admin", color: "text-red-600", icon: Shield };
+  //   }
+  //   if (isEditor) {
+  //     return { label: "Editor", color: "text-blue-600", icon: Edit3 };
+  //   }
+  //   return { label: "User", color: "text-gray-600", icon: Eye };
+  // };
 
   return (
     <nav
@@ -140,32 +135,93 @@ export function Navbar() {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="relative h-10 w-10 rounded-full"
+                    className="relative h-auto min-h-12 px-3 py-2 rounded-xl bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 border border-slate-200 dark:border-slate-600 hover:from-slate-100 hover:to-slate-150 dark:hover:from-slate-700 dark:hover:to-slate-600 transition-all duration-200 shadow-sm hover:shadow-md"
                   >
-                    <div className="flex items-center justify-center w-full h-full rounded-full bg-primary text-primary-foreground">
-                      {user.full_name
-                        ? user.full_name[0].toUpperCase()
-                        : user.email?.[0].toUpperCase() || "U"}
+                    <div className="flex items-center space-x-3">
+                      {/* Enhanced Avatar */}
+                      <div className="relative">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-primary via-primary to-purple-600 text-white text-sm font-bold shadow-lg ring-2 ring-white dark:ring-slate-800">
+                          {user.full_name
+                            ? user.full_name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .toUpperCase()
+                                .slice(0, 2)
+                            : user.email?.[0].toUpperCase() || "U"}
+                        </div>
+                        {/* Online status indicator */}
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-slate-800 rounded-full"></div>
+                      </div>
+                      
+                      {/* User Info */}
+                      <div className="flex flex-col items-start text-left min-w-0">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-semibold text-slate-900 dark:text-white truncate max-w-32">
+                            {user.full_name || "Anonymous User"}
+                          </span>
+                          {(isAdmin || isEditor) && (
+                            <span
+                              className={cn(
+                                "px-2 py-0.5 text-xs font-medium rounded-full",
+                                isAdmin
+                                  ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                                  : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                              )}
+                            >
+                              {isAdmin ? "Admin" : "Editor"}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-32">
+                          {user.email}
+                        </span>
+                      </div>
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-64" align="end" forceMount>
-                  {/* User Info */}
-                  <div className="flex items-center justify-start gap-2 p-4">
-                    <div className="flex flex-col space-y-1 leading-none">
+                <DropdownMenuContent className="w-72" align="end" forceMount>
+                  {/* Enhanced User Info Header */}
+                  <div className="flex items-center justify-start gap-3 p-4 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 border-b border-slate-200 dark:border-slate-600">
+                    <div className="relative">
+                      <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-primary to-purple-600 text-white text-sm font-bold shadow-lg">
+                        {user.full_name
+                          ? user.full_name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase()
+                              .slice(0, 2)
+                          : user.email?.[0].toUpperCase() || "U"}
+                      </div>
+                      {/* Online status indicator */}
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white dark:border-slate-800 rounded-full"></div>
+                    </div>
+                    <div className="flex flex-col space-y-1 leading-none min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm">
+                        <p className="font-semibold text-base text-slate-900 dark:text-white truncate">
                           {user.full_name || "Anonymous User"}
                         </p>
-                        <span
-                          className={cn("text-xs font-medium", roleInfo.color)}
-                        >
-                          {roleInfo.label}
-                        </span>
+                        {(isAdmin || isEditor) && (
+                          <span
+                            className={cn(
+                              "px-2 py-0.5 text-xs font-medium rounded-full",
+                              isAdmin
+                                ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                                : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                            )}
+                          >
+                            {isAdmin ? "Admin" : "Editor"}
+                          </span>
+                        )}
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
                         {user.email}
                       </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">Online</span>
+                      </div>
                     </div>
                   </div>
 
@@ -281,25 +337,39 @@ export function Navbar() {
               {user ? (
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
                   <div className="flex items-center px-3 mb-3">
-                    <div className="flex-shrink-0">
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-primary-foreground">
+                    <div className="flex-shrink-0 relative">
+                      <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-primary via-primary to-purple-600 text-white text-sm font-bold shadow-lg">
                         {user.full_name
-                          ? user.full_name[0].toUpperCase()
+                          ? user.full_name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase()
+                              .slice(0, 2)
                           : user.email?.[0].toUpperCase() || "U"}
                       </div>
+                      {/* Online status indicator */}
+                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-slate-800 rounded-full"></div>
                     </div>
-                    <div className="ml-3 flex-1">
-                      <div className="flex items-center gap-2">
-                        <div className="text-base font-medium">
+                    <div className="ml-3 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="text-base font-semibold truncate">
                           {user.full_name || "Anonymous User"}
                         </div>
-                        <span
-                          className={cn("text-xs font-medium", roleInfo.color)}
-                        >
-                          {roleInfo.label}
-                        </span>
+                        {(isAdmin || isEditor) && (
+                          <span
+                            className={cn(
+                              "px-2 py-0.5 text-xs font-medium rounded-full",
+                              isAdmin
+                                ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                                : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                            )}
+                          >
+                            {isAdmin ? "Admin" : "Editor"}
+                          </span>
+                        )}
                       </div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-sm text-muted-foreground truncate">
                         {user.email}
                       </div>
                     </div>

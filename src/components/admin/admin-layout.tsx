@@ -235,7 +235,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     [user]
   );
 
-  // Initialize admin status
+  // FIXED: Initialize admin status only once, not on every navigation
   useEffect(() => {
     if (loading || hasInitialized.current) return;
 
@@ -247,8 +247,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
 
     const initializeAdmin = async () => {
-      setAdminLoading(true);
-
+      // FIXED: Don't show loading during admin check to prevent double loading
+      // The middleware already validates admin access, so this is just a UI state update
+      
       try {
         const adminStatus = await checkAdminStatus(user.id);
         setIsAdmin(adminStatus);
@@ -262,13 +263,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         if (!loading) {
           router.push("/");
         }
-      } finally {
-        setAdminLoading(false);
       }
     };
 
     initializeAdmin();
-  }, [user, loading, router, pathname, checkAdminStatus]);
+  }, [user, loading, router, checkAdminStatus]); // REMOVED: pathname dependency to prevent re-runs on navigation
 
   // Track online presence and fetch data
   useEffect(() => {
@@ -448,7 +447,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     setIsSidebarOpen(false);
   }, []);
 
-  if (loading || (adminLoading && !hasInitialized.current)) {
+  // FIXED: Only show loading on initial auth load, not on admin verification
+  // This prevents double loading states with dashboard skeleton
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
         <div className="text-center">

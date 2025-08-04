@@ -30,10 +30,13 @@ function SignInForm() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!authLoading && user) {
-      // User is already logged in, redirect appropriately
+      // User is already logged in, redirect appropriately based on role
       if (user.role === "admin") {
         router.push("/admin/dashboard");
+      } else if (user.role === "editor") {
+        router.push("/admin/dashboard");
       } else {
+        // Regular users go to their intended destination or home
         router.push(redirectPath);
       }
     }
@@ -63,8 +66,8 @@ function SignInForm() {
         return;
       }
 
-      // Sign in was successful - the auth provider will handle the redirect
-      // based on the user's role and the redirect parameter
+      // Sign in was successful - wait for user data to be available
+      // The useEffect above will handle redirection based on user role
     } catch (err: any) {
       console.error("Sign in error:", err);
       setError("An unexpected error occurred. Please try again.");
@@ -115,15 +118,36 @@ function SignInForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="bg-white dark:bg-gray-800 shadow-xl rounded-lg p-8">
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden px-4 sm:px-6 lg:px-8">
+      {/* Advanced Background System */}
+      <div className="absolute inset-0 z-0">
+        {/* Base gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20 dark:from-slate-950 dark:via-blue-950/20 dark:to-purple-950/10" />
+        
+        {/* Animated gradients */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-r from-primary/20 via-purple-500/20 to-blue-500/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse" />
+        <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-gradient-to-r from-purple-500/20 via-blue-500/20 to-primary/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse animation-delay-2000" />
+        <div className="absolute bottom-1/3 left-1/3 w-96 h-96 bg-gradient-to-r from-blue-500/20 via-primary/20 to-purple-500/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse animation-delay-4000" />
+        
+        {/* Grid pattern overlay */}
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDk5LCAxMDIsIDI0MSwgMC4xKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-30" />
+      </div>
+
+      <div className="max-w-md w-full space-y-8 relative z-10">
+        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-2xl rounded-2xl p-8 border border-white/20 dark:border-slate-800/50">
           <div className="text-center">
-            <h2 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+            {/* Logo/Brand Section */}
+            <div className="mb-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-primary via-purple-600 to-blue-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
+                <span className="text-2xl font-bold text-white">RS</span>
+              </div>
+            </div>
+            
+            <h2 className="text-3xl font-bold bg-gradient-to-r from-slate-900 via-slate-700 to-slate-600 dark:from-white dark:via-slate-200 dark:to-slate-300 bg-clip-text text-transparent">
               Welcome back
             </h2>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Sign in to your account to continue
+            <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
+              Sign in to your account to continue to your portfolio
             </p>
           </div>
 
@@ -232,7 +256,11 @@ function SignInForm() {
                 </div>
               </div>
 
-              <Button type="submit" disabled={loading} className="w-full">
+              <Button 
+                type="submit" 
+                disabled={loading} 
+                className="w-full bg-gradient-to-r from-primary via-purple-600 to-blue-600 hover:from-primary/90 hover:via-purple-600/90 hover:to-blue-600/90 text-white font-medium py-3 transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

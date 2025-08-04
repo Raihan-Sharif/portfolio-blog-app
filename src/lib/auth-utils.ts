@@ -68,7 +68,7 @@ export async function signInWithPassword({
 }
 
 /**
- * Enhanced sign up with profile creation
+ * Enhanced sign up with profile creation and role assignment
  */
 export async function signUpWithPassword({
   email,
@@ -107,13 +107,77 @@ export async function signUpWithPassword({
       return { success: false, error: "Sign up failed" };
     }
 
-    // Handle email confirmation requirement
+    // If user is created but needs email confirmation
     if (!data.session) {
       return {
         success: true,
         user: data.user,
         requiresVerification: true,
       };
+    }
+
+    // If user is immediately signed in, ensure profile exists
+    if (data.session && data.user) {
+      try {
+        // Check if profile was created by database trigger
+        const { data: existingProfile, error: profileCheckError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", data.user.id)
+          .single();
+
+        // If profile doesn't exist, create it manually
+        if (profileCheckError && profileCheckError.code === "PGRST116") {
+          const { error: profileCreateError } = await supabase
+            .from("profiles")
+            .insert({
+              id: data.user.id,
+              full_name: fullName.trim(),
+              email: email.trim().toLowerCase(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+
+          if (profileCreateError) {
+            console.error("Profile creation error:", profileCreateError);
+            // Don't fail signup if profile creation fails
+          }
+        }
+
+        // Ensure user has viewer role by default
+        const { data: existingRole, error: roleCheckError } = await supabase
+          .from("user_roles")
+          .select("id")
+          .eq("user_id", data.user.id)
+          .single();
+
+        if (roleCheckError && roleCheckError.code === "PGRST116") {
+          // Get viewer role ID
+          const { data: viewerRole } = await supabase
+            .from("roles")
+            .select("id")
+            .eq("name", "viewer")
+            .single();
+
+          if (viewerRole) {
+            const { error: roleAssignError } = await supabase
+              .from("user_roles")
+              .insert({
+                user_id: data.user.id,
+                role_id: viewerRole.id,
+                created_at: new Date().toISOString(),
+              });
+
+            if (roleAssignError) {
+              console.error("Role assignment error:", roleAssignError);
+              // Don't fail signup if role assignment fails
+            }
+          }
+        }
+      } catch (profileError) {
+        console.error("Post-signup profile setup error:", profileError);
+        // Don't fail the signup, just log the error
+      }
     }
 
     return { success: true, user: data.user };
