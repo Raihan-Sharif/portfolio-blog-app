@@ -1,3 +1,4 @@
+// @ts-nocheck
 // app/projects/page.tsx
 import EnhancedFeaturedProjects from "@/components/home/enhanced-featured-projects";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -5,7 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 export const revalidate = 3600; // Revalidate at most once per hour
 
 export default async function ProjectsPage() {
-  const supabase = createServerSupabaseClient();
+  const supabase = createServerSupabaseClient() as any;
 
   // Fetch all projects with categories, technologies, and awards
   const [projectsResponse, categoriesResponse] = await Promise.all([

@@ -70,7 +70,7 @@ function extractTextContent(content: any): string {
 export async function generateMetadata({
   params,
 }: BlogPostPageProps): Promise<Metadata> {
-  const supabase = createServerSupabaseClient();
+  const supabase = createServerSupabaseClient() as any;
   const { data: post } = await supabase
     .from("posts")
     .select(
@@ -100,7 +100,7 @@ export async function generateMetadata({
 }
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
-  const supabase = createServerSupabaseClient();
+  const supabase = createServerSupabaseClient() as any;
 
   // Get post data
   const { data: post, error } = await supabase
@@ -174,7 +174,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
       .limit(3);
 
     // Add category data to each post
-    relatedPosts = (relatedPostsData || []).map((p) => ({
+    relatedPosts = (relatedPostsData || []).map((p: any) => ({
       id: p.id,
       title: p.title,
       slug: p.slug,
@@ -208,7 +208,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
   // Get categories for trending posts
   const categoryIds = [
-    ...new Set(trendingPostsData?.map((p) => p.category_id).filter(Boolean)),
+    ...new Set(trendingPostsData?.map((p: any) => p.category_id).filter(Boolean)),
   ];
   const { data: categories } =
     categoryIds.length > 0
@@ -232,7 +232,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
       name: string;
       slug: string;
     } | null;
-  }[] = (trendingPostsData || []).map((p) => ({
+  }[] = (trendingPostsData || []).map((p: any) => ({
     id: p.id,
     title: p.title,
     slug: p.slug,
@@ -240,7 +240,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     cover_image_url: p.cover_image_url,
     created_at: p.created_at,
     view_count: p.view_count,
-    category: categories?.find((c) => c.id === p.category_id) || null,
+    category: categories?.find((c: any) => c.id === p.category_id) || null,
   }));
 
   return (

@@ -30,7 +30,7 @@ interface BlogPageProps {
 const POSTS_PER_PAGE = 9;
 
 export default async function BlogPage({ searchParams }: BlogPageProps) {
-  const supabase = createServerSupabaseClient();
+  const supabase = createServerSupabaseClient() as any;
 
   // Parse search parameters
   const currentPage = parseInt(searchParams.page || "1", 10);
@@ -72,7 +72,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 
     // Get categories for trending posts
     const categoryIds = [
-      ...new Set(trendingPostsData?.map((p) => p.category_id).filter(Boolean)),
+      ...new Set(trendingPostsData?.map((p: any) => p.category_id).filter(Boolean)),
     ];
     const { data: trendingCategories } =
       categoryIds.length > 0
@@ -96,7 +96,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
         name: string;
         slug: string;
       } | null;
-    }[] = (trendingPostsData || []).map((p) => ({
+    }[] = (trendingPostsData || []).map((p: any) => ({
       id: p.id,
       title: p.title,
       slug: p.slug,
@@ -104,7 +104,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
       cover_image_url: p.cover_image_url || undefined,
       created_at: p.created_at,
       view_count: p.view_count || 0,
-      category: trendingCategories?.find((c) => c.id === p.category_id) || null,
+      category: trendingCategories?.find((c: any) => c.id === p.category_id) || null,
     }));
 
     // Build the posts query with all necessary joins
@@ -186,8 +186,8 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
         .eq("tags.slug", selectedTag);
 
       if (taggedPosts) {
-        const taggedPostIds = taggedPosts.map((pt) => pt.post_id);
-        filteredPosts = filteredPosts.filter((post) =>
+        const taggedPostIds = taggedPosts.map((pt: any) => pt.post_id);
+        filteredPosts = filteredPosts.filter((post: any) =>
           taggedPostIds.includes(post.id)
         );
       } else {

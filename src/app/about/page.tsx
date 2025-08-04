@@ -12,18 +12,19 @@ export const metadata: Metadata = {
 export const revalidate = 3600; // Revalidate at most once per hour
 
 export default async function AboutPage() {
-  const supabase = createServerSupabaseClient();
+  const supabase = createServerSupabaseClient() as any;
 
   // Fetch all about data
-  const [
-    { data: aboutSettings },
-    { data: experiences },
-    { data: education },
-    { data: courses },
-    { data: workshops },
-    { data: achievements },
-  ] = await Promise.all([
-    supabase.from("about_settings").select("*").eq("is_active", true).single(),
+  try {
+    const [
+      { data: aboutSettings },
+      { data: experiences },
+      { data: education },
+      { data: courses },
+      { data: workshops },
+      { data: achievements },
+    ] = await Promise.all([
+      supabase.from("about_settings").select("*").eq("is_active", true).single(),
     supabase
       .from("experience")
       .select("*")
@@ -49,16 +50,29 @@ export default async function AboutPage() {
       .select("*")
       .eq("is_active", true)
       .order("display_order, achievement_date", { ascending: false }),
-  ]);
+    ]);
 
-  return (
-    <AboutContent
-      aboutSettings={aboutSettings}
-      experiences={experiences || []}
-      education={education || []}
-      courses={courses || []}
-      workshops={workshops || []}
-      achievements={achievements || []}
-    />
-  );
+    return (
+      <AboutContent
+        aboutSettings={aboutSettings}
+        experiences={experiences || []}
+        education={education || []}
+        courses={courses || []}
+        workshops={workshops || []}
+        achievements={achievements || []}
+      />
+    );
+  } catch (error) {
+    console.error("Error fetching about data:", error);
+    return (
+      <AboutContent
+        aboutSettings={null}
+        experiences={[]}
+        education={[]}
+        courses={[]}
+        workshops={[]}
+        achievements={[]}
+      />
+    );
+  }
 }

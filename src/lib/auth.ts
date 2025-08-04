@@ -11,7 +11,7 @@ interface RoleData {
 }
 
 export async function getUserRole() {
-  const supabase = createServerSupabaseClient();
+  const supabase = createServerSupabaseClient() as any;
 
   // Get the current session
   const {

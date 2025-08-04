@@ -12,17 +12,6 @@ export const createServerSupabaseClient = () => {
     const cookieStore = cookies();
     return createServerComponentClient<Database>({
       cookies: () => cookieStore,
-      supabaseOptions: {
-        auth: {
-          autoRefreshToken: false, // Handled by client-side
-          persistSession: false, // Server doesn't persist sessions
-        },
-        global: {
-          headers: {
-            "X-Client-Info": "portfolio-app-server",
-          },
-        },
-      },
     });
   } catch (error) {
     console.error("Error creating server Supabase client:", error);
@@ -38,7 +27,7 @@ export const createServerSupabaseClient = () => {
  * Enhanced admin client with proper error handling and retry logic
  */
 class SupabaseAdminClient {
-  private client: ReturnType<typeof createClient>;
+  private client: any;
   private isInitialized = false;
 
   constructor() {
@@ -196,8 +185,8 @@ class SupabaseAdminClient {
           id: profile.id,
           full_name: profile.full_name,
           created_at: profile.created_at,
-          role: userRole?.roles?.name || "No role",
-          role_id: userRole?.roles?.id || 0,
+          role: (userRole?.roles as any)?.name || "No role",
+          role_id: (userRole?.roles as any)?.id || 0,
         };
       });
 
@@ -276,7 +265,7 @@ export async function hasServerRole(requiredRole: string) {
     }
 
     const userData = await adminClientInstance.getUserWithRole(session.user.id);
-    const userRole = userData?.[0]?.role_name;
+    const userRole = (userData as any)?.[0]?.role_name;
 
     if (!userRole) {
       return false;

@@ -21,11 +21,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storageKey: "sb-portfolio-auth-stable",
     
     // CRITICAL: Disable window focus refresh to prevent conflicts
-    refetchOnWindowFocus: false,
+    // refetchOnWindowFocus: false, // Not valid in Supabase auth config
     
     // FIXED: Optimized refresh settings
     // Refresh token 10 minutes before expiry (instead of 60 seconds)
-    refreshMargin: 600, // 10 minutes in seconds
+    // refreshMargin: 600, // Not valid in Supabase auth config
     
     // FIXED: Proper storage configuration
     storage: {

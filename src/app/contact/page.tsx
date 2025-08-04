@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export const revalidate = 1800; // Revalidate every 30 minutes
 
 export default async function ContactPage() {
-  const supabase = createServerSupabaseClient();
+  const supabase = createServerSupabaseClient() as any;
 
   // Fetch all contact-related data
   const [

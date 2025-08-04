@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
  * Simplified hook for tracking authentication status and session health
  */
 export function useAuthStatus() {
-  const { user, session, loading, sessionStatus } = useAuth();
+  const { user, session, loading } = useAuth();
   const [isOnline, setIsOnline] = useState(true);
   const [sessionHealth, setSessionHealth] = useState<
     "healthy" | "warning" | "expired"
@@ -70,7 +70,6 @@ export function useAuthStatus() {
     user,
     session,
     loading,
-    sessionStatus,
     sessionHealth,
     isOnline,
     lastActivity: Date.now(), // Simplified
