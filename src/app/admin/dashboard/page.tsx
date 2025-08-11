@@ -2,6 +2,7 @@
 "use client";
 
 import AdminLayout from "@/components/admin/admin-layout";
+import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase/client";
@@ -44,6 +45,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { DashboardSkeleton } from "@/components/ui/dashboard-skeleton";
 
 interface DashboardStats {
   totalPosts: number;
@@ -130,9 +132,10 @@ const TIME_PERIODS = [
   { key: "90d" as TimePeriod, label: "3M", days: 90 },
 ];
 
-const CHART_COLORS = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444"];
+// const CHART_COLORS = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444"]; // Keeping for future use
 
 export default function DashboardPage() {
+  const { user, session, loading: authLoading } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalPosts: 0,
     totalProjects: 0,
@@ -164,18 +167,83 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("30d");
   const [chartsLoading, setChartsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
 
+  // FIXED: Only fetch data when auth is ready and user is authenticated
+  // Combined data fetching to reduce loading states
   useEffect(() => {
-    fetchDashboardStats();
-  }, []);
+    if (!authLoading && user && session && !isFetching) {
+      // Fetch both dashboard stats and views data together on initial load
+      if (stats.totalPosts === 0 && stats.totalProjects === 0) {
+        fetchDashboardStats();
+        fetchViewsData();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user, session]);
 
+  // FIXED: Only refetch views data when period changes, not on auth changes
   useEffect(() => {
-    fetchViewsData();
+    if (user && session && stats.totalPosts > 0) {
+      fetchViewsData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPeriod]);
 
+  // FIXED: Minimal refresh behavior - only on extended absence
+  useEffect(() => {
+    let lastRefresh = 0;
+    const EXTENDED_ABSENCE_TIME = 30 * 60 * 1000; // 30 minutes
+    const REFRESH_COOLDOWN = 5 * 60 * 1000; // 5 minutes between refreshes
+    let visibilityStartTime = Date.now();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        const now = Date.now();
+        const timeAway = now - visibilityStartTime;
+        
+        // Only refresh if user was away for extended period AND enough time has passed since last refresh
+        if (timeAway > EXTENDED_ABSENCE_TIME && 
+            now - lastRefresh > REFRESH_COOLDOWN && 
+            !loading && !authLoading && user && session) {
+          console.log("Extended absence detected, refreshing dashboard data");
+          lastRefresh = now;
+          fetchDashboardStats();
+          fetchViewsData();
+        }
+      } else {
+        // Track when user leaves the tab
+        visibilityStartTime = Date.now();
+      }
+    };
+
+    // REMOVED: Aggressive window focus handler that caused tab switching issues
+    // Tab switching no longer triggers data refresh
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, authLoading, user, session]);
+
   const fetchDashboardStats = async () => {
+    // Prevent multiple concurrent fetches
+    if (isFetching) return;
+    
+    // FIXED: Trust that AdminLayout already verified auth - no need to double-check
+    // This reduces redundant validations that can cause loading delays
+    
     try {
-      setLoading(true);
+      setIsFetching(true);
+      // FIXED: Always show loading on initial load for smooth UX
+      if (stats.totalPosts === 0 && stats.totalProjects === 0) {
+        setLoading(true);
+      }
+
+      // FIXED: Remove aggressive session validation that caused conflicts
+      // Trust that user and session from auth provider are valid
 
       // Fetch total counts
       const [
@@ -195,12 +263,26 @@ export default function DashboardPage() {
           .select("*", { count: "exact", head: true }),
       ]);
 
-      // Fetch total views from both sources
-      const [{ data: postViewsData }, { data: projectViewsData }] =
-        await Promise.all([
-          supabase.from("post_views").select("view_count"),
-          supabase.from("project_views").select("view_count"),
-        ]);
+      // OPTIMIZED: Fetch views data more efficiently with aggregation
+      const today = new Date().toISOString().split("T")[0];
+      
+      // Combine multiple queries to reduce API calls
+      const [
+        { data: postViewsData },
+        { data: projectViewsData },
+        { data: todayPostViews },
+        { data: todayProjectViews },
+        { count: todayMessages },
+      ] = await Promise.all([
+        supabase.from("post_views").select("view_count"),
+        supabase.from("project_views").select("view_count"),
+        supabase.from("post_views").select("view_count").eq("view_date", today),
+        supabase.from("project_views").select("view_count").eq("view_date", today),
+        supabase
+          .from("contact_messages")
+          .select("*", { count: "exact", head: true })
+          .gte("created_at", today),
+      ]);
 
       const totalPostViews =
         postViewsData?.reduce((sum, item) => sum + (item.view_count || 0), 0) ||
@@ -210,24 +292,6 @@ export default function DashboardPage() {
           (sum, item) => sum + (item.view_count || 0),
           0
         ) || 0;
-
-      // Fetch today's statistics
-      const today = new Date().toISOString().split("T")[0];
-      const [
-        { data: todayPostViews },
-        { data: todayProjectViews },
-        { count: todayMessages },
-      ] = await Promise.all([
-        supabase.from("post_views").select("view_count").eq("view_date", today),
-        supabase
-          .from("project_views")
-          .select("view_count")
-          .eq("view_date", today),
-        supabase
-          .from("contact_messages")
-          .select("*", { count: "exact", head: true })
-          .gte("created_at", today),
-      ]);
 
       const todayViews =
         (todayPostViews?.reduce(
@@ -239,44 +303,45 @@ export default function DashboardPage() {
           0
         ) || 0);
 
-      // Fetch recent posts
-      const { data: recentPosts } = await supabase
-        .from("posts")
-        .select(
+      // OPTIMIZED: Batch fetch dashboard data to reduce API calls
+      const [
+        { data: recentPosts },
+        { data: recentProjects },
+        { data: recentMessages },
+        { data: topPosts },
+        { data: topProjects },
+        { data: onlineUsersData },
+      ] = await Promise.all([
+        supabase
+          .from("posts")
+          .select(
+            `
+            id,
+            title,
+            slug,
+            view_count,
+            created_at,
+            content,
+            cover_image_url,
+            excerpt,
+            profiles!inner(full_name)
           `
-          id,
-          title,
-          slug,
-          view_count,
-          created_at,
-          content,
-          cover_image_url,
-          excerpt,
-          profiles!inner(full_name)
-        `
-        )
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      // Fetch recent projects
-      const { data: recentProjects } = await supabase
-        .from("projects")
-        .select(
-          "id, title, slug, view_count, created_at, featured_image_url, description"
-        )
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      // Fetch recent messages
-      const { data: recentMessages } = await supabase
-        .from("contact_messages")
-        .select("id, name, subject, created_at, status, priority")
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      // Fetch top content
-      const [{ data: topPosts }, { data: topProjects }] = await Promise.all([
+          )
+          .order("created_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("projects")
+          .select(
+            "id, title, slug, view_count, created_at, featured_image_url, description"
+          )
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("contact_messages")
+          .select("id, name, subject, created_at, status, priority")
+          .order("created_at", { ascending: false })
+          .limit(5),
         supabase
           .from("posts")
           .select("id, title, slug, view_count")
@@ -288,6 +353,23 @@ export default function DashboardPage() {
           .eq("is_active", true)
           .order("view_count", { ascending: false })
           .limit(5),
+        supabase
+          .from("online_users")
+          .select(
+            `
+            user_id,
+            session_id,
+            last_activity,
+            is_authenticated,
+            page_url,
+            profiles!left(full_name)
+          `
+          )
+          .gte(
+            "last_activity",
+            new Date(Date.now() - 5 * 60 * 1000).toISOString()
+          )
+          .order("last_activity", { ascending: false }),
       ]);
 
       const topContent = [
@@ -304,25 +386,6 @@ export default function DashboardPage() {
       ]
         .sort((a, b) => b.views - a.views)
         .slice(0, 8);
-
-      // Fetch online users with enhanced data
-      const { data: onlineUsersData } = await supabase
-        .from("online_users")
-        .select(
-          `
-          user_id,
-          session_id,
-          last_activity,
-          is_authenticated,
-          page_url,
-          profiles!left(full_name)
-        `
-        )
-        .gte(
-          "last_activity",
-          new Date(Date.now() - 5 * 60 * 1000).toISOString()
-        )
-        .order("last_activity", { ascending: false });
 
       const onlineUsers = {
         total_online: onlineUsersData?.length || 0,
@@ -392,10 +455,14 @@ export default function DashboardPage() {
       console.error("Error fetching dashboard stats:", error);
     } finally {
       setLoading(false);
+      setIsFetching(false);
     }
   };
 
   const fetchViewsData = async () => {
+    // Prevent concurrent fetches
+    if (chartsLoading || isFetching) return;
+    
     try {
       setChartsLoading(true);
       const period = TIME_PERIODS.find((p) => p.key === selectedPeriod);
@@ -415,7 +482,7 @@ export default function DashboardPage() {
         dateRange.push(new Date(d).toISOString().split("T")[0]);
       }
 
-      // Fetch actual views data
+      // OPTIMIZED: Single batched query for views data
       const [{ data: postViewsDaily }, { data: projectViewsDaily }] =
         await Promise.all([
           supabase
@@ -624,20 +691,22 @@ export default function DashboardPage() {
     return gradientMap[color as keyof typeof gradientMap] || gradientMap.blue;
   };
 
-  if (loading) {
+  // OPTIMIZED: Only show skeleton on initial data load, not auth loading
+  // AdminLayout handles auth state, dashboard handles data loading
+  if (!authLoading && loading && user && session && (stats.totalPosts === 0 && stats.totalProjects === 0)) {
     return (
       <AdminLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-muted-foreground font-medium">
-              Loading dashboard...
-            </p>
+        <div className="space-y-8 max-w-7xl mx-auto">
+          <div className="text-center py-8">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-slate-600 dark:text-slate-400">Loading dashboard data...</p>
           </div>
         </div>
       </AdminLayout>
     );
   }
+
+  // FIXED: AdminLayout handles auth verification, no need for additional checks
 
   return (
     <AdminLayout>

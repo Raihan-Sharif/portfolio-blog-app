@@ -93,7 +93,8 @@ async function checkUserRole(
 }
 
 /**
- * Validate and refresh session if needed
+ * FIXED: Simple session validation without aggressive refresh
+ * This prevents token conflicts that cause revocation
  */
 async function ensureValidSession(supabase: any) {
   try {
@@ -107,32 +108,10 @@ async function ensureValidSession(supabase: any) {
       return null;
     }
 
-    if (!session) {
-      return null;
-    }
-
-    // Check if session is close to expiry (within 5 minutes)
-    const expiresAt = new Date(session.expires_at! * 1000).getTime();
-    const now = Date.now();
-    const timeToExpiry = expiresAt - now;
-
-    if (timeToExpiry < 5 * 60 * 1000) {
-      // Less than 5 minutes
-      console.log("Session needs refresh in middleware");
-      try {
-        const { data: refreshData, error: refreshError } =
-          await supabase.auth.refreshSession();
-        if (refreshError) {
-          console.error("Token refresh failed in middleware:", refreshError);
-          return session; // Return original session if refresh fails
-        }
-        return refreshData.session;
-      } catch (refreshErr) {
-        console.error("Token refresh error in middleware:", refreshErr);
-        return session; // Return original session if refresh fails
-      }
-    }
-
+    // CRITICAL FIX: Don't manually refresh tokens in middleware
+    // Let Supabase client handle refresh automatically
+    // Manual refresh in middleware conflicts with client-side refresh
+    
     return session;
   } catch (error) {
     console.error("Session validation failed:", error);

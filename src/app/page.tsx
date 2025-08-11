@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export const revalidate = 3600; // Revalidate at most once per hour
 
 export default async function HomePage() {
-  const supabase = createServerSupabaseClient();
+  const supabase = createServerSupabaseClient() as any;
 
   try {
     // Fetch all data in parallel for better performance
@@ -107,7 +107,7 @@ export default async function HomePage() {
 
     // Process projects to include technologies and awards properly
     const processedProjects =
-      featuredProjects?.map((project) => ({
+      featuredProjects?.map((project: any) => ({
         ...project,
         technologies:
           project.project_technologies?.map((pt: any) => ({

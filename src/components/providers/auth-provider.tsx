@@ -9,6 +9,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -65,6 +66,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditor, setIsEditor] = useState(false);
+  
+  // FIXED: Prevent double initialization with initialization guard
+  const isInitialized = useRef<boolean>(false);
+  const lastSessionCheck = useRef<number>(0);
+  const isTabVisible = useRef<boolean>(true);
+  const sessionValidationTimer = useRef<NodeJS.Timeout | null>(null);
+  const isRefreshing = useRef<boolean>(false);
+  
+  // REMOVED: Complex cross-tab storage synchronization that caused conflicts
+  // Supabase handles cross-tab session sharing automatically via localStorage
+
+  // REMOVED: Complex cross-tab synchronization that caused token revocation
+  // Supabase now handles this automatically through its built-in storage mechanism
+
+  // REMOVED: Manual session storage loading that conflicted with Supabase's internal mechanisms
 
   // Simple role checking with fallback
   const checkUserRole = useCallback(async (userId: string): Promise<string> => {
@@ -165,6 +181,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setSession(currentSession);
         setIsAdmin(role === "admin");
         setIsEditor(role === "admin" || role === "editor");
+        
+        // REMOVED: Manual storage sync - Supabase handles this automatically
       } catch (error) {
         console.error("Error updating user with role:", error);
         // Set user without role on error
@@ -176,20 +194,87 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setSession(currentSession);
         setIsAdmin(false);
         setIsEditor(false);
+        
+        // REMOVED: Manual storage sync - Supabase handles this automatically
       }
     },
     [checkUserRole]
   );
 
-  // Initialize auth state
+  // FIXED: Simplified session validation without aggressive refresh
+  const validateSession = useCallback(async () => {
+    // Prevent concurrent validation calls
+    if (isRefreshing.current) return;
+    
+    try {
+      const now = Date.now();
+      // Increased cooldown to prevent excessive API calls
+      if (now - lastSessionCheck.current < 120000) { // 2 minutes
+        return;
+      }
+      
+      lastSessionCheck.current = now;
+      isRefreshing.current = true;
+      
+      const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error("Session validation error:", error);
+        return;
+      }
+      
+      if (!currentSession) {
+        // Session expired or invalid
+        setUser(null);
+        setSession(null);
+        setIsAdmin(false);
+        setIsEditor(false);
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(ROLE_CACHE_KEY);
+        }
+        return;
+      }
+      
+      // CRITICAL: Let Supabase handle token refresh automatically
+      // Manual refresh was causing token revocation conflicts
+      
+    } catch (error) {
+      console.error("Session validation failed:", error);
+    } finally {
+      isRefreshing.current = false;
+    }
+  }, []);
+
+  // FIXED: Gentle visibility change handling without aggressive session validation
+  const handleVisibilityChange = useCallback(() => {
+    const isVisible = document.visibilityState === "visible";
+    isTabVisible.current = isVisible;
+    
+    // REMOVED: Aggressive session validation on tab switch
+    // This was causing token revocation issues
+  }, []);
+
+  // FIXED: Removed aggressive focus-based session validation
+  const handleFocus = useCallback(() => {
+    // REMOVED: Session validation on focus
+    // Let Supabase handle session state automatically
+  }, []);
+
+  // Initialize auth state - FIXED: Single initialization with guard
   useEffect(() => {
+    // CRITICAL: Prevent double initialization
+    if (isInitialized.current) {
+      return;
+    }
+    
     let mounted = true;
+    isInitialized.current = true;
 
     const initializeAuth = async () => {
       try {
         console.log("Initializing auth...");
 
-        // Get current session
+        // Get current session from Supabase
         const {
           data: { session: initialSession },
           error,
@@ -236,7 +321,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       mounted = false;
     };
-  }, [updateUserWithRole]);
+  }, []); // FIXED: Empty dependency array to prevent re-initialization
 
   // Listen for auth changes
   useEffect(() => {
@@ -258,10 +343,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
           if (typeof window !== "undefined") {
             localStorage.removeItem(ROLE_CACHE_KEY);
           }
+          // REMOVED: Manual storage sync
         } else if (event === "TOKEN_REFRESHED" && newSession?.user) {
           // Update session but don't refetch user data unnecessarily
           setSession(newSession);
           console.log("Token refreshed");
+          
+          // REMOVED: Manual session storage sync
         }
       } catch (error) {
         console.error("Auth state change error:", error);
@@ -274,6 +362,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
       subscription.unsubscribe();
     };
   }, [updateUserWithRole]);
+
+  // FIXED: Minimal event listeners without aggressive session management
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // REMOVED: Complex cross-tab synchronization that caused token conflicts
+    // Supabase handles cross-tab auth state automatically
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+
+    // FIXED: Reduced session validation frequency to prevent conflicts
+    // Only validate every 10 minutes and only when user exists
+    if (user && !sessionValidationTimer.current) {
+      sessionValidationTimer.current = setInterval(() => {
+        if (isTabVisible.current && user) {
+          validateSession();
+        }
+      }, 10 * 60 * 1000); // 10 minutes instead of 5
+    }
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+      if (sessionValidationTimer.current) {
+        clearInterval(sessionValidationTimer.current);
+        sessionValidationTimer.current = null;
+      }
+    };
+  }, [user, handleVisibilityChange, handleFocus, validateSession]);
 
   // Refresh user data
   const refreshUser = useCallback(async () => {
@@ -295,6 +413,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (typeof window !== "undefined") {
         localStorage.removeItem(ROLE_CACHE_KEY);
       }
+      // REMOVED: Manual storage sync
 
       const { error } = await supabase.auth.signOut();
 

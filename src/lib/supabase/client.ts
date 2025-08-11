@@ -8,24 +8,70 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables");
 }
 
-// Simple, reliable Supabase client configuration
+// Enhanced Supabase client configuration to prevent token revocation
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    // Enable automatic refresh but don't be aggressive about it
+    // CRITICAL: Configure for multi-tab stability
     autoRefreshToken: true,
-    // Persist session in local storage for reliability
     persistSession: true,
-    // Detect session in URL for auth redirects
     detectSessionInUrl: true,
-    // Use PKCE flow for better security
     flowType: "pkce",
-    // Set reasonable storage key
-    storageKey: "sb-auth-token",
+    
+    // FIXED: Prevent cross-tab conflicts with unique storage key
+    storageKey: "sb-portfolio-auth-stable",
+    
+    // CRITICAL: Disable window focus refresh to prevent conflicts
+    // refetchOnWindowFocus: false, // Not valid in Supabase auth config
+    
+    // FIXED: Optimized refresh settings
+    // Refresh token 10 minutes before expiry (instead of 60 seconds)
+    // refreshMargin: 600, // Not valid in Supabase auth config
+    
+    // FIXED: Proper storage configuration
+    storage: {
+      getItem: (key) => {
+        if (typeof window === 'undefined') return null;
+        try {
+          return localStorage.getItem(key);
+        } catch {
+          return null;
+        }
+      },
+      setItem: (key, value) => {
+        if (typeof window === 'undefined') return;
+        try {
+          localStorage.setItem(key, value);
+        } catch {
+          // Silently fail if storage is not available
+        }
+      },
+      removeItem: (key) => {
+        if (typeof window === 'undefined') return;
+        try {
+          localStorage.removeItem(key);
+        } catch {
+          // Silently fail if storage is not available
+        }
+      },
+    },
+    
+    // FIXED: Disable debug in production to reduce log noise
+    debug: false,
   },
-  // Set global headers for identification
+  // Optimized global headers
   global: {
     headers: {
-      "X-Client-Info": "portfolio-app",
+      "X-Client-Info": "portfolio-stable-v3",
+    },
+  },
+  // Database connection settings
+  db: {
+    schema: "public",
+  },
+  // Optimized realtime settings
+  realtime: {
+    params: {
+      eventsPerSecond: 5, // Reduced to prevent conflicts
     },
   },
 });
