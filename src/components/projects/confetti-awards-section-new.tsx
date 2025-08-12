@@ -42,7 +42,7 @@ export function ConfettiAwardsSection({
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d")!;
     let animationFrame: number;
-    let emitter: NodeJS.Timer | null = null;
+    let emitter: NodeJS.Timeout | null = null;
     let running = true;
     let timesFired = 0;
     let wind = 0;
@@ -93,7 +93,7 @@ export function ConfettiAwardsSection({
         y: -size,
         size,
         color: colors[Math.floor(Math.random() * colors.length)],
-        shape: Math.random() > 0.5 ? "rect" : "circle",
+        shape: Math.random() > 0.5 ? "rect" : "circle" as "rect" | "circle",
         vx: (Math.random() - 0.5) * 1.2,
         vy: Math.random() * 2 + 2.5,
         rotation: Math.random() * 360,

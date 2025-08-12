@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion, useInView } from "framer-motion";
 import { Crown, ExternalLink, Medal, Trophy } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface ProjectAward {
   id: number;
@@ -22,202 +22,297 @@ interface ConfettiAwardsSectionProps {
   awards: ProjectAward[];
 }
 
-// Enhanced confetti particle with realistic physics
-const RealisticConfettiParticle = ({
-  delay = 0,
-  index = 0,
-}: {
-  delay?: number;
-  index?: number;
-}) => {
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  color: string;
+  shape: 'circle' | 'square' | 'triangle' | 'star' | 'heart' | 'diamond';
+  rotation: number;
+  rotationSpeed: number;
+  opacity: number;
+  life: number;
+  maxLife: number;
+  gravity: number;
+  drift: number;
+  glowIntensity: number;
+}
+
+// Enhanced Canvas-based Confetti System with Proper Looping
+const useAdvancedConfetti = (trigger: boolean, shouldLoop: boolean = false) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationRef = useRef<number>();
+  const particlesRef = useRef<Particle[]>([]);
+  const isAnimatingRef = useRef(false);
+  const loopTimeoutRef = useRef<NodeJS.Timeout>();
+  const startTimeRef = useRef<number>(0);
+
   const colors = [
-    "#FFD700",
-    "#FF6B35",
-    "#F7931E",
-    "#FFB300",
-    "#FF5722",
-    "#E91E63",
-    "#9C27B0",
-    "#673AB7",
-    "#3F51B5",
-    "#2196F3",
-    "#00BCD4",
-    "#4CAF50",
-    "#8BC34A",
-    "#CDDC39",
-    "#FFC107",
-    "#FF9800",
-    "#795548",
-    "#607D8B",
-    "#F44336",
-    "#E91E63",
+    '#FFD700', '#FF6B35', '#F7931E', '#FFB300', '#FF5722',
+    '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#2196F3',
+    '#00BCD4', '#4CAF50', '#8BC34A', '#CDDC39', '#FFC107',
+    '#FF9800', '#795548', '#607D8B', '#F44336', '#9E9E9E'
   ];
 
-  const shapes = ["circle", "square", "triangle", "star", "diamond"];
-  const randomColor = colors[Math.floor(Math.random() * colors.length)];
-  const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
-
-  // Restored beautiful physics with smart optimization
-  const initialVelocityX = (Math.random() - 0.5) * 600; // Wide horizontal spread restored
-  const initialVelocityY = -Math.random() * 350 - 250; // Strong UPWARD blast restored
-  const gravity = 600; // Balanced gravity for natural fall
-  const size = Math.random() * 10 + 4; // 4-14px particles
-  const rotationSpeed = (Math.random() - 0.5) * 360; // Full rotation restored
-  const duration = 7; // 7 seconds for beautiful long fall
-
-  // Restored realistic trajectory calculation (optimized)
-  const calculatePosition = (time: number) => {
-    const x = initialVelocityX * time;
-    const y = initialVelocityY * time + 0.5 * gravity * time * time;
-    return { x, y };
-  };
-
-  // Smart optimization: fewer steps but still smooth
-  const trajectory = [];
-  const steps = 40; // Reduced from 90 but still smooth enough
-  for (let i = 0; i <= steps; i++) {
-    const t = (i / steps) * duration;
-    const pos = calculatePosition(t);
-    trajectory.push(pos);
-  }
-
-  const getShapeStyle = () => {
-    const baseStyle = {
-      width: `${size}px`,
-      height: `${size}px`,
-      backgroundColor: randomColor,
-      border: `1px solid ${randomColor}`,
+  const createParticle = useCallback((x: number, y: number, burstIntensity: number = 1): Particle => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = (Math.random() * 12 + 6) * burstIntensity;
+    const life = Math.random() * 240 + 180; // 3-7 seconds at 60fps
+    
+    return {
+      x,
+      y,
+      vx: Math.cos(angle) * speed + (Math.random() - 0.5) * 4,
+      vy: Math.sin(angle) * speed - Math.random() * 8 - 6, // Strong upward velocity
+      size: Math.random() * 10 + 5,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      shape: ['circle', 'square', 'triangle', 'star', 'heart', 'diamond'][Math.floor(Math.random() * 6)] as Particle['shape'],
+      rotation: Math.random() * 360,
+      rotationSpeed: (Math.random() - 0.5) * 12,
+      opacity: 1,
+      life,
+      maxLife: life,
+      gravity: 0.2 + Math.random() * 0.15,
+      drift: (Math.random() - 0.5) * 0.03,
+      glowIntensity: Math.random() * 0.8 + 0.2
     };
+  }, []);
 
-    switch (randomShape) {
-      case "circle":
-        return { ...baseStyle, borderRadius: "50%" };
-      case "square":
-        return { ...baseStyle, borderRadius: "2px" };
-      case "triangle":
-        return {
-          width: 0,
-          height: 0,
-          backgroundColor: "transparent",
-          borderLeft: `${size / 2}px solid transparent`,
-          borderRight: `${size / 2}px solid transparent`,
-          borderBottom: `${size}px solid ${randomColor}`,
-        };
-      case "star":
-        return {
-          ...baseStyle,
-          clipPath:
-            "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)",
-        };
-      case "diamond":
-        return {
-          ...baseStyle,
-          borderRadius: "4px",
-          transform: "rotate(45deg)",
-        };
-      default:
-        return { ...baseStyle, borderRadius: "50%" };
+  const drawParticle = useCallback((ctx: CanvasRenderingContext2D, particle: Particle) => {
+    ctx.save();
+    ctx.translate(particle.x, particle.y);
+    ctx.rotate((particle.rotation * Math.PI) / 180);
+    ctx.globalAlpha = particle.opacity;
+    
+    const halfSize = particle.size / 2;
+    
+    // Enhanced glow effects
+    if (particle.shape === 'star' || particle.shape === 'heart') {
+      ctx.shadowColor = particle.color;
+      ctx.shadowBlur = 12 * particle.glowIntensity;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
     }
-  };
+    
+    // Gradient fill for more realistic appearance
+    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, halfSize);
+    gradient.addColorStop(0, particle.color);
+    gradient.addColorStop(0.7, particle.color);
+    gradient.addColorStop(1, particle.color + '80');
+    ctx.fillStyle = gradient;
+    
+    switch (particle.shape) {
+      case 'circle':
+        ctx.beginPath();
+        ctx.arc(0, 0, halfSize, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+        
+      case 'square':
+        ctx.fillRect(-halfSize, -halfSize, particle.size, particle.size);
+        break;
+        
+      case 'triangle':
+        ctx.beginPath();
+        ctx.moveTo(0, -halfSize);
+        ctx.lineTo(-halfSize, halfSize);
+        ctx.lineTo(halfSize, halfSize);
+        ctx.closePath();
+        ctx.fill();
+        break;
+        
+      case 'star':
+        ctx.beginPath();
+        const spikes = 5;
+        const outerRadius = halfSize;
+        const innerRadius = halfSize * 0.4;
+        
+        for (let i = 0; i < spikes * 2; i++) {
+          const radius = i % 2 === 0 ? outerRadius : innerRadius;
+          const angle = (i * Math.PI) / spikes;
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius;
+          
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        break;
+        
+      case 'heart':
+        const heartSize = halfSize * 0.9;
+        ctx.beginPath();
+        ctx.moveTo(0, heartSize * 0.3);
+        ctx.bezierCurveTo(-heartSize, -heartSize * 0.5, -heartSize, heartSize * 0.3, 0, heartSize);
+        ctx.bezierCurveTo(heartSize, heartSize * 0.3, heartSize, -heartSize * 0.5, 0, heartSize * 0.3);
+        ctx.fill();
+        break;
+        
+      case 'diamond':
+        ctx.beginPath();
+        ctx.moveTo(0, -halfSize);
+        ctx.lineTo(halfSize, 0);
+        ctx.lineTo(0, halfSize);
+        ctx.lineTo(-halfSize, 0);
+        ctx.closePath();
+        ctx.fill();
+        break;
+    }
+    
+    ctx.restore();
+  }, []);
 
-  return (
-    <motion.div
-      className="absolute pointer-events-none"
-      style={{
-        ...getShapeStyle(),
-        willChange: "transform, opacity", // Keep performance optimization
-      }}
-      initial={{
-        x: 0,
-        y: 0,
-        rotate: 0,
-        opacity: 1,
-        scale: 0.3,
-      }}
-      animate={{
-        x: trajectory.map((p) => p.x),
-        y: trajectory.map((p) => p.y),
-        rotate: rotationSpeed,
-        opacity: [1, 1, 1, 1, 0.8, 0.5, 0.2, 0], // Beautiful gradual fade restored
-        scale: [0.3, 1, 0.9, 0.8, 0.6, 0.4, 0.2, 0.1], // Gradual scale restored
-      }}
-      transition={{
-        duration: duration,
-        delay: delay,
-        ease: "linear", // Linear for realistic physics
-        times: trajectory.map((_, i) => i / (trajectory.length - 1)),
-      }}
-    />
-  );
-};
+  const updateParticle = useCallback((particle: Particle): boolean => {
+    particle.x += particle.vx;
+    particle.y += particle.vy;
+    particle.vy += particle.gravity; // Apply gravity
+    particle.vx += particle.drift; // Wind effect
+    particle.rotation += particle.rotationSpeed;
+    particle.life--;
+    
+    // Smooth fade out over time
+    particle.opacity = Math.max(0, (particle.life / particle.maxLife) * 0.95);
+    
+    // Gradual slowdown
+    particle.vx *= 0.9985;
+    particle.vy *= 0.998;
+    
+    // Particle stays alive if within bounds and has life
+    return particle.life > 0 && particle.y < window.innerHeight + 100 && particle.opacity > 0.01;
+  }, []);
 
-// Restored confetti cannon with balanced particle count
-const ConfettiCannon = ({
-  position,
-  trigger,
-  particleCount = 30, // Restored good particle count
-  delay = 0,
-}: {
-  position: { x: number; y: number };
-  trigger: boolean;
-  particleCount?: number;
-  delay?: number;
-}) => {
-  if (!trigger) return null;
+  const animate = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    particlesRef.current = particlesRef.current.filter(particle => {
+      const alive = updateParticle(particle);
+      if (alive) {
+        drawParticle(ctx, particle);
+      }
+      return alive;
+    });
+    
+    // Continue animation if particles exist or we're still animating
+    if (particlesRef.current.length > 0 || isAnimatingRef.current) {
+      animationRef.current = requestAnimationFrame(animate);
+    }
+  }, [updateParticle, drawParticle]);
 
-  return (
-    <div
-      className="absolute pointer-events-none z-30"
-      style={{
-        left: `${position.x}%`,
-        top: `${position.y}%`,
-      }}
-    >
-      {Array.from({ length: particleCount }).map((_, i) => (
-        <RealisticConfettiParticle
-          key={i}
-          delay={delay + i * 0.01} // Restored natural stagger timing
-          index={i}
-        />
-      ))}
-    </div>
-  );
-};
+  const createBurst = useCallback((intensity: number = 1) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    // Multiple burst points for spectacular effect
+    const burstPoints = [
+      { x: canvas.width * 0.2, y: canvas.height * 0.4 },
+      { x: canvas.width * 0.4, y: canvas.height * 0.3 },
+      { x: canvas.width * 0.5, y: canvas.height * 0.25 },
+      { x: canvas.width * 0.6, y: canvas.height * 0.3 },
+      { x: canvas.width * 0.8, y: canvas.height * 0.4 },
+    ];
+    
+    burstPoints.forEach((point, index) => {
+      setTimeout(() => {
+        const particleCount = Math.floor((25 + Math.random() * 20) * intensity);
+        for (let i = 0; i < particleCount; i++) {
+          particlesRef.current.push(createParticle(point.x, point.y, intensity));
+        }
+      }, index * 80);
+    });
+    
+    // Center mega burst
+    setTimeout(() => {
+      const centerX = canvas.width * 0.5;
+      const centerY = canvas.height * 0.3;
+      const megaParticleCount = Math.floor(60 * intensity);
+      
+      for (let i = 0; i < megaParticleCount; i++) {
+        particlesRef.current.push(createParticle(centerX, centerY, intensity * 1.2));
+      }
+    }, 150);
+  }, [createParticle]);
 
-// Restored epic confetti system (smart optimization)
-const EpicConfettiBurst = ({ trigger }: { trigger: boolean }) => {
-  if (!trigger) return null;
+  const startConfetti = useCallback(() => {
+    if (isAnimatingRef.current) return;
+    
+    isAnimatingRef.current = true;
+    startTimeRef.current = Date.now();
+    
+    // Initial spectacular burst
+    createBurst(1.2);
+    
+    // Additional bursts for extended effect
+    const additionalBursts = [500, 1200, 2000, 3200];
+    additionalBursts.forEach((delay, index) => {
+      setTimeout(() => {
+        if (isAnimatingRef.current) {
+          createBurst(0.8 - index * 0.1);
+        }
+      }, delay);
+    });
+    
+    // Main animation duration
+    setTimeout(() => {
+      isAnimatingRef.current = false;
+      
+      // Setup looping if enabled
+      if (shouldLoop) {
+        loopTimeoutRef.current = setTimeout(() => {
+          if (trigger) {
+            startConfetti();
+          }
+        }, 2000); // 2 second pause between loops
+      }
+    }, 5000);
+    
+    animate();
+  }, [animate, createBurst, shouldLoop, trigger]);
 
-  // Restored multiple cannons for spectacular effect
-  const cannonPositions = [
-    { x: 25, y: 60 }, // Left
-    { x: 45, y: 55 }, // Left-center
-    { x: 50, y: 50 }, // Center
-    { x: 55, y: 55 }, // Right-center
-    { x: 75, y: 60 }, // Right
-  ];
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const resizeCanvas = () => {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+    };
+    
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    return () => {
+      window.removeEventListener('resize', resizeCanvas);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      if (loopTimeoutRef.current) {
+        clearTimeout(loopTimeoutRef.current);
+      }
+    };
+  }, []);
 
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none z-30">
-      {cannonPositions.map((position, index) => (
-        <ConfettiCannon
-          key={index}
-          position={position}
-          trigger={trigger}
-          particleCount={30} // Balanced count
-          delay={index * 0.06} // Quick succession for epic burst
-        />
-      ))}
+  useEffect(() => {
+    if (trigger) {
+      startConfetti();
+    } else {
+      isAnimatingRef.current = false;
+      if (loopTimeoutRef.current) {
+        clearTimeout(loopTimeoutRef.current);
+      }
+    }
+  }, [trigger, startConfetti]);
 
-      {/* Center mega burst restored */}
-      <ConfettiCannon
-        position={{ x: 50, y: 50 }}
-        trigger={trigger}
-        particleCount={50} // Restored impressive center burst
-        delay={0.12}
-      />
-    </div>
-  );
+  return canvasRef;
 };
 
 // Enhanced Award Card with fixed animations
@@ -265,15 +360,16 @@ const CelebrationAwardCard = ({
         animate={
           hasTriggered
             ? {
-                opacity: [0.1, 0.25, 0.1], // Restored beautiful intensity
+                opacity: 0.25,
               }
-            : {}
+            : { opacity: 0.1 }
         }
         transition={{
-          duration: 3, // Restored longer beautiful cycle
+          duration: 2,
           delay: hasTriggered ? index * 0.25 + 2.5 : 0,
-          repeat: hasTriggered ? 5 : 0, // Limited but visible repeats
+          repeat: hasTriggered ? 3 : 0,
           repeatType: "reverse",
+          ease: "easeInOut"
         }}
       />
 
@@ -290,14 +386,16 @@ const CelebrationAwardCard = ({
               }}
               initial={{ scale: 0, opacity: 0 }}
               animate={{
-                scale: [0, 1, 0],
-                opacity: [0, 1, 0],
+                scale: 1,
+                opacity: 1,
               }}
               transition={{
-                duration: 1.5,
-                delay: index * 0.25 + 3 + i * 0.3, // Adjusted for longer confetti duration
+                duration: 0.5,
+                delay: index * 0.25 + 3 + i * 0.3,
                 repeat: Infinity,
-                repeatDelay: 4,
+                repeatType: "reverse",
+                repeatDelay: 1,
+                ease: "easeInOut"
               }}
             />
           ))}
@@ -341,15 +439,17 @@ const CelebrationAwardCard = ({
             animate={
               hasTriggered
                 ? {
-                    opacity: [0, 0.5, 0],
+                    opacity: 0.5,
                   }
-                : {}
+                : { opacity: 0 }
             }
             transition={{
-              duration: 2,
-              delay: index * 0.25 + 2.5, // Adjusted for extended confetti
-              repeat: hasTriggered ? Infinity : 0,
-              repeatDelay: 4, // Longer delay between repeats for extended effect
+              duration: 1.5,
+              delay: index * 0.25 + 2.5,
+              repeat: hasTriggered ? 2 : 0,
+              repeatType: "reverse",
+              repeatDelay: 1,
+              ease: "easeInOut"
             }}
           />
         </motion.div>
@@ -503,17 +603,21 @@ export function ConfettiAwardsSection({ awards }: ConfettiAwardsSectionProps) {
   const sectionRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(sectionRef, {
     once: true,
-    amount: 0.3,
+    amount: 0.2,
     margin: "-50px",
   });
 
   const [hasTriggeredConfetti, setHasTriggeredConfetti] = useState(false);
+  const [shouldLoop, setShouldLoop] = useState(false);
+  const confettiCanvasRef = useAdvancedConfetti(hasTriggeredConfetti, shouldLoop);
 
   useEffect(() => {
     if (isInView && !hasTriggeredConfetti) {
       const timer = setTimeout(() => {
         setHasTriggeredConfetti(true);
-      }, 300); // Slightly longer pause before the slower confetti begins
+        // Enable looping for continuous celebration
+        setShouldLoop(true);
+      }, 400);
 
       return () => clearTimeout(timer);
     }
@@ -524,34 +628,43 @@ export function ConfettiAwardsSection({ awards }: ConfettiAwardsSectionProps) {
   return (
     <motion.div
       ref={sectionRef}
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 40 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      transition={{ duration: 0.8 }}
-      className="relative"
+      transition={{ duration: 0.8, ease: "easeOut" }}
+      className="relative overflow-hidden"
     >
-      <Card className="relative overflow-hidden backdrop-blur-sm bg-card/50 border border-white/10 shadow-2xl">
-        {/* Epic confetti burst effect */}
-        <EpicConfettiBurst trigger={hasTriggeredConfetti} />
+      {/* Enhanced Canvas Confetti */}
+      <canvas
+        ref={confettiCanvasRef}
+        className="absolute inset-0 pointer-events-none z-40"
+        style={{ width: '100%', height: '100%' }}
+      />
+      
+      <Card className="relative backdrop-blur-sm bg-card/60 border border-yellow-200/30 dark:border-yellow-800/30 shadow-2xl overflow-hidden">
 
-        {/* Celebration background wave */}
+        {/* Enhanced Celebration background */}
         <motion.div
-          className="absolute inset-0 bg-gradient-to-r from-yellow-500/5 via-orange-500/10 to-red-500/5"
-          initial={{ opacity: 0, scale: 0.8 }}
+          className="absolute inset-0 bg-gradient-to-br from-yellow-500/8 via-orange-500/12 to-red-500/8"
+          initial={{ opacity: 0, scale: 0.9 }}
           animate={{
-            opacity: hasTriggeredConfetti ? 1 : 0,
-            scale: hasTriggeredConfetti ? 1 : 0.8,
+            opacity: hasTriggeredConfetti ? 0.5 : 0,
+            scale: hasTriggeredConfetti ? 1 : 0.9,
           }}
-          transition={{ duration: 1.5, delay: 0.5 }}
+          transition={{ 
+            duration: 1.5, 
+            delay: 0.5,
+            ease: "easeInOut"
+          }}
         />
 
-        <CardHeader className="relative z-10">
+        <CardHeader className="relative z-10 pb-6">
           <motion.div
-            initial={{ opacity: 0, y: -30 }}
-            animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: -30 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
+            initial={{ opacity: 0, y: -20 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, delay: 0.2 }}
           >
-            <CardTitle className="flex items-center gap-4 text-3xl justify-center">
+            <CardTitle className="flex items-center gap-4 text-2xl md:text-3xl justify-center flex-wrap">
               <motion.div
                 animate={
                   hasTriggeredConfetti
@@ -559,7 +672,7 @@ export function ConfettiAwardsSection({ awards }: ConfettiAwardsSectionProps) {
                         scale: 1.3,
                         rotate: 15,
                       }
-                    : { scale: 1, rotate: 0 }
+                    : {}
                 }
                 transition={{
                   duration: 1,
@@ -575,7 +688,7 @@ export function ConfettiAwardsSection({ awards }: ConfettiAwardsSectionProps) {
                 Awards & Recognition
               </span>
 
-              {/* Award count celebration badge */}
+              {/* Enhanced award count celebration badge */}
               <motion.div
                 initial={{ scale: 0, opacity: 0, rotate: -180 }}
                 animate={
@@ -585,26 +698,41 @@ export function ConfettiAwardsSection({ awards }: ConfettiAwardsSectionProps) {
                         opacity: 1,
                         rotate: 0,
                       }
-                    : { scale: 0, opacity: 0, rotate: -180 }
+                    : {}
                 }
                 transition={{
-                  delay: 1.5,
+                  delay: 1.2,
                   duration: 0.8,
                   type: "spring",
                   stiffness: 150,
                 }}
-                className="ml-auto"
               >
-                <div className="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-xl border-2 border-white/20">
-                  🎉 {awards.length} Award{awards.length > 1 ? "s" : ""} Won! 🏆
-                </div>
+                <motion.div 
+                  className="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white px-3 py-1.5 rounded-full text-sm font-bold shadow-lg border border-white/20"
+                  animate={
+                    hasTriggeredConfetti ? {
+                      boxShadow: [
+                        "0 4px 15px rgba(255, 165, 0, 0.3)",
+                        "0 6px 25px rgba(255, 165, 0, 0.5)",
+                        "0 4px 15px rgba(255, 165, 0, 0.3)"
+                      ]
+                    } : {}
+                  }
+                  transition={{
+                    duration: 2,
+                    repeat: hasTriggeredConfetti ? Infinity : 0,
+                    repeatType: "reverse"
+                  }}
+                >
+                  🎉 {awards.length} Award{awards.length > 1 ? "s" : ""}! 🏆
+                </motion.div>
               </motion.div>
             </CardTitle>
           </motion.div>
         </CardHeader>
 
         <CardContent className="relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {awards.map((award, index) => (
               <CelebrationAwardCard
                 key={award.id}
