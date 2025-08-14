@@ -384,16 +384,16 @@ export default function CoursesManager() {
                 <div>
                   <Label htmlFor="rating">Rating (1-5)</Label>
                   <Select
-                    value={formData.rating}
+                    value={formData.rating || "none"}
                     onValueChange={(value) =>
-                      setFormData((prev) => ({ ...prev, rating: value }))
+                      setFormData((prev) => ({ ...prev, rating: value === "none" ? "" : value }))
                     }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select rating" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No rating</SelectItem>
+                      <SelectItem value="none">No rating</SelectItem>
                       <SelectItem value="1">1 Star</SelectItem>
                       <SelectItem value="2">2 Stars</SelectItem>
                       <SelectItem value="3">3 Stars</SelectItem>

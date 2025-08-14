@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 interface AboutSettings {
   id: number;
@@ -118,6 +118,28 @@ interface Achievement {
   achievement_type?: string;
 }
 
+interface Certification {
+  id: number;
+  title: string;
+  issuing_organization: string;
+  description?: string;
+  issue_date?: string;
+  expiry_date?: string;
+  is_permanent: boolean;
+  credential_id?: string;
+  credential_url?: string;
+  certificate_url?: string;
+  skills_covered?: string[];
+  verification_url?: string;
+  badge_image_url?: string;
+  category: string;
+  level?: string;
+  score?: string;
+  total_score?: string;
+  hours_completed?: number;
+  is_featured: boolean;
+}
+
 interface AboutContentProps {
   aboutSettings: AboutSettings | null;
   experiences: Experience[];
@@ -125,6 +147,7 @@ interface AboutContentProps {
   courses: Course[];
   workshops: Workshop[];
   achievements: Achievement[];
+  certifications: Certification[];
 }
 
 export default function AboutContent({
@@ -134,10 +157,13 @@ export default function AboutContent({
   courses,
   workshops,
   achievements,
+  certifications,
 }: AboutContentProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
   const isHeroInView = useInView(heroRef, { once: true, amount: 0.3 });
+  const [expandedSkills, setExpandedSkills] = useState<Set<number>>(new Set());
+  const [expandedCourses, setExpandedCourses] = useState<Set<number>>(new Set());
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -900,6 +926,708 @@ export default function AboutContent({
                           <p className="text-muted-foreground text-sm mt-3">
                             {edu.description}
                           </p>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </motion.section>
+        )}
+
+        {/* Courses Section */}
+        {courses.length > 0 && (
+          <motion.section
+            className="py-20"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.8 }}
+          >
+            <div className="container mx-auto px-4">
+              <motion.div
+                className="text-center mb-16"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8 }}
+              >
+                <div className="relative">
+                  <h2 className="text-3xl lg:text-4xl font-bold mb-6 flex items-center justify-center gap-4 text-center">
+                    <motion.div 
+                      className="w-14 h-14 bg-gradient-to-br from-purple-500/20 via-purple-600/20 to-pink-600/20 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-purple-500/20"
+                      whileHover={{ rotate: 12, scale: 1.1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <BookOpen className="w-7 h-7 text-purple-600" />
+                    </motion.div>
+                    <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 bg-clip-text text-transparent">
+                      Professional Courses
+                    </span>
+                  </h2>
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <div className="w-12 h-0.5 bg-gradient-to-r from-transparent to-purple-500"></div>
+                    <div className="w-8 h-0.5 bg-gradient-to-r from-purple-500 to-pink-600"></div>
+                    <div className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-600"></div>
+                    <div className="w-8 h-0.5 bg-gradient-to-r from-pink-600 to-purple-500"></div>
+                    <div className="w-12 h-0.5 bg-gradient-to-r from-purple-500 to-transparent"></div>
+                  </div>
+                </div>
+              </motion.div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
+                {courses.map((course, index) => (
+                  <motion.div
+                    key={course.id}
+                    initial={{ opacity: 0, y: 50 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                    whileHover={{ scale: 1.02, y: -8 }}
+                    className="group relative bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:border-purple-400/40 hover:shadow-purple-500/15 hover:bg-gradient-to-br hover:from-card/90 hover:to-card/60 transition-all duration-500"
+                  >
+                    {/* Decorative gradient overlay */}
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-purple-500/5 via-transparent to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                    <div className="relative z-10">
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg flex items-center justify-center border border-purple-500/20">
+                          <BookOpen className="w-6 h-6 text-purple-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-lg mb-1 line-clamp-2">{course.title}</h3>
+                          <div className="text-purple-600 font-medium text-sm mb-2">
+                            {course.provider}
+                          </div>
+                          {course.instructor && (
+                            <div className="text-xs text-muted-foreground">
+                              Instructor: {course.instructor}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {course.description && (
+                        <p className="text-muted-foreground text-sm mb-4 line-clamp-3">
+                          {course.description}
+                        </p>
+                      )}
+
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            <span>Completed: {formatDate(course.completion_date)}</span>
+                          </div>
+                          {course.duration && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              <span>{course.duration}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {course.rating && (
+                          <div className="flex items-center gap-1 text-xs">
+                            <div className="flex items-center gap-0.5">
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`w-3 h-3 ${
+                                    i < parseInt(course.rating?.toString() || "0")
+                                      ? 'text-yellow-400 fill-yellow-400'
+                                      : 'text-gray-300'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-muted-foreground ml-1">({course.rating}/5)</span>
+                          </div>
+                        )}
+
+                        {course.skills_learned && course.skills_learned.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {(expandedCourses.has(course.id) ? course.skills_learned : course.skills_learned.slice(0, 3)).map((skill, skillIndex) => (
+                              <motion.span
+                                key={skillIndex}
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.2, delay: skillIndex * 0.05 }}
+                                className="px-2 py-1 bg-purple-500/10 text-purple-600 rounded text-xs font-medium"
+                              >
+                                {skill}
+                              </motion.span>
+                            ))}
+                            {course.skills_learned.length > 3 && (
+                              <motion.button
+                                onClick={() => {
+                                  const newExpanded = new Set(expandedCourses);
+                                  if (newExpanded.has(course.id)) {
+                                    newExpanded.delete(course.id);
+                                  } else {
+                                    newExpanded.add(course.id);
+                                  }
+                                  setExpandedCourses(newExpanded);
+                                }}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-xs transition-colors"
+                              >
+                                {expandedCourses.has(course.id) 
+                                  ? 'Show less' 
+                                  : `+${course.skills_learned.length - 3} more`
+                                }
+                              </motion.button>
+                            )}
+                          </div>
+                        )}
+
+                        {(course.certificate_url || course.course_url) && (
+                          <div className="flex flex-wrap gap-2 pt-3 border-t border-white/10">
+                            {course.course_url && (
+                              <motion.a
+                                href={course.course_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                whileHover={{ scale: 1.05 }}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-purple-50 text-purple-700 rounded-md hover:bg-purple-100 transition-colors border border-purple-200"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                View Course
+                              </motion.a>
+                            )}
+                            {course.certificate_url && (
+                              <motion.a
+                                href={course.certificate_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                whileHover={{ scale: 1.05 }}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-emerald-50 text-emerald-700 rounded-md hover:bg-emerald-100 transition-colors border border-emerald-200"
+                              >
+                                <Award className="w-3 h-3" />
+                                Certificate
+                              </motion.a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </motion.section>
+        )}
+
+        {/* Certifications Section */}
+        {certifications.length > 0 && (
+          <motion.section
+            className="py-20"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.8 }}
+          >
+            <div className="container mx-auto px-4">
+              <motion.div
+                className="text-center mb-16"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8 }}
+              >
+                <div className="relative">
+                  <h2 className="text-3xl lg:text-4xl font-bold mb-6 flex items-center justify-center gap-4 text-center">
+                    <motion.div 
+                      className="w-14 h-14 bg-gradient-to-br from-blue-500/20 via-blue-600/20 to-indigo-600/20 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-blue-500/20"
+                      whileHover={{ rotate: 12, scale: 1.1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <Award className="w-7 h-7 text-blue-600" />
+                    </motion.div>
+                    <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                      Professional Certifications
+                    </span>
+                  </h2>
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <div className="w-12 h-0.5 bg-gradient-to-r from-transparent to-blue-500"></div>
+                    <div className="w-8 h-0.5 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+                    <div className="w-2 h-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+                    <div className="w-8 h-0.5 bg-gradient-to-r from-indigo-600 to-blue-500"></div>
+                    <div className="w-12 h-0.5 bg-gradient-to-r from-blue-500 to-transparent"></div>
+                  </div>
+                </div>
+              </motion.div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
+                {certifications.map((cert, index) => {
+                  const isExpired = !cert.is_permanent && cert.expiry_date && new Date(cert.expiry_date) < new Date();
+                  
+                  return (
+                    <motion.div
+                      key={cert.id}
+                      initial={{ opacity: 0, y: 50 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.5, delay: index * 0.1 }}
+                      whileHover={{ scale: 1.02, y: -8 }}
+                      className={`group relative bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-md rounded-2xl p-6 border transition-all duration-500 hover:shadow-2xl ${
+                        isExpired 
+                          ? 'border-orange-200/60 hover:border-orange-300 hover:shadow-orange-500/20 bg-gradient-to-br from-orange-50/10 to-orange-100/5'
+                          : cert.is_featured
+                          ? 'border-blue-200/60 hover:border-blue-300 hover:shadow-blue-500/20 bg-gradient-to-br from-blue-50/10 to-blue-100/5 ring-1 ring-blue-500/20'
+                          : 'border-white/20 hover:border-blue-400/40 hover:shadow-blue-500/15'
+                      } hover:bg-gradient-to-br hover:from-card/90 hover:to-card/60`}
+                    >
+                      {cert.is_featured && (
+                        <div className="absolute -top-3 -right-3 w-8 h-8 bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white/20">
+                          <Star className="w-4 h-4 text-white fill-white" />
+                        </div>
+                      )}
+
+                      {/* Decorative gradient overlay */}
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/5 via-transparent to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                      <div className="relative flex items-start gap-3 mb-4 z-10">
+                        {cert.badge_image_url ? (
+                          <motion.div
+                            whileHover={{ scale: 1.1, rotate: 2 }}
+                            className="w-12 h-12 rounded-lg overflow-hidden border border-white/10 flex-shrink-0 bg-white/5 p-1"
+                          >
+                            <Image
+                              src={cert.badge_image_url}
+                              alt={`${cert.title} badge`}
+                              width={48}
+                              height={48}
+                              className="object-contain w-full h-full rounded-md"
+                            />
+                          </motion.div>
+                        ) : (
+                          <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-lg flex items-center justify-center flex-shrink-0 border border-blue-500/20">
+                            <Award className="w-6 h-6 text-blue-600" />
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-lg mb-1 line-clamp-2">{cert.title}</h3>
+                          <div className="text-blue-600 font-medium text-sm mb-2">
+                            {cert.issuing_organization}
+                          </div>
+                          
+                          {cert.level && (
+                            <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium mb-2 ${
+                              cert.level === 'professional' ? 'bg-red-100 text-red-800' :
+                              cert.level === 'expert' ? 'bg-orange-100 text-orange-800' :
+                              cert.level === 'advanced' ? 'bg-purple-100 text-purple-800' :
+                              cert.level === 'intermediate' ? 'bg-blue-100 text-blue-800' :
+                              'bg-green-100 text-green-800'
+                            }`}>
+                              {cert.level.charAt(0).toUpperCase() + cert.level.slice(1)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {cert.description && (
+                        <p className="text-muted-foreground text-sm mb-4 line-clamp-3">
+                          {cert.description}
+                        </p>
+                      )}
+
+                      <div className="relative space-y-3 z-10">
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            <span>Issued: {formatDate(cert.issue_date)}</span>
+                          </div>
+                        </div>
+
+                        {!cert.is_permanent && (
+                          <div className="flex items-center gap-1 text-xs">
+                            <Calendar className="w-3 h-3" />
+                            {cert.expiry_date ? (
+                              <span className={isExpired ? 'text-orange-600 font-medium' : 'text-muted-foreground'}>
+                                {isExpired ? 'Expired' : 'Expires'}: {formatDate(cert.expiry_date)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">No expiry date</span>
+                            )}
+                          </div>
+                        )}
+
+                        {cert.is_permanent && (
+                          <div className="text-xs text-green-600 font-medium">
+                            ✓ Permanent Certification
+                          </div>
+                        )}
+
+                        {cert.score && (
+                          <div className="text-xs text-muted-foreground">
+                            Score: {cert.score}{cert.total_score && ` / ${cert.total_score}`}
+                          </div>
+                        )}
+
+                        {cert.skills_covered && cert.skills_covered.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-3">
+                            {(expandedSkills.has(cert.id) ? cert.skills_covered : cert.skills_covered.slice(0, 3)).map((skill, skillIndex) => (
+                              <motion.span
+                                key={skillIndex}
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.2, delay: skillIndex * 0.05 }}
+                                className="px-2 py-1 bg-blue-500/10 text-blue-600 rounded text-xs font-medium"
+                              >
+                                {skill}
+                              </motion.span>
+                            ))}
+                            {cert.skills_covered.length > 3 && (
+                              <motion.button
+                                onClick={() => {
+                                  const newExpanded = new Set(expandedSkills);
+                                  if (newExpanded.has(cert.id)) {
+                                    newExpanded.delete(cert.id);
+                                  } else {
+                                    newExpanded.add(cert.id);
+                                  }
+                                  setExpandedSkills(newExpanded);
+                                }}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-xs transition-colors"
+                              >
+                                {expandedSkills.has(cert.id) 
+                                  ? 'Show less' 
+                                  : `+${cert.skills_covered.length - 3} more`
+                                }
+                              </motion.button>
+                            )}
+                          </div>
+                        )}
+
+                        {(cert.credential_url || cert.certificate_url || cert.verification_url) && (
+                          <div className="flex flex-wrap gap-2 pt-3 border-t border-white/10">
+                            {cert.credential_url && (
+                              <motion.a
+                                href={cert.credential_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                whileHover={{ scale: 1.05 }}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 transition-colors border border-blue-200"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                View Credential
+                              </motion.a>
+                            )}
+                            {cert.certificate_url && (
+                              <motion.a
+                                href={cert.certificate_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                whileHover={{ scale: 1.05 }}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-purple-50 text-purple-700 rounded-md hover:bg-purple-100 transition-colors border border-purple-200"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                Certificate
+                              </motion.a>
+                            )}
+                            {cert.verification_url && (
+                              <motion.a
+                                href={cert.verification_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                whileHover={{ scale: 1.05 }}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-emerald-50 text-emerald-700 rounded-md hover:bg-emerald-100 transition-colors border border-emerald-200"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                Verify
+                              </motion.a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.section>
+        )}
+
+        {/* Workshops Section */}
+        {workshops.length > 0 && (
+          <motion.section
+            className="py-20"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.8 }}
+          >
+            <div className="container mx-auto px-4">
+              <motion.div
+                className="text-center mb-16"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8 }}
+              >
+                <div className="relative">
+                  <h2 className="text-3xl lg:text-4xl font-bold mb-6 flex items-center justify-center gap-4 text-center">
+                    <motion.div 
+                      className="w-14 h-14 bg-gradient-to-br from-emerald-500/20 via-teal-600/20 to-cyan-600/20 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-emerald-500/20"
+                      whileHover={{ rotate: 12, scale: 1.1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <Users className="w-7 h-7 text-emerald-600" />
+                    </motion.div>
+                    <span className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">
+                      Workshops & Events
+                    </span>
+                  </h2>
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <div className="w-12 h-0.5 bg-gradient-to-r from-transparent to-emerald-500"></div>
+                    <div className="w-8 h-0.5 bg-gradient-to-r from-emerald-500 to-teal-600"></div>
+                    <div className="w-2 h-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600"></div>
+                    <div className="w-8 h-0.5 bg-gradient-to-r from-teal-600 to-emerald-500"></div>
+                    <div className="w-12 h-0.5 bg-gradient-to-r from-emerald-500 to-transparent"></div>
+                  </div>
+                </div>
+              </motion.div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
+                {workshops.map((workshop, index) => (
+                  <motion.div
+                    key={workshop.id}
+                    initial={{ opacity: 0, y: 50 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                    whileHover={{ scale: 1.02, y: -8 }}
+                    className="group relative bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:border-emerald-400/40 hover:shadow-emerald-500/15 hover:bg-gradient-to-br hover:from-card/90 hover:to-card/60 transition-all duration-500"
+                  >
+                    {/* Decorative gradient overlay */}
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-emerald-500/5 via-transparent to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                    <div className="relative z-10">
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-lg flex items-center justify-center border border-emerald-500/20">
+                          <Users className="w-6 h-6 text-emerald-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-lg mb-1 line-clamp-2">{workshop.title}</h3>
+                          <div className="text-emerald-600 font-medium text-sm mb-2">
+                            {workshop.organizer}
+                          </div>
+                          <div className="text-xs text-muted-foreground capitalize">
+                            {workshop.event_type}
+                          </div>
+                        </div>
+                      </div>
+
+                      {workshop.description && (
+                        <p className="text-muted-foreground text-sm mb-4 line-clamp-3">
+                          {workshop.description}
+                        </p>
+                      )}
+
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            <span>{formatDate(workshop.event_date)}</span>
+                          </div>
+                          {workshop.duration && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              <span>{workshop.duration}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {workshop.location && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <MapPin className="w-3 h-3" />
+                            <span>{workshop.location}</span>
+                          </div>
+                        )}
+
+                        {workshop.attendees_count && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Users className="w-3 h-3" />
+                            <span>{workshop.attendees_count} attendees</span>
+                          </div>
+                        )}
+
+                        {workshop.skills_gained && workshop.skills_gained.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {workshop.skills_gained.slice(0, 3).map((skill, skillIndex) => (
+                              <span
+                                key={skillIndex}
+                                className="px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded text-xs font-medium"
+                              >
+                                {skill}
+                              </span>
+                            ))}
+                            {workshop.skills_gained.length > 3 && (
+                              <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded text-xs">
+                                +{workshop.skills_gained.length - 3} more
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {(workshop.certificate_url || workshop.event_url) && (
+                          <div className="flex flex-wrap gap-2 pt-3 border-t border-white/10">
+                            {workshop.event_url && (
+                              <motion.a
+                                href={workshop.event_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                whileHover={{ scale: 1.05 }}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-emerald-50 text-emerald-700 rounded-md hover:bg-emerald-100 transition-colors border border-emerald-200"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                Event
+                              </motion.a>
+                            )}
+                            {workshop.certificate_url && (
+                              <motion.a
+                                href={workshop.certificate_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                whileHover={{ scale: 1.05 }}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-amber-50 text-amber-700 rounded-md hover:bg-amber-100 transition-colors border border-amber-200"
+                              >
+                                <Award className="w-3 h-3" />
+                                Certificate
+                              </motion.a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </motion.section>
+        )}
+
+        {/* Achievements Section */}
+        {achievements.length > 0 && (
+          <motion.section
+            className="py-20"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.8 }}
+          >
+            <div className="container mx-auto px-4">
+              <motion.div
+                className="text-center mb-16"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8 }}
+              >
+                <div className="relative">
+                  <h2 className="text-3xl lg:text-4xl font-bold mb-6 flex items-center justify-center gap-4 text-center">
+                    <motion.div 
+                      className="w-14 h-14 bg-gradient-to-br from-amber-500/20 via-yellow-600/20 to-orange-600/20 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-amber-500/20"
+                      whileHover={{ rotate: 12, scale: 1.1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <Trophy className="w-7 h-7 text-amber-600" />
+                    </motion.div>
+                    <span className="bg-gradient-to-r from-amber-600 via-yellow-600 to-orange-600 bg-clip-text text-transparent">
+                      Achievements & Awards
+                    </span>
+                  </h2>
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <div className="w-12 h-0.5 bg-gradient-to-r from-transparent to-amber-500"></div>
+                    <div className="w-8 h-0.5 bg-gradient-to-r from-amber-500 to-yellow-600"></div>
+                    <div className="w-2 h-2 rounded-full bg-gradient-to-r from-amber-500 to-yellow-600"></div>
+                    <div className="w-8 h-0.5 bg-gradient-to-r from-yellow-600 to-amber-500"></div>
+                    <div className="w-12 h-0.5 bg-gradient-to-r from-amber-500 to-transparent"></div>
+                  </div>
+                </div>
+              </motion.div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
+                {achievements.map((achievement, index) => (
+                  <motion.div
+                    key={achievement.id}
+                    initial={{ opacity: 0, y: 50 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                    whileHover={{ scale: 1.02, y: -8 }}
+                    className="group relative bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:border-amber-400/40 hover:shadow-amber-500/15 hover:bg-gradient-to-br hover:from-card/90 hover:to-card/60 transition-all duration-500"
+                  >
+                    {/* Decorative gradient overlay */}
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-amber-500/5 via-transparent to-yellow-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                    <div className="relative z-10">
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-lg flex items-center justify-center border border-amber-500/20">
+                          <Trophy className="w-6 h-6 text-amber-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-lg mb-1 line-clamp-2">{achievement.title}</h3>
+                          {achievement.organization && (
+                            <div className="text-amber-600 font-medium text-sm mb-2">
+                              {achievement.organization}
+                            </div>
+                          )}
+                          {achievement.achievement_type && (
+                            <div className="text-xs text-muted-foreground capitalize">
+                              {achievement.achievement_type}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {achievement.description && (
+                        <p className="text-muted-foreground text-sm mb-4 line-clamp-3">
+                          {achievement.description}
+                        </p>
+                      )}
+
+                      <div className="space-y-3">
+                        {achievement.achievement_date && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Calendar className="w-3 h-3" />
+                            <span>{formatDate(achievement.achievement_date)}</span>
+                          </div>
+                        )}
+
+                        {(achievement.certificate_url || achievement.achievement_url) && (
+                          <div className="flex flex-wrap gap-2 pt-3 border-t border-white/10">
+                            {achievement.achievement_url && (
+                              <motion.a
+                                href={achievement.achievement_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                whileHover={{ scale: 1.05 }}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-amber-50 text-amber-700 rounded-md hover:bg-amber-100 transition-colors border border-amber-200"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                View Achievement
+                              </motion.a>
+                            )}
+                            {achievement.certificate_url && (
+                              <motion.a
+                                href={achievement.certificate_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                whileHover={{ scale: 1.05 }}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-emerald-50 text-emerald-700 rounded-md hover:bg-emerald-100 transition-colors border border-emerald-200"
+                              >
+                                <Award className="w-3 h-3" />
+                                Certificate
+                              </motion.a>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>

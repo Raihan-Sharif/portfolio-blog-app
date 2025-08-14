@@ -23,6 +23,7 @@ export default async function AboutPage() {
       { data: courses },
       { data: workshops },
       { data: achievements },
+      { data: certifications },
     ] = await Promise.all([
       supabase.from("about_settings").select("*").eq("is_active", true).single(),
     supabase
@@ -50,6 +51,11 @@ export default async function AboutPage() {
       .select("*")
       .eq("is_active", true)
       .order("display_order, achievement_date", { ascending: false }),
+    supabase
+      .from("certifications")
+      .select("*")
+      .eq("is_active", true)
+      .order("display_order, issue_date", { ascending: false }),
     ]);
 
     return (
@@ -60,6 +66,7 @@ export default async function AboutPage() {
         courses={courses || []}
         workshops={workshops || []}
         achievements={achievements || []}
+        certifications={certifications || []}
       />
     );
   } catch (error) {
@@ -72,6 +79,7 @@ export default async function AboutPage() {
         courses={[]}
         workshops={[]}
         achievements={[]}
+        certifications={[]}
       />
     );
   }

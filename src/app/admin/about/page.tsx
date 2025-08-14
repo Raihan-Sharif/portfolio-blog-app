@@ -9,6 +9,7 @@ import { AlertCircle, Plus, Settings, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import AboutSettingsForm from "./components/about-settings-form";
 import AchievementsManager from "./components/achievements-manager";
+import CertificationsManager from "./components/certifications-manager";
 import CoursesManager from "./components/courses-manager";
 import EducationManager from "./components/education-manager";
 import ExperienceManager from "./components/experience-manager";
@@ -90,7 +91,7 @@ export default function AdminAboutPage() {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="settings" className="flex items-center gap-2">
               <Settings className="w-4 h-4" />
               Settings
@@ -110,6 +111,10 @@ export default function AdminAboutPage() {
             <TabsTrigger value="workshops" className="flex items-center gap-2">
               <Plus className="w-4 h-4" />
               Workshops
+            </TabsTrigger>
+            <TabsTrigger value="certifications" className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Certifications
             </TabsTrigger>
             <TabsTrigger
               value="achievements"
@@ -177,6 +182,17 @@ export default function AdminAboutPage() {
               </CardHeader>
               <CardContent>
                 <WorkshopsManager />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="certifications">
+            <Card>
+              <CardHeader>
+                <CardTitle>Professional Certifications</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CertificationsManager />
               </CardContent>
             </Card>
           </TabsContent>

@@ -997,6 +997,33 @@ created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Certifications Table
+CREATE TABLE certifications (
+id SERIAL PRIMARY KEY,
+title TEXT NOT NULL,
+issuing_organization TEXT NOT NULL,
+description TEXT,
+issue_date DATE,
+expiry_date DATE,
+is_permanent BOOLEAN DEFAULT false, -- true if certification doesn't expire
+credential_id TEXT,
+credential_url TEXT,
+certificate_url TEXT,
+skills_covered JSONB, -- Array of skills/technologies covered
+verification_url TEXT, -- Direct link to verify the certification
+badge_image_url TEXT, -- Badge or logo of the certification
+category TEXT CHECK (category IN ('technical', 'professional', 'industry', 'language', 'safety', 'other')) DEFAULT 'technical',
+level TEXT CHECK (level IN ('beginner', 'intermediate', 'advanced', 'expert', 'professional')),
+score TEXT, -- Score or grade achieved
+total_score TEXT, -- Total possible score or grade scale
+hours_completed INTEGER, -- Hours of training completed
+display_order INTEGER DEFAULT 0,
+is_featured BOOLEAN DEFAULT false,
+is_active BOOLEAN DEFAULT true,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Enable RLS on all new tables
 ALTER TABLE about_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE experience ENABLE ROW LEVEL SECURITY;
@@ -1004,6 +1031,7 @@ ALTER TABLE education ENABLE ROW LEVEL SECURITY;
 ALTER TABLE courses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workshops ENABLE ROW LEVEL SECURITY;
 ALTER TABLE achievements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE certifications ENABLE ROW LEVEL SECURITY;
 
 -- About settings: Public read, admin write
 CREATE POLICY "About settings are viewable by everyone"
@@ -1089,6 +1117,26 @@ WHERE ur.user_id = auth.uid() AND r.name = 'admin'
 )
 );
 
+-- Certifications: Public read active entries, admin write
+CREATE POLICY "Active certifications are viewable by everyone"
+ON certifications FOR SELECT USING (is_active = true);
+
+CREATE POLICY "Admin can manage certifications"
+ON certifications FOR ALL
+USING (
+EXISTS (
+SELECT 1 FROM user_roles ur
+JOIN roles r ON ur.role_id = r.id
+WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+)
+);
+
+Create policy "Enable insert for authenticated users only"
+on "public"."courses"
+to authenticated
+with check (
+true
+);
 -- Insert default about settings
 INSERT INTO about_settings (
 title,
@@ -2790,6 +2838,179 @@ LANGUAGE plpgsql SECURITY DEFINER;
 -- Grant execute permission
 GRANT EXECUTE ON FUNCTION get_unread_notification_count(UUID) TO authenticated;
 
+---
+
+-- Certifications Management Functions
+
+-- Function to get active certifications with expiry status
+CREATE OR REPLACE FUNCTION get_certifications_with_status()
+RETURNS TABLE (
+id INTEGER,
+title TEXT,
+issuing_organization TEXT,
+description TEXT,
+issue_date DATE,
+expiry_date DATE,
+is_permanent BOOLEAN,
+credential_id TEXT,
+credential_url TEXT,
+certificate_url TEXT,
+skills_covered JSONB,
+verification_url TEXT,
+badge_image_url TEXT,
+category TEXT,
+level TEXT,
+score TEXT,
+total_score TEXT,
+hours_completed INTEGER,
+display_order INTEGER,
+is_featured BOOLEAN,
+is_expired BOOLEAN,
+days_until_expiry INTEGER,
+created_at TIMESTAMPTZ,
+updated_at TIMESTAMPTZ
+) AS $$
+BEGIN
+RETURN QUERY
+SELECT
+c.id,
+c.title,
+c.issuing_organization,
+c.description,
+c.issue_date,
+c.expiry_date,
+c.is_permanent,
+c.credential_id,
+c.credential_url,
+c.certificate_url,
+c.skills_covered,
+c.verification_url,
+c.badge_image_url,
+c.category,
+c.level,
+c.score,
+c.total_score,
+c.hours_completed,
+c.display_order,
+c.is_featured,
+CASE
+WHEN c.is_permanent = true THEN false
+WHEN c.expiry_date IS NULL THEN false
+ELSE c.expiry_date < CURRENT_DATE
+END as is_expired,
+CASE
+WHEN c.is_permanent = true THEN NULL
+WHEN c.expiry_date IS NULL THEN NULL
+ELSE (c.expiry_date - CURRENT_DATE)::INTEGER
+END as days_until_expiry,
+c.created_at,
+c.updated_at
+FROM certifications c
+WHERE c.is_active = true
+ORDER BY c.display_order ASC, c.issue_date DESC;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get certifications by category
+CREATE OR REPLACE FUNCTION get_certifications_by_category(p_category TEXT DEFAULT NULL)
+RETURNS TABLE (
+id INTEGER,
+title TEXT,
+issuing_organization TEXT,
+description TEXT,
+issue_date DATE,
+expiry_date DATE,
+is_permanent BOOLEAN,
+credential_url TEXT,
+certificate_url TEXT,
+skills_covered JSONB,
+verification_url TEXT,
+badge_image_url TEXT,
+category TEXT,
+level TEXT,
+score TEXT,
+is_featured BOOLEAN,
+is_expired BOOLEAN
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+SELECT
+c.id,
+c.title,
+c.issuing_organization,
+c.description,
+c.issue_date,
+c.expiry_date,
+c.is_permanent,
+c.credential_url,
+c.certificate_url,
+c.skills_covered,
+c.verification_url,
+c.badge_image_url,
+c.category,
+c.level,
+c.score,
+c.is_featured,
+CASE
+WHEN c.is_permanent = true THEN false
+WHEN c.expiry_date IS NULL THEN false
+ELSE c.expiry_date < CURRENT_DATE
+END as is_expired
+FROM certifications c
+WHERE c.is_active = true
+AND (p_category IS NULL OR c.category = p_category)
+ORDER BY c.is_featured DESC, c.display_order ASC, c.issue_date DESC;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get certification statistics
+CREATE OR REPLACE FUNCTION get_certification_stats()
+RETURNS TABLE (
+total_certifications INTEGER,
+active_certifications INTEGER,
+expired_certifications INTEGER,
+expiring_soon INTEGER, -- expires within 30 days
+featured_certifications INTEGER,
+categories_count INTEGER
+) AS
+$$
+
+BEGIN
+RETURN QUERY
+WITH stats AS (
+SELECT
+COUNT(\*) as total,
+COUNT(CASE WHEN is_active = true THEN 1 END) as active,
+COUNT(CASE WHEN is_active = true AND is_permanent = false AND expiry_date IS NOT NULL AND expiry_date < CURRENT_DATE THEN 1 END) as expired,
+COUNT(CASE WHEN is_active = true AND is_permanent = false AND expiry_date IS NOT NULL AND expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days' THEN 1 END) as expiring_soon,
+COUNT(CASE WHEN is_active = true AND is_featured = true THEN 1 END) as featured,
+COUNT(DISTINCT category) as categories
+FROM certifications
+)
+SELECT
+total::INTEGER,
+active::INTEGER,
+expired::INTEGER,
+expiring_soon::INTEGER,
+featured::INTEGER,
+categories::INTEGER
+FROM stats;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permissions for certification functions
+GRANT EXECUTE ON FUNCTION get_certifications_with_status() TO authenticated;
+GRANT EXECUTE ON FUNCTION get_certifications_by_category(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_certification_stats() TO authenticated;
+
 -- Create indexes for performance
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_type ON notifications(type);
@@ -2799,6 +3020,7 @@ CREATE INDEX idx_notification_recipients_user_id ON notification_recipients(user
 CREATE INDEX idx_system_analytics_metric_date ON system_analytics(metric_name, date_key);
 
 ---
+
 
 $$
 
@@ -2815,6 +3037,7 @@ avg_daily_views NUMERIC,
 growth_rate NUMERIC,
 online_users_count INTEGER
 ) AS
+
 $$
 
 DECLARE
@@ -2870,9 +3093,10 @@ END AS growth*rate,
 (SELECT COUNT(*)::INTEGER FROM online_users WHERE last_activity >= NOW() - INTERVAL '5 minutes') AS online_users_count;
 END;
 
-$$
-LANGUAGE plpgsql SECURITY DEFINER;
 
+$$
+
+LANGUAGE plpgsql SECURITY DEFINER;
 
 $$
 
@@ -2883,7 +3107,9 @@ view_date DATE,
 post_views INTEGER,
 project_views INTEGER,
 total_views INTEGER
-) AS $$
+) AS
+$$
+
 BEGIN
 RETURN QUERY
 WITH date_series AS (
