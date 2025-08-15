@@ -146,17 +146,34 @@ CREATE TABLE project_views (
   UNIQUE(project_id, view_date)
 );
 
--- Online users tracking
+-- Enhanced online users tracking
 CREATE TABLE online_users (
   id SERIAL PRIMARY KEY,
-  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  session_id TEXT NOT NULL,
+  
+  -- User identification
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE, -- NULL for anonymous users
+  session_id TEXT NOT NULL, -- Browser-generated session ID
+  ip_address INET, -- User's IP address for anonymous tracking
+  browser_fingerprint TEXT, -- Browser fingerprint for better anonymous identification
+  
+  -- Activity tracking
   last_activity TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  is_authenticated BOOLEAN DEFAULT false,
+  first_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   page_url TEXT,
+  user_agent TEXT,
+  
+  -- User information (for display)
+  display_name TEXT, -- Cached user name for performance
+  is_authenticated BOOLEAN DEFAULT false,
+  
+  -- Session metadata
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(session_id)
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Add unique constraints with proper syntax
+CREATE UNIQUE INDEX unique_authenticated_user ON online_users(user_id) WHERE user_id IS NOT NULL;
+CREATE UNIQUE INDEX unique_anonymous_session ON online_users(session_id, ip_address) WHERE user_id IS NULL;
 
 -- Insert initial roles
 INSERT INTO roles (name) VALUES ('admin');
@@ -3267,7 +3284,160 @@ CREATE POLICY "Users can update their own online status"
 CREATE POLICY "Users can delete their own online status"
   ON online_users FOR DELETE USING (true);
 
+-- Enhanced online user tracking functions
+CREATE OR REPLACE FUNCTION upsert_online_user(
+  p_user_id UUID DEFAULT NULL,
+  p_session_id TEXT DEFAULT NULL,
+  p_ip_address INET DEFAULT NULL,
+  p_browser_fingerprint TEXT DEFAULT NULL,
+  p_page_url TEXT DEFAULT NULL,
+  p_user_agent TEXT DEFAULT NULL,
+  p_display_name TEXT DEFAULT NULL
+) RETURNS void AS $$
+DECLARE
+  activity_threshold INTERVAL := '5 minutes';
+  cleanup_threshold INTERVAL := '10 minutes';
+BEGIN
+  -- Clean up old sessions first (only run occasionally)
+  IF random() < 0.1 THEN -- 10% chance to run cleanup
+    DELETE FROM online_users 
+    WHERE last_activity < NOW() - cleanup_threshold;
+  END IF;
+
+  -- For authenticated users
+  IF p_user_id IS NOT NULL THEN
+    INSERT INTO online_users (
+      user_id, session_id, ip_address, browser_fingerprint,
+      page_url, user_agent, display_name, is_authenticated,
+      last_activity, updated_at
+    ) VALUES (
+      p_user_id, p_session_id, p_ip_address, p_browser_fingerprint,
+      p_page_url, p_user_agent, p_display_name, true,
+      NOW(), NOW()
+    )
+    ON CONFLICT (user_id) WHERE user_id IS NOT NULL
+    DO UPDATE SET
+      session_id = EXCLUDED.session_id,
+      ip_address = EXCLUDED.ip_address,
+      browser_fingerprint = EXCLUDED.browser_fingerprint,
+      page_url = EXCLUDED.page_url,
+      user_agent = EXCLUDED.user_agent,
+      display_name = EXCLUDED.display_name,
+      last_activity = NOW(),
+      updated_at = NOW();
+  
+  -- For anonymous users
+  ELSE
+    INSERT INTO online_users (
+      user_id, session_id, ip_address, browser_fingerprint,
+      page_url, user_agent, display_name, is_authenticated,
+      last_activity, updated_at
+    ) VALUES (
+      NULL, p_session_id, p_ip_address, p_browser_fingerprint,
+      p_page_url, p_user_agent, 'Anonymous', false,
+      NOW(), NOW()
+    )
+    ON CONFLICT (session_id, ip_address) WHERE user_id IS NULL
+    DO UPDATE SET
+      page_url = EXCLUDED.page_url,
+      user_agent = EXCLUDED.user_agent,
+      browser_fingerprint = EXCLUDED.browser_fingerprint,
+      last_activity = NOW(),
+      updated_at = NOW()
+    WHERE online_users.last_activity < NOW() - INTERVAL '30 seconds'; -- Throttle anonymous updates
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get current online user statistics
+CREATE OR REPLACE FUNCTION get_online_user_stats()
+RETURNS TABLE (
+  total_online INTEGER,
+  authenticated_users INTEGER,
+  anonymous_users INTEGER
+) AS $$
+DECLARE
+  activity_threshold INTERVAL := '5 minutes';
+BEGIN
+  RETURN QUERY
+  SELECT 
+    COUNT(*)::INTEGER AS total_online,
+    COUNT(*) FILTER (WHERE is_authenticated = true)::INTEGER AS authenticated_users,
+    COUNT(*) FILTER (WHERE is_authenticated = false)::INTEGER AS anonymous_users
+  FROM online_users 
+  WHERE last_activity > NOW() - activity_threshold;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get recent online users (for admin dashboard)
+CREATE OR REPLACE FUNCTION get_recent_online_users(limit_count INTEGER DEFAULT 10)
+RETURNS TABLE (
+  id INTEGER,
+  user_id UUID,
+  session_id TEXT,
+  display_name TEXT,
+  last_activity TIMESTAMP WITH TIME ZONE,
+  is_authenticated BOOLEAN,
+  page_url TEXT,
+  ip_address INET
+) AS $$
+DECLARE
+  activity_threshold INTERVAL := '5 minutes';
+BEGIN
+  RETURN QUERY
+  SELECT 
+    ou.id,
+    ou.user_id,
+    ou.session_id,
+    ou.display_name,
+    ou.last_activity,
+    ou.is_authenticated,
+    ou.page_url,
+    ou.ip_address
+  FROM online_users ou
+  WHERE ou.last_activity > NOW() - activity_threshold
+  ORDER BY ou.last_activity DESC
+  LIMIT limit_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to manually clean up old sessions
+CREATE OR REPLACE FUNCTION cleanup_old_sessions()
+RETURNS INTEGER AS $$
+DECLARE
+  deleted_count INTEGER;
+  cleanup_threshold INTERVAL := '10 minutes';
+BEGIN
+  DELETE FROM online_users 
+  WHERE last_activity < NOW() - cleanup_threshold;
+  
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to remove specific user session (for logout)
+CREATE OR REPLACE FUNCTION remove_user_session(p_user_id UUID DEFAULT NULL, p_session_id TEXT DEFAULT NULL)
+RETURNS BOOLEAN AS $$
+BEGIN
+  IF p_user_id IS NOT NULL THEN
+    DELETE FROM online_users WHERE user_id = p_user_id;
+  ELSIF p_session_id IS NOT NULL THEN
+    DELETE FROM online_users WHERE session_id = p_session_id;
+  ELSE
+    RETURN false;
+  END IF;
+  
+  RETURN true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Grant permissions for all functions
+GRANT EXECUTE ON FUNCTION upsert_online_user(UUID, TEXT, INET, TEXT, TEXT, TEXT, TEXT) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION get_online_user_stats() TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION get_recent_online_users(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION cleanup_old_sessions() TO authenticated;
+GRANT EXECUTE ON FUNCTION remove_user_session(UUID, TEXT) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION update_online_user(UUID, TEXT, INET, TEXT, TEXT, BOOLEAN) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_online_users_count() TO authenticated;
 GRANT EXECUTE ON FUNCTION get_recent_online_users(INTEGER) TO authenticated;
@@ -3282,13 +3452,6 @@ CREATE INDEX IF NOT EXISTS idx_online_users_session_id ON online_users(session_i
 CREATE INDEX IF NOT EXISTS idx_online_users_user_id ON online_users(user_id);
 CREATE INDEX IF NOT EXISTS idx_online_users_is_authenticated ON online_users(is_authenticated);
 
--- Create a scheduled job to clean up old online users (if using pg_cron)
--- Uncomment if you have pg_cron enabled
-/*
-SELECT cron.schedule(
-  'cleanup-online-users',
-  '*/5 * * * *', -- Every 5 minutes
-  'SELECT cleanup_online_users();'
-);
-*/
+-- Note: Automatic cleanup happens within upsert_online_user function
+-- No cron jobs needed - cleanup runs automatically with 10% probability on each upsert
 $$

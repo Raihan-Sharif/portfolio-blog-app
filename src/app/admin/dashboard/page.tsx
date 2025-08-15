@@ -117,6 +117,7 @@ interface DashboardStats {
       is_authenticated: boolean;
       page_url: string;
       user_name?: string;
+      display_name?: string;
     }>;
   };
   monthlyStats: Array<{
@@ -373,23 +374,7 @@ export default function DashboardPage() {
           .eq("is_active", true)
           .order("view_count", { ascending: false })
           .limit(5),
-        supabase
-          .from("online_users")
-          .select(
-            `
-            user_id,
-            session_id,
-            last_activity,
-            is_authenticated,
-            page_url,
-            profiles!left(full_name)
-          `
-          )
-          .gte(
-            "last_activity",
-            new Date(Date.now() - 5 * 60 * 1000).toISOString()
-          )
-          .order("last_activity", { ascending: false }),
+        supabase.rpc("get_recent_online_users", { limit_count: 10 }),
       ]);
 
       const topContent = [
@@ -407,24 +392,22 @@ export default function DashboardPage() {
         .sort((a, b) => b.views - a.views)
         .slice(0, 8);
 
+      // Get online user statistics
+      const { data: onlineStats } = await supabase.rpc("get_online_user_stats");
+      
       const onlineUsers = {
-        total_online: onlineUsersData?.length || 0,
-        authenticated_users:
-          onlineUsersData?.filter((u) => u.is_authenticated).length || 0,
-        anonymous_users:
-          onlineUsersData?.filter((u) => !u.is_authenticated).length || 0,
-        recent_users:
-          onlineUsersData?.slice(0, 10).map((user) => ({
-            id: user.user_id,
-            session_id: user.session_id,
-            last_activity: user.last_activity,
-            is_authenticated: user.is_authenticated,
-            page_url: user.page_url,
-            user_name:
-              Array.isArray(user.profiles) && user.profiles.length > 0
-                ? user.profiles[0].full_name
-                : "Anonymous",
-          })) || [],
+        total_online: onlineStats?.[0]?.total_online || 0,
+        authenticated_users: onlineStats?.[0]?.authenticated_users || 0,
+        anonymous_users: onlineStats?.[0]?.anonymous_users || 0,
+        recent_users: onlineUsersData?.map((user: any) => ({
+          id: user.user_id,
+          session_id: user.session_id,
+          last_activity: user.last_activity,
+          is_authenticated: user.is_authenticated,
+          page_url: user.page_url,
+          user_name: user.display_name,
+          display_name: user.display_name,
+        })) || [],
       };
 
       // Calculate growth metrics (simplified for demo)
@@ -990,7 +973,7 @@ export default function DashboardPage() {
                     <p>No recent activity</p>
                   </div>
                 ) : (
-                  stats.onlineUsers.recent_users.map((user, index) => (
+                  stats.onlineUsers.recent_users.map((user) => (
                     <div
                       key={user.session_id}
                       className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50"
@@ -1007,7 +990,7 @@ export default function DashboardPage() {
                         <div>
                           <div className="font-medium text-sm">
                             {user.is_authenticated
-                              ? user.user_name
+                              ? user.display_name || user.user_name || "User"
                               : "Anonymous User"}
                           </div>
                           <div className="text-xs text-muted-foreground">

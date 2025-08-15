@@ -15,6 +15,8 @@ import { ModeToggle } from "@/components/ui/mode-toggle";
 import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { OnlineUsersNavbar } from "@/components/admin/online-users-navbar";
+import { useEnhancedOnlineTracking } from "@/hooks/use-enhanced-online-tracking";
 import {
   Activity,
   AlertCircle,
@@ -70,11 +72,6 @@ interface Notification {
   created_at: string;
 }
 
-interface OnlineStats {
-  total_online: number;
-  authenticated_users: number;
-  anonymous_users: number;
-}
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const { user, loading, signOut } = useAuth();
@@ -86,12 +83,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [onlineStats, setOnlineStats] = useState<OnlineStats>({
-    total_online: 0,
-    authenticated_users: 0,
-    anonymous_users: 0,
-  });
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
+  
+  // Enhanced online tracking
+  const { onlineStats } = useEnhancedOnlineTracking();
 
   // Enhanced admin check with better caching
   const hasInitialized = useRef(false);
@@ -126,21 +121,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
   }, []);
 
-  // Track online presence
-  const trackOnlinePresence = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      await supabase.rpc("update_online_user", {
-        p_user_id: user.id,
-        p_session_id: `admin_${user.id}`,
-        p_page_url: pathname,
-        p_is_authenticated: true,
-      });
-    } catch (error) {
-      console.error("Error tracking online presence:", error);
-    }
-  }, [user, pathname]);
 
   // Fetch notifications with proper error handling and read status
   const fetchNotifications = useCallback(async () => {
@@ -193,20 +173,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
   }, [user, isAdmin]);
 
-  // Fetch online users stats
-  const fetchOnlineStats = useCallback(async () => {
-    try {
-      const { data, error } = await supabase.rpc("get_online_users_count");
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        setOnlineStats(data[0]);
-      }
-    } catch (error) {
-      console.error("Error fetching online stats:", error);
-    }
-  }, []);
 
   // Mark notification as read with proper implementation
   const markNotificationAsRead = useCallback(
@@ -269,31 +235,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     initializeAdmin();
   }, [user, loading, router, checkAdminStatus]); // REMOVED: pathname dependency to prevent re-runs on navigation
 
-  // Track online presence and fetch data
+  // Fetch notifications for admin users
   useEffect(() => {
     if (isAdmin && user) {
-      trackOnlinePresence();
       fetchNotifications();
-      fetchOnlineStats();
 
-      // Set up intervals for real-time updates
-      const presenceInterval = setInterval(trackOnlinePresence, 30000); // 30 seconds
-      const statsInterval = setInterval(fetchOnlineStats, 60000); // 1 minute
+      // Set up interval for notifications updates
       const notificationsInterval = setInterval(fetchNotifications, 120000); // 2 minutes
 
       return () => {
-        clearInterval(presenceInterval);
-        clearInterval(statsInterval);
         clearInterval(notificationsInterval);
       };
     }
-  }, [
-    isAdmin,
-    user,
-    trackOnlinePresence,
-    fetchNotifications,
-    fetchOnlineStats,
-  ]);
+  }, [isAdmin, user, fetchNotifications]);
 
   const handleSignOut = useCallback(async () => {
     if (user?.id) {
@@ -788,6 +742,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {/* Online Users */}
+            <OnlineUsersNavbar 
+              recentUsers={onlineStats.recent_users} 
+              className="transition-all duration-200 hover:scale-105"
+            />
+            
             {/* Theme Toggle */}
             <ModeToggle />
 
