@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { ServiceInquiryFormData } from '@/types/services';
+import { verifyRecaptcha } from '@/lib/recaptcha';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -54,13 +55,29 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const supabase = createServerSupabaseClient();
-    const body: ServiceInquiryFormData = await request.json();
+    const body: ServiceInquiryFormData & { recaptcha_token?: string } = await request.json();
 
     // Validate required fields
     if (!body.name || !body.email || !body.project_description) {
       return NextResponse.json({ 
         error: 'Missing required fields',
         details: 'Name, email, and project description are required'
+      }, { status: 400 });
+    }
+
+    // Verify reCAPTCHA
+    if (body.recaptcha_token) {
+      const isValidRecaptcha = await verifyRecaptcha(body.recaptcha_token);
+      if (!isValidRecaptcha) {
+        return NextResponse.json({ 
+          error: 'reCAPTCHA verification failed',
+          details: 'Please complete the security verification'
+        }, { status: 400 });
+      }
+    } else if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ 
+        error: 'reCAPTCHA verification required',
+        details: 'Please complete the security verification'
       }, { status: 400 });
     }
 

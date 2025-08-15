@@ -6,6 +6,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
+import LeadGenerationProvider from "@/components/lead-generation/lead-generation-provider";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -127,11 +128,12 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <AuthProvider>
-              {/* Background pattern */}
-              <div className="fixed inset-0 bg-dot-pattern bg-dot-sm opacity-[0.02] dark:opacity-[0.05] pointer-events-none" />
+              <LeadGenerationProvider>
+                {/* Background pattern */}
+                <div className="fixed inset-0 bg-dot-pattern bg-dot-sm opacity-[0.02] dark:opacity-[0.05] pointer-events-none" />
 
-              {/* FIXED: Use ConditionalLayout to exclude navbar/footer for admin routes */}
-              <ConditionalLayout
+                {/* FIXED: Use ConditionalLayout to exclude navbar/footer for admin routes */}
+                <ConditionalLayout
                 navbar={
                   <ErrorBoundary
                     fallback={
@@ -159,13 +161,14 @@ export default function RootLayout({
                   </ErrorBoundary>
                 }
               >
-                <ErrorBoundary>{children}</ErrorBoundary>
-              </ConditionalLayout>
+                  <ErrorBoundary>{children}</ErrorBoundary>
+                </ConditionalLayout>
 
-              {/* Global notification manager */}
-              <ErrorBoundary>
-                <NotificationManager />
-              </ErrorBoundary>
+                {/* Global notification manager */}
+                <ErrorBoundary>
+                  <NotificationManager />
+                </ErrorBoundary>
+              </LeadGenerationProvider>
             </AuthProvider>
           </ThemeProvider>
         </ErrorBoundary>

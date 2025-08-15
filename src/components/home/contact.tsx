@@ -41,7 +41,8 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useRef } from "react";
+import ReCAPTCHAComponent, { ReCAPTCHARef } from "@/components/ui/recaptcha";
 
 // Interfaces
 interface ContactInfo {
@@ -121,6 +122,8 @@ export default function Contact({
     message?: string;
   }>({});
   const [phoneError, setPhoneError] = useState<string>("");
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHARef>(null);
 
   // Form handlers (keep the same logic as your original)
   const handleChange = (
@@ -187,6 +190,10 @@ export default function Contact({
       }
     }
 
+    if (!recaptchaToken) {
+      throw new Error("Please complete the reCAPTCHA verification");
+    }
+
     return true;
   };
 
@@ -210,6 +217,7 @@ export default function Contact({
         subject: formData.subject.trim(),
         message: formData.message.trim(),
         status: "pending",
+        recaptcha_token: recaptchaToken,
       });
 
       if (error) throw error;
@@ -221,6 +229,8 @@ export default function Contact({
       });
 
       setFormData({ name: "", email: "", phone: "", subject: "", message: "" });
+      setRecaptchaToken(null);
+      recaptchaRef.current?.reset();
     } catch (submitError: any) {
       setSubmitStatus({
         success: false,
@@ -228,6 +238,9 @@ export default function Contact({
           submitError.message ||
           "There was an error sending your message. Please try again.",
       });
+      // Reset reCAPTCHA on error so user can try again
+      setRecaptchaToken(null);
+      recaptchaRef.current?.reset();
     } finally {
       setIsSubmitting(false);
     }
@@ -670,6 +683,20 @@ export default function Contact({
                       disabled={isSubmitting}
                       placeholder="Tell me about your project..."
                       className="bg-white/5 border-white/20 focus:border-primary/50 transition-colors"
+                    />
+                  </div>
+
+                  {/* reCAPTCHA */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <span>Security Verification</span>
+                    </label>
+                    <ReCAPTCHAComponent
+                      ref={recaptchaRef}
+                      onVerify={setRecaptchaToken}
+                      onExpired={() => setRecaptchaToken(null)}
+                      onError={() => setRecaptchaToken(null)}
+                      theme="auto"
                     />
                   </div>
 

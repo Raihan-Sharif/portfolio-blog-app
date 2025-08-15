@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Service, ServiceInquiryFormData } from '@/types/services';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MessageCircle, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import ReCAPTCHAComponent, { ReCAPTCHARef } from '@/components/ui/recaptcha';
 
 interface ServiceInquiryFormProps {
   service: Service;
@@ -37,6 +38,8 @@ export default function ServiceInquiryForm({ service, selectedPackageId }: Servi
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string>('');
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHARef>(null);
 
   // Update form data when selectedPackageId changes
   useEffect(() => {
@@ -55,6 +58,7 @@ export default function ServiceInquiryForm({ service, selectedPackageId }: Servi
       newErrors.email = 'Please enter a valid email address';
     }
     if (!formData.project_description.trim()) newErrors.project_description = 'Project description is required';
+    if (!recaptchaToken) newErrors.recaptcha = 'Please complete the reCAPTCHA verification';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -74,7 +78,10 @@ export default function ServiceInquiryForm({ service, selectedPackageId }: Servi
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          recaptcha_token: recaptchaToken
+        }),
       });
 
       const responseData = await response.json();
@@ -96,6 +103,8 @@ export default function ServiceInquiryForm({ service, selectedPackageId }: Servi
           preferred_contact: 'email',
           urgency: 'normal'
         });
+        setRecaptchaToken(null);
+        recaptchaRef.current?.reset();
       } else {
         console.error('Server error:', responseData);
         setSubmitStatus('error');
@@ -105,6 +114,9 @@ export default function ServiceInquiryForm({ service, selectedPackageId }: Servi
       console.error('Error submitting inquiry:', error);
       setSubmitStatus('error');
       setSubmitError('Network error. Please check your connection and try again.');
+      // Reset reCAPTCHA on error so user can try again
+      setRecaptchaToken(null);
+      recaptchaRef.current?.reset();
     } finally {
       setIsSubmitting(false);
     }
@@ -331,6 +343,19 @@ export default function ServiceInquiryForm({ service, selectedPackageId }: Servi
               placeholder="Any additional requirements or questions..."
               rows={3}
             />
+          </div>
+
+          {/* reCAPTCHA */}
+          <div className="space-y-2">
+            <Label>Security Verification</Label>
+            <ReCAPTCHAComponent
+              ref={recaptchaRef}
+              onVerify={setRecaptchaToken}
+              onExpired={() => setRecaptchaToken(null)}
+              onError={() => setRecaptchaToken(null)}
+              theme="auto"
+            />
+            {errors.recaptcha && <p className="text-sm text-red-500">{errors.recaptcha}</p>}
           </div>
 
           <Button 

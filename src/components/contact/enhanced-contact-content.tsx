@@ -38,7 +38,8 @@ import {
   Star,
   User,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef } from "react";
+import ReCAPTCHAComponent, { ReCAPTCHARef } from "@/components/ui/recaptcha";
 
 // interfaces remain the same as in your original contact component
 interface ContactInfo {
@@ -124,6 +125,8 @@ export default function EnhancedContactContent({
     message?: string;
   }>({});
   const [phoneError, setPhoneError] = useState<string>("");
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHARef>(null);
 
   // Form handlers (keep the same logic as your original)
   const handleChange = (
@@ -190,6 +193,10 @@ export default function EnhancedContactContent({
       }
     }
 
+    if (!recaptchaToken) {
+      throw new Error("Please complete the reCAPTCHA verification");
+    }
+
     return true;
   };
 
@@ -213,6 +220,7 @@ export default function EnhancedContactContent({
         subject: formData.subject.trim(),
         message: formData.message.trim(),
         status: "pending",
+        recaptcha_token: recaptchaToken,
       });
 
       if (error) throw error;
@@ -224,6 +232,8 @@ export default function EnhancedContactContent({
       });
 
       setFormData({ name: "", email: "", phone: "", subject: "", message: "" });
+      setRecaptchaToken(null);
+      recaptchaRef.current?.reset();
     } catch (submitError: any) {
       setSubmitStatus({
         success: false,
@@ -231,6 +241,9 @@ export default function EnhancedContactContent({
           submitError.message ||
           "There was an error sending your message. Please try again.",
       });
+      // Reset reCAPTCHA on error so user can try again
+      setRecaptchaToken(null);
+      recaptchaRef.current?.reset();
     } finally {
       setIsSubmitting(false);
     }
@@ -671,6 +684,20 @@ export default function EnhancedContactContent({
                         disabled={isSubmitting}
                         placeholder="Tell me about your project, timeline, budget, and any specific requirements..."
                         className="bg-white/5 border-white/20"
+                      />
+                    </div>
+
+                    {/* reCAPTCHA */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium flex items-center gap-2">
+                        <span>Security Verification</span>
+                      </label>
+                      <ReCAPTCHAComponent
+                        ref={recaptchaRef}
+                        onVerify={setRecaptchaToken}
+                        onExpired={() => setRecaptchaToken(null)}
+                        onError={() => setRecaptchaToken(null)}
+                        theme="auto"
                       />
                     </div>
 

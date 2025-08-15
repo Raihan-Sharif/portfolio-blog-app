@@ -2,6 +2,74 @@ Database Setup
 
 Here's the SQL to create the database schema on Supabase:
 
+## Newsletter & Lead Generation Tables
+
+```sql
+-- Newsletter Subscribers Table
+CREATE TABLE newsletter_subscribers (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  first_name VARCHAR(100),
+  last_name VARCHAR(100),
+  lead_magnet VARCHAR(100), -- Track which lead magnet they subscribed for
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'unsubscribed', 'bounced', 'complained')),
+  source VARCHAR(50) DEFAULT 'website', -- website, popup, form, etc.
+  client_ip INET,
+  user_agent TEXT,
+  referrer TEXT,
+  tags TEXT[], -- Array of tags for segmentation
+  custom_fields JSONB, -- Additional custom data
+  subscribed_at TIMESTAMPTZ DEFAULT NOW(),
+  unsubscribed_at TIMESTAMPTZ,
+  resubscribed_at TIMESTAMPTZ,
+  last_email_sent_at TIMESTAMPTZ,
+  email_open_count INTEGER DEFAULT 0,
+  email_click_count INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Newsletter Campaigns Table
+CREATE TABLE newsletter_campaigns (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name VARCHAR(200) NOT NULL,
+  subject VARCHAR(300) NOT NULL,
+  content TEXT,
+  html_content TEXT,
+  status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'scheduled', 'sending', 'sent', 'paused', 'cancelled')),
+  scheduled_at TIMESTAMPTZ,
+  sent_at TIMESTAMPTZ,
+  total_recipients INTEGER DEFAULT 0,
+  total_opened INTEGER DEFAULT 0,
+  total_clicked INTEGER DEFAULT 0,
+  total_bounced INTEGER DEFAULT 0,
+  total_complained INTEGER DEFAULT 0,
+  total_unsubscribed INTEGER DEFAULT 0,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Campaign Recipients Tracking Table
+CREATE TABLE newsletter_campaign_recipients (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  campaign_id UUID REFERENCES newsletter_campaigns(id) ON DELETE CASCADE,
+  subscriber_id UUID REFERENCES newsletter_subscribers(id) ON DELETE CASCADE,
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained', 'unsubscribed')),
+  sent_at TIMESTAMPTZ,
+  opened_at TIMESTAMPTZ,
+  clicked_at TIMESTAMPTZ,
+  bounced_at TIMESTAMPTZ,
+  unsubscribed_at TIMESTAMPTZ,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(campaign_id, subscriber_id)
+);
+```
+
+## Core Application Tables
+
 ```sql
 -- Create tables
 CREATE TABLE profiles (
