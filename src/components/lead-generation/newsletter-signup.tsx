@@ -175,7 +175,10 @@ export default function NewsletterSignup({
               
               <div className="bg-white/50 dark:bg-green-950/30 p-4 rounded-lg border border-green-200 dark:border-green-800 mb-6">
                 <div className="flex items-center gap-3 mb-2">
-                  <selectedMagnet.icon className="w-5 h-5 text-green-600" />
+                  {(() => {
+                    const MagnetIcon = leadMagnets.find(m => m.id === selectedMagnet.id)?.icon || CheckCircle;
+                    return <MagnetIcon className="w-5 h-5 text-green-600" />;
+                  })()}
                   <span className="font-semibold text-green-800 dark:text-green-200">
                     {selectedMagnet.title}
                   </span>

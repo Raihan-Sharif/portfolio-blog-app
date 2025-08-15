@@ -66,6 +66,147 @@ CREATE TABLE newsletter_campaign_recipients (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(campaign_id, subscriber_id)
 );
+
+-- Create indexes for newsletter tables
+CREATE INDEX idx_newsletter_subscribers_email ON newsletter_subscribers(email);
+CREATE INDEX idx_newsletter_subscribers_status ON newsletter_subscribers(status);
+CREATE INDEX idx_newsletter_subscribers_subscribed_at ON newsletter_subscribers(subscribed_at);
+CREATE INDEX idx_newsletter_subscribers_lead_magnet ON newsletter_subscribers(lead_magnet);
+CREATE INDEX idx_newsletter_subscribers_source ON newsletter_subscribers(source);
+
+CREATE INDEX idx_newsletter_campaigns_status ON newsletter_campaigns(status);
+CREATE INDEX idx_newsletter_campaigns_created_by ON newsletter_campaigns(created_by);
+CREATE INDEX idx_newsletter_campaigns_scheduled_at ON newsletter_campaigns(scheduled_at);
+
+CREATE INDEX idx_campaign_recipients_campaign_id ON newsletter_campaign_recipients(campaign_id);
+CREATE INDEX idx_campaign_recipients_subscriber_id ON newsletter_campaign_recipients(subscriber_id);
+CREATE INDEX idx_campaign_recipients_status ON newsletter_campaign_recipients(status);
+
+-- Create updated_at trigger function (if not exists)
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Create triggers for newsletter tables
+CREATE TRIGGER update_newsletter_subscribers_updated_at 
+  BEFORE UPDATE ON newsletter_subscribers 
+  FOR EACH ROW 
+  EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE TRIGGER update_newsletter_campaigns_updated_at 
+  BEFORE UPDATE ON newsletter_campaigns 
+  FOR EACH ROW 
+  EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE TRIGGER update_campaign_recipients_updated_at 
+  BEFORE UPDATE ON newsletter_campaign_recipients 
+  FOR EACH ROW 
+  EXECUTE PROCEDURE update_updated_at_column();
+
+-- RLS (Row Level Security) policies for newsletter tables
+ALTER TABLE newsletter_subscribers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE newsletter_campaigns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE newsletter_campaign_recipients ENABLE ROW LEVEL SECURITY;
+
+-- Newsletter subscribers policies
+CREATE POLICY "Allow public to insert newsletter subscribers" ON newsletter_subscribers
+  FOR INSERT TO anon, authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Allow authenticated to read newsletter subscribers" ON newsletter_subscribers
+  FOR SELECT TO authenticated
+  USING (true);
+
+CREATE POLICY "Allow authenticated to update newsletter subscribers" ON newsletter_subscribers
+  FOR UPDATE TO authenticated
+  USING (true);
+
+CREATE POLICY "Allow authenticated to delete newsletter subscribers" ON newsletter_subscribers
+  FOR DELETE TO authenticated
+  USING (true);
+
+-- Newsletter campaigns policies
+CREATE POLICY "Allow authenticated to manage campaigns" ON newsletter_campaigns
+  FOR ALL TO authenticated
+  USING (true);
+
+-- Campaign recipients policies
+CREATE POLICY "Allow authenticated to manage campaign recipients" ON newsletter_campaign_recipients
+  FOR ALL TO authenticated
+  USING (true);
+
+-- Newsletter analytics functions
+CREATE OR REPLACE FUNCTION get_newsletter_stats()
+RETURNS TABLE (
+  total_subscribers INTEGER,
+  active_subscribers INTEGER,
+  unsubscribed_subscribers INTEGER,
+  bounced_subscribers INTEGER,
+  new_subscribers_this_month INTEGER,
+  growth_rate DECIMAL
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    COUNT(*)::INTEGER as total_subscribers,
+    COUNT(*) FILTER (WHERE status = 'active')::INTEGER as active_subscribers,
+    COUNT(*) FILTER (WHERE status = 'unsubscribed')::INTEGER as unsubscribed_subscribers,
+    COUNT(*) FILTER (WHERE status = 'bounced')::INTEGER as bounced_subscribers,
+    COUNT(*) FILTER (WHERE subscribed_at >= DATE_TRUNC('month', NOW()))::INTEGER as new_subscribers_this_month,
+    CASE 
+      WHEN COUNT(*) FILTER (WHERE subscribed_at >= DATE_TRUNC('month', NOW()) - INTERVAL '1 month' AND subscribed_at < DATE_TRUNC('month', NOW())) > 0
+      THEN ((COUNT(*) FILTER (WHERE subscribed_at >= DATE_TRUNC('month', NOW()))::DECIMAL / 
+             COUNT(*) FILTER (WHERE subscribed_at >= DATE_TRUNC('month', NOW()) - INTERVAL '1 month' AND subscribed_at < DATE_TRUNC('month', NOW()))::DECIMAL - 1) * 100)
+      ELSE 0
+    END as growth_rate
+  FROM newsletter_subscribers;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION get_lead_magnet_stats()
+RETURNS TABLE (
+  lead_magnet VARCHAR(100),
+  subscriber_count INTEGER,
+  conversion_rate DECIMAL
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    COALESCE(ns.lead_magnet, 'Unknown') as lead_magnet,
+    COUNT(*)::INTEGER as subscriber_count,
+    (COUNT(*)::DECIMAL / (SELECT COUNT(*) FROM newsletter_subscribers)::DECIMAL * 100) as conversion_rate
+  FROM newsletter_subscribers ns
+  WHERE ns.status = 'active'
+  GROUP BY ns.lead_magnet
+  ORDER BY subscriber_count DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION unsubscribe_newsletter(subscriber_email VARCHAR)
+RETURNS BOOLEAN AS $$
+DECLARE
+  updated_rows INTEGER;
+BEGIN
+  UPDATE newsletter_subscribers 
+  SET 
+    status = 'unsubscribed',
+    unsubscribed_at = NOW()
+  WHERE email = subscriber_email AND status = 'active';
+  
+  GET DIAGNOSTICS updated_rows = ROW_COUNT;
+  
+  RETURN updated_rows > 0;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant permissions for newsletter functions
+GRANT EXECUTE ON FUNCTION get_newsletter_stats() TO authenticated;
+GRANT EXECUTE ON FUNCTION get_lead_magnet_stats() TO authenticated;
+GRANT EXECUTE ON FUNCTION unsubscribe_newsletter(VARCHAR) TO anon, authenticated;
 ```
 
 ## Core Application Tables
@@ -186,10 +327,12 @@ CREATE TABLE contact_messages (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   email TEXT NOT NULL,
+  phone TEXT,
   subject TEXT NOT NULL,
   message TEXT NOT NULL,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'read', 'replied', 'resolved')),
   priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+  recaptcha_token TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -1010,8 +1153,7 @@ INSERT INTO availability_status (status, title, description, response_time, is_c
 ('busy', 'Partially Available', 'Currently working on projects but open to discuss new opportunities.', 'Within 48 hours', false, 'bg-yellow-500'),
 ('unavailable', 'Fully Booked', 'Not accepting new projects at the moment.', 'Will respond when available', false, 'bg-red-500');
 
--- Update contact_messages table to include phone field if not exists
-ALTER TABLE contact_messages ADD COLUMN IF NOT EXISTS phone TEXT;
+-- Note: phone and recaptcha_token columns are now included in the contact_messages table definition above
 
 ---
 
