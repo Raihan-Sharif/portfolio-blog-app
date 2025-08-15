@@ -82,18 +82,31 @@ export function useEnhancedOnlineTracking() {
     return true;
   }, [user]);
 
-  // Get user's IP address (server-side only)
+  // Cache IP address to avoid continuous fetching
+  const ipCacheRef = useRef<string | null>(null);
+  const ipCacheTimeRef = useRef<number>(0);
+  const IP_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+  // Get user's IP address with caching
   const getUserIP = useCallback(async (): Promise<string | null> => {
+    // Return cached IP if still valid
+    const now = Date.now();
+    if (ipCacheRef.current && (now - ipCacheTimeRef.current) < IP_CACHE_DURATION) {
+      return ipCacheRef.current;
+    }
+
     try {
       const response = await fetch('/api/get-client-ip');
       if (response.ok) {
         const data = await response.json();
+        ipCacheRef.current = data.ip;
+        ipCacheTimeRef.current = now;
         return data.ip;
       }
     } catch (error) {
       console.warn('Could not get client IP:', error);
     }
-    return null;
+    return ipCacheRef.current; // Return cached value even if fetch failed
   }, []);
 
   // Update online presence

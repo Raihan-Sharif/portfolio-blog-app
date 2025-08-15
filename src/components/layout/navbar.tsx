@@ -69,6 +69,7 @@ export function Navbar() {
       href: "/projects",
       current: pathname.startsWith("/projects"),
     },
+    { name: "Services", href: "/services", current: pathname.startsWith("/services") },
     { name: "Blog", href: "/blog", current: pathname.startsWith("/blog") },
     { name: "Contact", href: "/contact", current: pathname === "/contact" },
   ];

@@ -442,7 +442,7 @@ export default function ProjectDetailPage({
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/30 to-background">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/50 dark:from-slate-900 dark:via-slate-800 dark:to-blue-950/50">
       <ViewTracker
         type="project"
         id={project.id}
@@ -450,29 +450,34 @@ export default function ProjectDetailPage({
         debug={process.env.NODE_ENV === "development"}
       />
 
-      {/* Animated background elements */}
+      {/* Enhanced Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 right-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse float-animation"></div>
-        <div className="absolute bottom-20 left-20 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000 float-animation"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,theme(colors.slate.300)_1px,transparent_0)] dark:bg-[radial-gradient(circle_at_1px_1px,theme(colors.slate.700)_1px,transparent_0)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_at_center,black_50%,transparent_90%)]" />
+        <div className="absolute top-1/4 right-1/6 w-96 h-96 bg-gradient-to-r from-primary/30 to-blue-500/30 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/3 left-1/6 w-80 h-80 bg-gradient-to-l from-purple-500/20 to-pink-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute top-2/3 left-1/2 w-64 h-64 bg-gradient-to-t from-cyan-400/20 to-teal-500/20 rounded-full blur-2xl animate-pulse delay-500" />
       </div>
 
       <div className="relative z-10">
         <div className="container mx-auto px-4 py-8">
-          {/* Navigation */}
+          {/* Enhanced Navigation */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="flex items-center justify-between mb-8"
+            className="flex items-center justify-between mb-12"
           >
             <NextLink href="/projects">
-              <Button variant="outline" className="gap-2">
+              <Button 
+                variant="outline" 
+                className="gap-2 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
                 <ArrowLeft className="w-4 h-4" />
                 Back to Projects
               </Button>
             </NextLink>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <ShareButton
                 title={project.title}
                 description={project.subtitle || project.description}
@@ -483,23 +488,26 @@ export default function ProjectDetailPage({
                 variant="outline"
                 size="icon"
                 onClick={() => setLiked(!liked)}
-                className={cn(liked && "text-red-500")}
+                className={cn(
+                  "bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-slate-300 dark:border-slate-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105",
+                  liked && "text-red-500 border-red-300 bg-red-50 dark:bg-red-950/20"
+                )}
               >
                 <Heart className={cn("w-4 h-4", liked && "fill-current")} />
               </Button>
             </div>
           </motion.div>
 
-          {/* Hero Section */}
+          {/* Enhanced Hero Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16"
+            className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-20"
           >
-            {/* Project Image */}
-            <div className="space-y-4">
-              <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl group cursor-pointer">
+            {/* Enhanced Project Image */}
+            <div className="space-y-6">
+              <div className="relative aspect-video rounded-3xl overflow-hidden shadow-2xl group cursor-pointer bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50">
                 {project.hero_image_url || project.featured_image_url ? (
                   <>
                     <Image

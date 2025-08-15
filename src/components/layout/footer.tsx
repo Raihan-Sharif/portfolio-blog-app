@@ -49,12 +49,20 @@ interface FooterStats {
   totalSkills: number;
 }
 
+interface ServiceCategory {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+}
+
 export function Footer() {
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
   const [aboutSettings, setAboutSettings] = useState<AboutSettings | null>(
     null
   );
   const [stats, setStats] = useState<FooterStats | null>(null);
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
   const [currentYear] = useState(new Date().getFullYear());
   const [showScrollTop, setShowScrollTop] = useState(false);
 
@@ -84,6 +92,14 @@ export function Footer() {
         .eq("is_active", true)
         .single();
 
+      // Fetch service categories
+      const { data: categoriesData } = await supabase
+        .from("service_categories")
+        .select("id, name, slug, is_active")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true })
+        .limit(6); // Limit to 6 categories for footer
+
       // Fetch stats
       const [
         { count: totalProjects },
@@ -103,6 +119,7 @@ export function Footer() {
 
       setSocialLinks(socialData || []);
       setAboutSettings(aboutData);
+      setServiceCategories(categoriesData || []);
       setStats({
         totalProjects: totalProjects || 0,
         totalPosts: totalPosts || 0,
@@ -149,13 +166,17 @@ export function Footer() {
     { href: "/contact", label: "Contact" },
   ];
 
-  const services = [
-    { label: "Web Development", href: "/services/web-development" },
-    { label: "Full Stack Solutions", href: "/services/full-stack" },
-    { label: "React Development", href: "/services/react" },
-    { label: ".NET Development", href: "/services/dotnet" },
-    { label: "Consulting", href: "/contact" },
-    { label: "Code Review", href: "/contact" },
+  // Generate dynamic service links from categories
+  const serviceLinks = [
+    ...serviceCategories.map(category => ({
+      label: category.name,
+      href: `/services?category=${category.id}`
+    })),
+    // Add additional service links if needed
+    ...(serviceCategories.length < 6 ? [
+      { label: "View All Services", href: "/services" },
+      { label: "Get Consultation", href: "/contact" }
+    ] : [])
   ];
 
   return (
@@ -269,7 +290,7 @@ export function Footer() {
               Services
             </h4>
             <ul className="space-y-3">
-              {services.map((service) => (
+              {serviceLinks.map((service) => (
                 <li key={service.label}>
                   <Link
                     href={service.href}

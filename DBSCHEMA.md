@@ -2483,6 +2483,203 @@ date_key DATE DEFAULT CURRENT_DATE
 
 CREATE INDEX idx_metric_name_date_key ON system_analytics(metric_name, date_key);
 
+## Services Management Tables
+
+### Service Categories
+```sql
+CREATE TABLE service_categories (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name VARCHAR(100) NOT NULL UNIQUE,
+  description TEXT,
+  slug VARCHAR(100) NOT NULL UNIQUE,
+  icon_name VARCHAR(50),
+  color VARCHAR(7), -- For theme colors
+  sort_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### Services
+```sql
+CREATE TABLE services (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title VARCHAR(200) NOT NULL,
+  description TEXT NOT NULL,
+  short_description VARCHAR(500),
+  slug VARCHAR(200) NOT NULL UNIQUE,
+  category_id UUID REFERENCES service_categories(id) ON DELETE SET NULL,
+  icon_name VARCHAR(50),
+  image_url TEXT,
+  price_from DECIMAL(10,2),
+  price_to DECIMAL(10,2),
+  price_type VARCHAR(20) DEFAULT 'fixed', -- fixed, hourly, project, negotiable
+  duration VARCHAR(100), -- e.g., "2-4 weeks", "1 month"
+  delivery_time VARCHAR(100), -- e.g., "7 days", "2 weeks"
+  features JSONB DEFAULT '[]'::JSONB, -- Array of feature strings
+  tech_stack JSONB DEFAULT '[]'::JSONB, -- Array of technologies used
+  process_steps JSONB DEFAULT '[]'::JSONB, -- Array of process steps
+  includes JSONB DEFAULT '[]'::JSONB, -- What's included in the service
+  requirements JSONB DEFAULT '[]'::JSONB, -- Client requirements
+  portfolio_items JSONB DEFAULT '[]'::JSONB, -- Related project IDs or URLs
+  is_featured BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
+  is_popular BOOLEAN DEFAULT false,
+  difficulty_level VARCHAR(20) DEFAULT 'medium', -- easy, medium, hard, expert
+  status VARCHAR(20) DEFAULT 'active', -- active, draft, archived
+  tags JSONB DEFAULT '[]'::JSONB, -- Array of tag strings
+  seo_title VARCHAR(200),
+  seo_description VARCHAR(300),
+  meta_keywords TEXT,
+  view_count INTEGER DEFAULT 0,
+  inquiry_count INTEGER DEFAULT 0,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by UUID REFERENCES auth.users(id),
+  updated_by UUID REFERENCES auth.users(id)
+);
+```
+
+### Service Packages
+```sql
+CREATE TABLE service_packages (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  service_id UUID REFERENCES services(id) ON DELETE CASCADE,
+  name VARCHAR(100) NOT NULL, -- Basic, Standard, Premium
+  description TEXT,
+  price DECIMAL(10,2) NOT NULL,
+  price_type VARCHAR(20) DEFAULT 'fixed',
+  features JSONB DEFAULT '[]'::JSONB,
+  delivery_time VARCHAR(100),
+  revisions INTEGER DEFAULT 0, -- Number of revisions included
+  is_popular BOOLEAN DEFAULT false,
+  sort_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### Service Inquiries
+```sql
+CREATE TABLE service_inquiries (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  service_id UUID REFERENCES services(id) ON DELETE SET NULL,
+  package_id UUID REFERENCES service_packages(id) ON DELETE SET NULL,
+  name VARCHAR(100) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  phone VARCHAR(20),
+  company VARCHAR(100),
+  project_title VARCHAR(200),
+  project_description TEXT NOT NULL,
+  budget_range VARCHAR(50),
+  timeline VARCHAR(100),
+  additional_requirements TEXT,
+  preferred_contact VARCHAR(20) DEFAULT 'email', -- email, phone, both
+  urgency VARCHAR(20) DEFAULT 'normal', -- low, normal, high, urgent
+  status VARCHAR(20) DEFAULT 'new', -- new, contacted, in_discussion, quoted, won, lost
+  admin_notes TEXT,
+  response_sent_at TIMESTAMPTZ,
+  follow_up_date TIMESTAMPTZ,
+  estimated_value DECIMAL(10,2),
+  actual_value DECIMAL(10,2),
+  client_ip INET,
+  user_agent TEXT,
+  referrer TEXT,
+  utm_source VARCHAR(100),
+  utm_medium VARCHAR(100),
+  utm_campaign VARCHAR(100),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  responded_by UUID REFERENCES auth.users(id)
+);
+```
+
+### Service Testimonials
+```sql
+CREATE TABLE service_testimonials (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  service_id UUID REFERENCES services(id) ON DELETE CASCADE,
+  client_name VARCHAR(100) NOT NULL,
+  client_title VARCHAR(100),
+  client_company VARCHAR(100),
+  client_image_url TEXT,
+  rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+  testimonial TEXT NOT NULL,
+  project_title VARCHAR(200),
+  project_url TEXT,
+  is_featured BOOLEAN DEFAULT false,
+  is_approved BOOLEAN DEFAULT false,
+  display_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  approved_by UUID REFERENCES auth.users(id)
+);
+```
+
+### Service FAQs
+```sql
+CREATE TABLE service_faqs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  service_id UUID REFERENCES services(id) ON DELETE CASCADE,
+  question TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  sort_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### Service Views Tracking
+```sql
+CREATE TABLE service_views (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  service_id UUID REFERENCES services(id) ON DELETE CASCADE,
+  client_ip INET,
+  user_agent TEXT,
+  referrer TEXT,
+  country VARCHAR(2),
+  device_type VARCHAR(20), -- desktop, mobile, tablet
+  viewed_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### Services Database Functions
+```sql
+-- Function to increment service view count
+CREATE OR REPLACE FUNCTION increment_service_views(service_slug TEXT)
+RETURNS void AS $$
+BEGIN
+    UPDATE services 
+    SET view_count = view_count + 1 
+    WHERE slug = service_slug AND is_active = true;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to increment service inquiry count
+CREATE OR REPLACE FUNCTION increment_service_inquiries(service_slug TEXT)
+RETURNS void AS $$
+BEGIN
+    UPDATE services 
+    SET inquiry_count = inquiry_count + 1 
+    WHERE slug = service_slug AND is_active = true;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### Default Service Categories
+```sql
+INSERT INTO service_categories (name, description, slug, icon_name, color) VALUES
+  ('Web Development', 'Full-stack web application development services', 'web-development', 'Code', '#3B82F6'),
+  ('Mobile Development', 'iOS and Android mobile application development', 'mobile-development', 'Smartphone', '#10B981'),
+  ('UI/UX Design', 'User interface and user experience design services', 'ui-ux-design', 'Palette', '#8B5CF6'),
+  ('Consulting', 'Technical consulting and architecture planning', 'consulting', 'Users', '#F59E0B'),
+  ('Maintenance', 'Ongoing support and maintenance services', 'maintenance', 'Settings', '#EF4444');
+```
+
 -- Enable RLS
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_recipients ENABLE ROW LEVEL SECURITY;
@@ -3244,6 +3441,64 @@ CREATE POLICY "Admins can update contact messages"
       WHERE ur.user_id = auth.uid() AND r.name = 'admin'
     )
   );
+
+-- Service inquiries policies
+ALTER TABLE service_inquiries ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public service inquiry creation"
+ON service_inquiries FOR INSERT
+WITH CHECK (true);
+
+CREATE POLICY "Admin and editors can view service inquiries"
+ON service_inquiries FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM user_roles ur
+    JOIN roles r ON ur.role_id = r.id
+    WHERE ur.user_id = auth.uid() 
+    AND r.name IN ('admin', 'editor')
+  )
+);
+
+CREATE POLICY "Admin and editors can update service inquiries"
+ON service_inquiries FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM user_roles ur
+    JOIN roles r ON ur.role_id = r.id
+    WHERE ur.user_id = auth.uid() 
+    AND r.name IN ('admin', 'editor')
+  )
+);
+
+CREATE POLICY "Admin can delete service inquiries"
+ON service_inquiries FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1 FROM user_roles ur
+    JOIN roles r ON ur.role_id = r.id
+    WHERE ur.user_id = auth.uid() 
+    AND r.name = 'admin'
+  )
+);
+
+-- Service packages policies
+ALTER TABLE service_packages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public to read active service packages"
+ON service_packages FOR SELECT
+USING (is_active = true);
+
+CREATE POLICY "Admin and editors can manage service packages"
+ON service_packages FOR ALL
+USING (
+  EXISTS (
+    SELECT 1 FROM user_roles ur
+    JOIN roles r ON ur.role_id = r.id
+    WHERE ur.user_id = auth.uid() 
+    AND r.name IN ('admin', 'editor')
+  )
+);
 
 -- View tracking policies
 CREATE POLICY "Views are publicly readable"

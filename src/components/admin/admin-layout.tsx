@@ -331,6 +331,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       category: "main",
     },
     {
+      name: "Services",
+      href: "/admin/services",
+      icon: <Settings size={20} />,
+      category: "content",
+    },
+    {
       name: "Blog Posts",
       href: "/admin/blog",
       icon: <FileText size={20} />,
