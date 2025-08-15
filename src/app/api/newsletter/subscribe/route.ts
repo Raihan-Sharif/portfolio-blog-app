@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { verifyRecaptcha } from '@/lib/recaptcha';
 
 interface SubscribeRequest {
@@ -11,7 +11,18 @@ interface SubscribeRequest {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const supabase = createServerSupabaseClient();
+    // Use service role client for server-side operations
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+    
     const body: SubscribeRequest = await request.json();
 
     // Validate required fields

@@ -113,21 +113,31 @@ ALTER TABLE newsletter_campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE newsletter_campaign_recipients ENABLE ROW LEVEL SECURITY;
 
 -- Newsletter subscribers policies
-CREATE POLICY "Allow public to insert newsletter subscribers" ON newsletter_subscribers
-  FOR INSERT TO anon, authenticated
+CREATE POLICY "Enable insert for newsletter subscriptions" ON newsletter_subscribers
+  FOR INSERT 
   WITH CHECK (true);
 
-CREATE POLICY "Allow authenticated to read newsletter subscribers" ON newsletter_subscribers
-  FOR SELECT TO authenticated
+CREATE POLICY "Enable read for authenticated users" ON newsletter_subscribers
+  FOR SELECT 
+  TO authenticated 
   USING (true);
 
-CREATE POLICY "Allow authenticated to update newsletter subscribers" ON newsletter_subscribers
-  FOR UPDATE TO authenticated
+CREATE POLICY "Enable update for authenticated users" ON newsletter_subscribers
+  FOR UPDATE 
+  TO authenticated 
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY "Enable delete for authenticated users" ON newsletter_subscribers
+  FOR DELETE 
+  TO authenticated 
   USING (true);
 
-CREATE POLICY "Allow authenticated to delete newsletter subscribers" ON newsletter_subscribers
-  FOR DELETE TO authenticated
-  USING (true);
+CREATE POLICY "Enable all operations for service role" ON newsletter_subscribers
+  FOR ALL 
+  TO service_role 
+  USING (true)
+  WITH CHECK (true);
 
 -- Newsletter campaigns policies
 CREATE POLICY "Allow authenticated to manage campaigns" ON newsletter_campaigns
