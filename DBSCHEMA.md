@@ -37,6 +37,9 @@ CREATE TABLE projects (
   github_url TEXT,
   demo_url TEXT,
   featured BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
+  view_count INTEGER DEFAULT 0,
+  featured_image_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -110,6 +113,51 @@ CREATE TABLE social_links (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Contact messages table
+CREATE TABLE contact_messages (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  message TEXT NOT NULL,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'read', 'replied', 'resolved')),
+  priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Post views tracking
+CREATE TABLE post_views (
+  id SERIAL PRIMARY KEY,
+  post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+  view_date DATE DEFAULT CURRENT_DATE,
+  view_count INTEGER DEFAULT 1,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(post_id, view_date)
+);
+
+-- Project views tracking  
+CREATE TABLE project_views (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+  view_date DATE DEFAULT CURRENT_DATE,
+  view_count INTEGER DEFAULT 1,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(project_id, view_date)
+);
+
+-- Online users tracking
+CREATE TABLE online_users (
+  id SERIAL PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  session_id TEXT NOT NULL,
+  last_activity TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  is_authenticated BOOLEAN DEFAULT false,
+  page_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(session_id)
+);
+
 -- Insert initial roles
 INSERT INTO roles (name) VALUES ('admin');
 INSERT INTO roles (name) VALUES ('editor');
@@ -149,6 +197,10 @@ ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE post_tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE theme_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE social_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contact_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_views ENABLE ROW LEVEL SECURITY;
+ALTER TABLE project_views ENABLE ROW LEVEL SECURITY;
+ALTER TABLE online_users ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: Public read, own write
 CREATE POLICY "Profiles are viewable by everyone"
@@ -3148,6 +3200,72 @@ END;
 
 $$
 LANGUAGE plpgsql SECURITY DEFINER;
+
+-- RLS Policies for new analytics tables
+
+-- Contact messages policies
+CREATE POLICY "Contact messages are viewable by admins"
+  ON contact_messages FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+    )
+  );
+
+CREATE POLICY "Anyone can insert contact messages"
+  ON contact_messages FOR INSERT
+  WITH CHECK (true);
+
+CREATE POLICY "Admins can update contact messages"
+  ON contact_messages FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+    )
+  );
+
+-- View tracking policies
+CREATE POLICY "Views are publicly readable"
+  ON post_views FOR SELECT USING (true);
+
+CREATE POLICY "Views are publicly readable"
+  ON project_views FOR SELECT USING (true);
+
+CREATE POLICY "Anyone can track views"
+  ON post_views FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Anyone can track views"
+  ON project_views FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Views can be updated"
+  ON post_views FOR UPDATE USING (true);
+
+CREATE POLICY "Views can be updated"  
+  ON project_views FOR UPDATE USING (true);
+
+-- Online users policies
+CREATE POLICY "Online users viewable by admins"
+  ON online_users FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+    )
+  );
+
+CREATE POLICY "Anyone can track online status"
+  ON online_users FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Users can update their own online status"
+  ON online_users FOR UPDATE USING (true);
+
+CREATE POLICY "Users can delete their own online status"
+  ON online_users FOR DELETE USING (true);
 
 -- Grant permissions for all functions
 GRANT EXECUTE ON FUNCTION update_online_user(UUID, TEXT, INET, TEXT, TEXT, BOOLEAN) TO authenticated;

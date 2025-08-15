@@ -12,6 +12,8 @@ This is a modern portfolio and blog application built with Next.js 14, TypeScrip
 - **Explicit return types** - Always define return types for functions
 - **No `any` type** - Use proper typing or `unknown` if necessary
 - **Consistent naming** - Use camelCase for variables/functions, PascalCase for components/interfaces
+- **No unused variables** - Remove all unused imports, variables, and parameters
+- **Build-ready code** - All code must compile without errors or warnings
 
 ### React & Next.js
 - **Functional components only** - No class components
@@ -143,16 +145,26 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 6. **Linting** - `npm run lint`
 7. **Testing** - `npm run test`
 
+### Build Error Prevention
+- **Zero warnings policy** - Fix all TypeScript and ESLint warnings
+- **Unused code cleanup** - Remove all unused imports, variables, functions
+- **Type safety** - No `any` types, proper interface definitions
+- **Import validation** - Verify all import paths are correct
+- **Component props** - All required props must be provided
+- **Database schema sync** - Keep DBSCHEMA.md updated with all changes
+
 ### Pre-commit Checklist
-- [ ] Code compiles without errors
+- [ ] Code compiles without errors or warnings
 - [ ] All tests pass
-- [ ] Linting passes
-- [ ] Type checking passes
-- [ ] No console.log statements
-- [ ] Proper error handling
-- [ ] Accessibility tested
-- [ ] Mobile responsive
-- [ ] Dark mode compatible
+- [ ] Linting passes (ESLint + Prettier)
+- [ ] Type checking passes (TypeScript)
+- [ ] No unused variables/imports/functions
+- [ ] No console.log statements in production code
+- [ ] Proper error handling implemented
+- [ ] Accessibility tested (WCAG compliance)
+- [ ] Mobile responsive design verified
+- [ ] Dark mode compatibility confirmed
+- [ ] Database schema documented if changed
 
 ### Deployment Process
 1. **Feature complete** - All requirements met

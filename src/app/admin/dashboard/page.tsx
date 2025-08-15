@@ -27,12 +27,6 @@ import {
   Users,
   Zap,
   Award,
-  BookOpen,
-  Heart,
-  MousePointer,
-  Smartphone,
-  Monitor,
-  Tablet,
   CircleCheckBig,
   Timer,
   ThumbsUp,
@@ -55,7 +49,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { DashboardSkeleton } from "@/components/ui/dashboard-skeleton";
 
 interface DashboardStats {
   totalPosts: number;
@@ -461,7 +454,7 @@ export default function DashboardPage() {
         growthMetrics,
         recentMessages: recentMessages || [],
         onlineUsers,
-        monthlyStats: monthlyStats.map(({monthDate, ...rest}) => rest),
+        monthlyStats,
       });
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
@@ -475,7 +468,7 @@ export default function DashboardPage() {
     const periodConfig = TIME_PERIODS.find((p) => p.key === period);
     if (!periodConfig) return [];
 
-    const monthlyStats = [];
+    const monthlyStatsResult = [];
     const monthlyStatsPromises = [];
     
     // Calculate number of months to show based on period
@@ -650,8 +643,8 @@ export default function DashboardPage() {
       return (
         <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
           <p className="font-medium">{format(date, "EEEE, MMMM d, yyyy")}</p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
+          {payload.map((entry: any) => (
+            <p key={entry.dataKey} className="text-sm" style={{ color: entry.color }}>
               {entry.dataKey === "post_views" && `Blog Views: ${entry.value}`}
               {entry.dataKey === "project_views" &&
                 `Project Views: ${entry.value}`}
