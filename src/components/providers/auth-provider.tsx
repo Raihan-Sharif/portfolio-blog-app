@@ -1,7 +1,6 @@
-// src/components/providers/auth-provider.tsx
 "use client";
 
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/utils/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
 import {
   createContext,
@@ -50,16 +49,6 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-// Simple role cache with localStorage
-const ROLE_CACHE_KEY = "user_role_cache";
-const ROLE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-interface RoleCache {
-  role: string;
-  timestamp: number;
-  userId: string;
-}
-
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<EnhancedUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -67,371 +56,342 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditor, setIsEditor] = useState(false);
   
-  // FIXED: Prevent double initialization with initialization guard
-  const isInitialized = useRef<boolean>(false);
-  const lastSessionCheck = useRef<number>(0);
-  const isTabVisible = useRef<boolean>(true);
-  const sessionValidationTimer = useRef<NodeJS.Timeout | null>(null);
-  const isRefreshing = useRef<boolean>(false);
-  
-  // REMOVED: Complex cross-tab storage synchronization that caused conflicts
-  // Supabase handles cross-tab session sharing automatically via localStorage
+  const initialized = useRef(false);
+  const lastVisibilityRefresh = useRef(0);
+  const visibilityHandlerRunning = useRef(false);
+  const supabase = createClient();
 
-  // REMOVED: Complex cross-tab synchronization that caused token revocation
-  // Supabase now handles this automatically through its built-in storage mechanism
-
-  // REMOVED: Manual session storage loading that conflicted with Supabase's internal mechanisms
-
-  // Simple role checking with fallback
-  const checkUserRole = useCallback(async (userId: string): Promise<string> => {
+  // Simplified role fetching
+  const getUserRole = useCallback(async (userId: string): Promise<string> => {
     try {
-      // Check cache first
-      if (typeof window !== "undefined") {
-        const cached = localStorage.getItem(ROLE_CACHE_KEY);
-        if (cached) {
-          const roleCache: RoleCache = JSON.parse(cached);
-          if (
-            roleCache.userId === userId &&
-            Date.now() - roleCache.timestamp < ROLE_CACHE_DURATION
-          ) {
-            return roleCache.role;
-          }
-        }
+      console.log("🔍 STARTING role fetch for user:", userId);
+      console.log("📡 About to call supabase.rpc('get_user_with_role')");
+      
+      // Try RPC first - let's add more debugging
+      const rpcStart = performance.now();
+      const rpcResult = await supabase.rpc("get_user_with_role", {
+        p_user_id: userId,
+      });
+      const rpcEnd = performance.now();
+      
+      console.log("📊 RPC call completed in", rpcEnd - rpcStart, "ms");
+      console.log("📊 RPC result:", rpcResult);
+      
+      const { data: rpcData, error: rpcError } = rpcResult;
+
+      if (!rpcError && rpcData && rpcData.length > 0) {
+        console.log("✅ SUCCESS: Got role from RPC:", rpcData[0].role_name);
+        return rpcData[0].role_name || "viewer";
       }
 
-      // Try new function first, fallback to direct query
-      let role = "viewer"; // Default role
+      console.log("⚠️ RPC failed or returned no data:", { error: rpcError, data: rpcData });
 
-      try {
-        const { data, error } = await supabase.rpc("get_user_with_role", {
-          p_user_id: userId,
-        });
+      // Fallback to direct query
+      console.log("🔄 Falling back to direct user_roles query");
+      const { data: roleData, error: roleError } = await supabase
+        .from("user_roles")
+        .select("roles(name)")
+        .eq("user_id", userId)
+        .maybeSingle();
 
-        if (!error && data && data.length > 0) {
-          role = data[0].role_name || "viewer";
-        } else {
-          throw new Error("Function not found, using fallback");
-        }
-      } catch (funcError) {
-        // Fallback to direct table query
-        console.log("Using fallback role query");
-        const { data: roleData, error: roleError } = await supabase
-          .from("user_roles")
-          .select(
-            `
-            roles (
-              name
-            )
-          `
-          )
-          .eq("user_id", userId)
-          .single();
+      console.log("📊 Direct query result:", { data: roleData, error: roleError });
 
-        if (!roleError && roleData?.roles) {
-          // Handle both object and array cases
-          const roleObj = Array.isArray(roleData.roles)
-            ? roleData.roles[0]
-            : roleData.roles;
-          role = roleObj?.name || "viewer";
-        }
+      if (!roleError && roleData?.roles) {
+        const roleObj = Array.isArray(roleData.roles) ? roleData.roles[0] : roleData.roles;
+        const roleName = (roleObj as any)?.name || "viewer";
+        console.log("✅ Got role from direct query:", roleName);
+        return roleName;
       }
 
-      // Cache the result
-      if (typeof window !== "undefined") {
-        const roleCache: RoleCache = {
-          role,
-          timestamp: Date.now(),
-          userId,
-        };
-        localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify(roleCache));
-      }
-
-      return role;
+      console.log("⚠️ No role found anywhere, defaulting to viewer");
+      return "viewer";
     } catch (error) {
-      console.error("Error checking user role:", error);
-      return "viewer"; // Safe default
+      console.error("❌ EXCEPTION in getUserRole:", error);
+      return "viewer";
+    }
+  }, [supabase]);
+
+  // Enhanced user with profile and role
+  const createEnhancedUser = useCallback(async (authUser: User): Promise<EnhancedUser> => {
+    try {
+      console.log("👤 Creating enhanced user for:", authUser.id);
+      
+      // Get profile
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", authUser.id)
+        .maybeSingle();
+
+      console.log("📋 Profile data:", profile);
+
+      // Get role - This will call the RPC function
+      const role = await getUserRole(authUser.id);
+      console.log("👥 Final role assigned:", role);
+
+      const enhancedUser = {
+        ...authUser,
+        full_name: profile?.full_name ||
+                   authUser.user_metadata?.full_name ||
+                   authUser.user_metadata?.name ||
+                   authUser.email?.split('@')[0] ||
+                   'User',
+        role,
+      };
+
+      console.log("✨ Enhanced user created:", { id: enhancedUser.id, name: enhancedUser.full_name, role: enhancedUser.role });
+      return enhancedUser;
+    } catch (error) {
+      console.error("❌ Error creating enhanced user:", error);
+      return {
+        ...authUser,
+        full_name: authUser.user_metadata?.full_name ||
+                   authUser.user_metadata?.name ||
+                   authUser.email?.split('@')[0] ||
+                   'User',
+        role: "viewer",
+      };
+    }
+  }, [supabase, getUserRole]);
+
+  // Set auth state
+  const setAuthState = useCallback((authUser: User | null, authSession: Session | null, enhancedUser?: EnhancedUser) => {
+    if (authUser && authSession) {
+      const finalUser = enhancedUser || {
+        ...authUser,
+        full_name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'User',
+        role: 'viewer'
+      };
+      
+      setUser(finalUser);
+      setSession(authSession);
+      setIsAdmin(finalUser.role === "admin");
+      setIsEditor(finalUser.role === "admin" || finalUser.role === "editor");
+    } else {
+      setUser(null);
+      setSession(null);
+      setIsAdmin(false);
+      setIsEditor(false);
     }
   }, []);
 
-  // Update user with role
-  const updateUserWithRole = useCallback(
-    async (sessionUser: User, currentSession: Session) => {
-      try {
-        // Get profile data
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", sessionUser.id)
-          .single();
-
-        // Get user role
-        const role = await checkUserRole(sessionUser.id);
-
-        const enhancedUser: EnhancedUser = {
-          ...sessionUser,
-          full_name:
-            profileData?.full_name ||
-            sessionUser.user_metadata?.full_name ||
-            sessionUser.user_metadata?.name ||
-            null,
-          role: role,
-        };
-
-        setUser(enhancedUser);
-        setSession(currentSession);
-        setIsAdmin(role === "admin");
-        setIsEditor(role === "admin" || role === "editor");
-        
-        // REMOVED: Manual storage sync - Supabase handles this automatically
-      } catch (error) {
-        console.error("Error updating user with role:", error);
-        // Set user without role on error
-        setUser({
-          ...sessionUser,
-          full_name: sessionUser.user_metadata?.full_name || null,
-          role: "viewer",
-        });
-        setSession(currentSession);
-        setIsAdmin(false);
-        setIsEditor(false);
-        
-        // REMOVED: Manual storage sync - Supabase handles this automatically
-      }
-    },
-    [checkUserRole]
-  );
-
-  // FIXED: Simplified session validation without aggressive refresh
-  const validateSession = useCallback(async () => {
-    // Prevent concurrent validation calls
-    if (isRefreshing.current) return;
-    
-    try {
-      const now = Date.now();
-      // Increased cooldown to prevent excessive API calls
-      if (now - lastSessionCheck.current < 120000) { // 2 minutes
-        return;
-      }
-      
-      lastSessionCheck.current = now;
-      isRefreshing.current = true;
-      
-      const { data: { session: currentSession }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error("Session validation error:", error);
-        return;
-      }
-      
-      if (!currentSession) {
-        // Session expired or invalid
-        setUser(null);
-        setSession(null);
-        setIsAdmin(false);
-        setIsEditor(false);
-        if (typeof window !== "undefined") {
-          localStorage.removeItem(ROLE_CACHE_KEY);
-        }
-        return;
-      }
-      
-      // CRITICAL: Let Supabase handle token refresh automatically
-      // Manual refresh was causing token revocation conflicts
-      
-    } catch (error) {
-      console.error("Session validation failed:", error);
-    } finally {
-      isRefreshing.current = false;
-    }
-  }, []);
-
-  // FIXED: Gentle visibility change handling without aggressive session validation
-  const handleVisibilityChange = useCallback(() => {
-    const isVisible = document.visibilityState === "visible";
-    isTabVisible.current = isVisible;
-    
-    // REMOVED: Aggressive session validation on tab switch
-    // This was causing token revocation issues
-  }, []);
-
-  // FIXED: Removed aggressive focus-based session validation
-  const handleFocus = useCallback(() => {
-    // REMOVED: Session validation on focus
-    // Let Supabase handle session state automatically
-  }, []);
-
-  // Initialize auth state - FIXED: Single initialization with guard
+  // Initialize auth
   useEffect(() => {
-    // CRITICAL: Prevent double initialization
-    if (isInitialized.current) {
-      return;
-    }
-    
-    let mounted = true;
-    isInitialized.current = true;
+    if (initialized.current) return;
+    initialized.current = true;
 
-    const initializeAuth = async () => {
+    const initAuth = async () => {
       try {
-        console.log("Initializing auth...");
-
-        // Get current session from Supabase
-        const {
-          data: { session: initialSession },
-          error,
-        } = await supabase.auth.getSession();
-
-        if (error) {
-          console.error("Session error:", error);
-          if (mounted) {
-            setUser(null);
-            setSession(null);
-            setIsAdmin(false);
-            setIsEditor(false);
-          }
+        setLoading(true);
+        
+        // Always use getUser() as recommended by Supabase
+        const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError) {
+          console.error("Auth initialization error:", userError);
+          setAuthState(null, null);
           return;
         }
 
-        if (initialSession?.user && mounted) {
-          await updateUserWithRole(initialSession.user, initialSession);
-          console.log("Auth initialized with user");
-        } else if (mounted) {
-          setUser(null);
-          setSession(null);
-          setIsAdmin(false);
-          setIsEditor(false);
-          console.log("Auth initialized without user");
+        if (!authUser) {
+          setAuthState(null, null);
+          return;
         }
+
+        // Get session
+        const { data: { session: authSession }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError || !authSession) {
+          console.error("Session error:", sessionError);
+          setAuthState(null, null);
+          return;
+        }
+
+        // Create enhanced user
+        const enhancedUser = await createEnhancedUser(authUser);
+        setAuthState(authUser, authSession, enhancedUser);
+
       } catch (error) {
-        console.error("Auth initialization error:", error);
-        if (mounted) {
-          setUser(null);
-          setSession(null);
-          setIsAdmin(false);
-          setIsEditor(false);
-        }
+        console.error("Auth initialization failed:", error);
+        setAuthState(null, null);
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     };
 
-    initializeAuth();
-
-    return () => {
-      mounted = false;
-    };
-  }, []); // FIXED: Empty dependency array to prevent re-initialization
+    initAuth();
+  }, [supabase, setAuthState, createEnhancedUser]);
 
   // Listen for auth changes
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log("Auth state change:", event);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, authSession) => {
+      console.log("🔔 Auth state changed:", event, "User ID:", authSession?.user?.id);
 
-      try {
-        if (event === "SIGNED_IN" && newSession?.user) {
-          await updateUserWithRole(newSession.user, newSession);
-        } else if (event === "SIGNED_OUT") {
-          setUser(null);
-          setSession(null);
-          setIsAdmin(false);
-          setIsEditor(false);
-
-          // Clear caches
-          if (typeof window !== "undefined") {
-            localStorage.removeItem(ROLE_CACHE_KEY);
-          }
-          // REMOVED: Manual storage sync
-        } else if (event === "TOKEN_REFRESHED" && newSession?.user) {
-          // Update session but don't refetch user data unnecessarily
-          setSession(newSession);
-          console.log("Token refreshed");
-          
-          // REMOVED: Manual session storage sync
-        }
-      } catch (error) {
-        console.error("Auth state change error:", error);
+      // Check if visibility handler is currently running - if so, skip this to avoid race condition
+      if (visibilityHandlerRunning.current) {
+        console.log("⏸️ Visibility handler is running - skipping auth state change to prevent race condition");
+        return;
       }
 
-      setLoading(false);
+      if (event === "SIGNED_OUT" || !authSession?.user) {
+        console.log("🚪 Signing out - clearing auth state");
+        setAuthState(null, null);
+        return;
+      }
+
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+        console.log("🔄 Processing auth change event:", event);
+        
+        // Always use getUser() for the most current user data
+        const { data: { user: authUser }, error } = await supabase.auth.getUser();
+        
+        if (error || !authUser) {
+          console.error("❌ Error getting user in auth change:", error);
+          setAuthState(null, null);
+          return;
+        }
+
+        if (event === "TOKEN_REFRESHED") {
+          // For token refresh, just update session
+          console.log("🔄 Token refreshed - updating session only");
+          setSession(authSession);
+        } else {
+          // For other events, refresh user data
+          console.log("🔄 Auth event requires user data refresh - calling createEnhancedUser");
+          try {
+            const enhancedUser = await createEnhancedUser(authUser);
+            setAuthState(authUser, authSession, enhancedUser);
+            console.log("✅ Auth state updated from auth change event");
+          } catch (error) {
+            console.error("❌ Error in auth change enhanced user creation:", error);
+          }
+        }
+      }
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [updateUserWithRole]);
+    return () => subscription.unsubscribe();
+  }, [supabase, setAuthState, createEnhancedUser]);
 
-  // FIXED: Minimal event listeners without aggressive session management
+  // Handle tab switching
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    // REMOVED: Complex cross-tab synchronization that caused token conflicts
-    // Supabase handles cross-tab auth state automatically
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", handleFocus);
-
-    // FIXED: Reduced session validation frequency to prevent conflicts
-    // Only validate every 10 minutes and only when user exists
-    if (user && !sessionValidationTimer.current) {
-      sessionValidationTimer.current = setInterval(() => {
-        if (isTabVisible.current && user) {
-          validateSession();
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === "visible" && !loading) {
+        // Throttle: Only refresh if it's been more than 2 seconds since last refresh
+        const now = Date.now();
+        if (now - lastVisibilityRefresh.current < 2000) {
+          console.log("⏳ Skipping visibility refresh (throttled)");
+          return;
         }
-      }, 10 * 60 * 1000); // 10 minutes instead of 5
-    }
+        lastVisibilityRefresh.current = now;
+        
+        console.log("👁️ Tab became visible - refreshing auth state");
+        
+        // Set flag to prevent auth state change interference
+        visibilityHandlerRunning.current = true;
+        
+        try {
+          // Verify auth state when tab becomes visible
+          const { data: { user: currentUser }, error } = await supabase.auth.getUser();
+          
+          if (error) {
+            console.error("❌ Visibility check error:", error);
+            if (user) setAuthState(null, null);
+            return;
+          }
 
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", handleFocus);
-      if (sessionValidationTimer.current) {
-        clearInterval(sessionValidationTimer.current);
-        sessionValidationTimer.current = null;
+          const hadUser = !!user;
+          const hasUser = !!currentUser;
+
+          if (hadUser !== hasUser) {
+            if (hasUser) {
+              // User signed in on another tab
+              console.log("🔄 User signed in on another tab");
+              const { data: { session: currentSession } } = await supabase.auth.getSession();
+              if (currentSession) {
+                const enhancedUser = await createEnhancedUser(currentUser);
+                setAuthState(currentUser, currentSession, enhancedUser);
+              }
+            } else {
+              // User signed out on another tab
+              console.log("🚪 User signed out on another tab");
+              setAuthState(null, null);
+            }
+          } else if (hasUser && currentUser) {
+            // Same user is still logged in - refresh their data including role
+            console.log("🔄 Same user detected - refreshing profile and role data (calling get_user_with_role)");
+            console.log("📊 Current user ID:", currentUser.id);
+            
+            const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+            console.log("📋 Session check result:", { hasSession: !!currentSession, error: sessionError });
+            
+            if (currentSession) {
+              console.log("✅ Session valid - creating enhanced user");
+              try {
+                // Always refresh user data when tab becomes visible to get latest role info
+                const enhancedUser = await createEnhancedUser(currentUser);
+                console.log("🎯 About to set auth state with enhanced user");
+                setAuthState(currentUser, currentSession, enhancedUser);
+                console.log("✅ Auth state updated successfully from visibility handler");
+              } catch (error) {
+                console.error("❌ Error in visibility change enhanced user creation:", error);
+              }
+            } else {
+              console.log("❌ No valid session found during visibility change");
+            }
+          }
+        } finally {
+          // Always clear the flag, even if there was an error
+          visibilityHandlerRunning.current = false;
+          console.log("🏁 Visibility handler completed - flag cleared");
+        }
       }
     };
-  }, [user, handleVisibilityChange, handleFocus, validateSession]);
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [supabase, user, loading, setAuthState, createEnhancedUser]);
 
   // Refresh user data
   const refreshUser = useCallback(async () => {
-    if (!session?.user) return;
-
     try {
-      await updateUserWithRole(session.user, session);
+      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !currentUser) {
+        console.error("Error refreshing user:", userError);
+        return;
+      }
+
+      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !currentSession) {
+        console.error("Error refreshing session:", sessionError);
+        return;
+      }
+
+      const enhancedUser = await createEnhancedUser(currentUser);
+      setAuthState(currentUser, currentSession, enhancedUser);
     } catch (error) {
-      console.error("Error refreshing user:", error);
+      console.error("Error in refreshUser:", error);
     }
-  }, [session, updateUserWithRole]);
+  }, [supabase, setAuthState, createEnhancedUser]);
 
   // Sign out
   const signOut = useCallback(async () => {
     try {
       setLoading(true);
-
-      // Clear caches
-      if (typeof window !== "undefined") {
-        localStorage.removeItem(ROLE_CACHE_KEY);
-      }
-      // REMOVED: Manual storage sync
-
       const { error } = await supabase.auth.signOut();
-
+      
       if (error) {
         console.error("Sign out error:", error);
       }
 
-      // Reset state
-      setUser(null);
-      setSession(null);
-      setIsAdmin(false);
-      setIsEditor(false);
+      setAuthState(null, null);
     } catch (error) {
       console.error("Sign out error:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [supabase, setAuthState]);
 
   const value: AuthContextType = {
     user,

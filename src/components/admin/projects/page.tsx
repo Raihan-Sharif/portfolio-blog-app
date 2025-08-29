@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/utils/supabase/client";
 import {
   AlertCircle,
   Briefcase,
@@ -48,6 +48,7 @@ interface Project {
 
 export default function AdminProjectsPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

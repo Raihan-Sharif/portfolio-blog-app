@@ -20,7 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/utils/supabase/client";
+const supabase = createClient();
 import { AlertCircle, Palette, Plus, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 

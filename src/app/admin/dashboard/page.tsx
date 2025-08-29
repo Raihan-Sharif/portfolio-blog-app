@@ -5,7 +5,7 @@ import AdminLayout from "@/components/admin/admin-layout";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/utils/supabase/client";
 import { getReadTime } from "@/lib/utils";
 import { format, formatDistanceToNow, parseISO } from "date-fns";
 import {
@@ -143,6 +143,7 @@ const TIME_PERIODS = [
 
 export default function DashboardPage() {
   const { user, session, loading: authLoading } = useAuth();
+  const supabase = createClient();
   const [stats, setStats] = useState<DashboardStats>({
     totalPosts: 0,
     totalProjects: 0,

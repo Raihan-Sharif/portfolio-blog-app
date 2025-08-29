@@ -1,27 +1,6 @@
-// src/lib/supabase/server.ts
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import { createClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
-import type { Database } from "./database.types";
-
-/**
- * Create a Supabase client for server components with enhanced error handling
- */
-export const createServerSupabaseClient = () => {
-  try {
-    const cookieStore = cookies();
-    return createServerComponentClient<Database>({
-      cookies: () => cookieStore,
-    });
-  } catch (error) {
-    console.error("Error creating server Supabase client:", error);
-    // Return a fallback client that won't break the app
-    return createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-    );
-  }
-};
+import { createServerClient } from '@supabase/ssr'
+// Re-export the utils version for backward compatibility
+export { createClient } from '@/utils/supabase/server'
 
 /**
  * Enhanced admin client with proper error handling and retry logic
@@ -44,7 +23,7 @@ class SupabaseAdminClient {
       );
     }
 
-    return createClient(url, serviceKey, {
+    return createServerClient(url, serviceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -52,6 +31,14 @@ class SupabaseAdminClient {
       global: {
         headers: {
           "X-Client-Info": "portfolio-app-admin",
+        },
+      },
+      cookies: {
+        getAll() {
+          return []
+        },
+        setAll() {
+          // Admin client doesn't use cookies
         },
       },
     });
@@ -72,7 +59,7 @@ class SupabaseAdminClient {
    * Execute a query with retry logic and error handling
    */
   async executeWithRetry<T>(
-    operation: (client: ReturnType<typeof createClient>) => Promise<T>,
+    operation: (client: any) => Promise<T>,
     maxRetries = 3,
     baseDelay = 1000
   ): Promise<T> {
@@ -213,7 +200,8 @@ export const getAdminClient = () => adminClientInstance;
  */
 export async function verifyServerSession() {
   try {
-    const supabase = createServerSupabaseClient();
+    const { createClient } = require('@/utils/supabase/server');
+    const supabase = createClient();
     const {
       data: { session },
       error,
@@ -236,7 +224,8 @@ export async function verifyServerSession() {
  */
 export async function getCurrentServerUser() {
   try {
-    const supabase = createServerSupabaseClient();
+    const { createClient } = require('@/utils/supabase/server');
+    const supabase = createClient();
     const {
       data: { user },
       error,
@@ -306,4 +295,10 @@ export async function requireServerAuth(requiredRole?: string) {
   }
 
   return session;
+}
+
+// Legacy exports for backward compatibility
+export function createServerSupabaseClient() {
+  const { createClient } = require('@/utils/supabase/server');
+  return createClient();
 }

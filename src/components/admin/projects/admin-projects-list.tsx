@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/utils/supabase/client";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import {
@@ -152,6 +152,7 @@ const getStatusIcon = (status?: string) => {
 
 export default function AdminProjectsList() {
   const router = useRouter();
+  const supabase = createClient();
   const [projects, setProjects] = useState<Project[]>([]);
   const [categories, setCategories] = useState<ProjectCategory[]>([]);
   const [loading, setLoading] = useState(true);

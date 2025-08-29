@@ -16,7 +16,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/utils/supabase/client";
 import { slugify } from "@/lib/utils";
 import {
   AlertCircle,
@@ -100,6 +100,7 @@ interface ProjectEditorProps {
 
 export default function EnhancedProjectEditor({ params }: ProjectEditorProps) {
   const router = useRouter();
+  const supabase = createClient();
   const isNewProject = params.projectId === "new";
   const [loading, setLoading] = useState(!isNewProject);
   const [saving, setSaving] = useState(false);

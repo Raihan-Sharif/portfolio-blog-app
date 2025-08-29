@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ModeToggle } from "@/components/ui/mode-toggle";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/utils/supabase/client";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { OnlineUsersNavbar } from "@/components/admin/online-users-navbar";
@@ -77,6 +77,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const supabase = createClient();
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminLoading, setAdminLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);

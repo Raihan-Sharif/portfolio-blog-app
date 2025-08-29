@@ -4,7 +4,8 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/utils/supabase/client";
+const supabase = createClient();
 import { Image as ImageIcon, Loader2, X } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";

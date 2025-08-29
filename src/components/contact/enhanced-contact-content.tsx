@@ -20,7 +20,8 @@ import {
   validatePhoneNumber,
   type Country,
 } from "@/lib/phone-utils";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/utils/supabase/client";
+const supabase = createClient();
 import { motion } from "framer-motion";
 import {
   AlertCircle,
