@@ -17,7 +17,8 @@
       "Bash(find:*)",
       "Bash(npm run type-check:*)",
       "Bash(npm run:*)",
-      "WebFetch(domain:www.google.com)"
+      "WebFetch(domain:www.google.com)",
+      "WebFetch(domain:developers.google.com)"
     ],
     "deny": [],
     "additionalDirectories": [

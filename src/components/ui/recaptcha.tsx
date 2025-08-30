@@ -17,61 +17,77 @@ export interface ReCAPTCHAV3Ref {
 declare global {
   interface Window {
     grecaptcha: any;
-    recaptchaScriptLoading?: boolean;
-    recaptchaScriptReady?: boolean;
   }
 }
 
 const ReCAPTCHAV3Component = forwardRef<ReCAPTCHAV3Ref, ReCAPTCHAV3ComponentProps>(
   ({ onVerify, onError, action = 'submit', autoExecute = false }, ref) => {
-    const [isLoaded, setIsLoaded] = useState(false);
     const [isReady, setIsReady] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const hasAutoExecutedRef = useRef(false);
+    const executionTimeoutRef = useRef<NodeJS.Timeout>();
+    
+    // Get site key from config
     const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
     
 
     const executeRecaptcha = useCallback(async (): Promise<string | null> => {
-      if (!window.grecaptcha || !window.grecaptcha.ready || !siteKey) {
-        console.warn('❌ reCAPTCHA not ready or site key missing');
+      if (!window.grecaptcha?.ready || !siteKey) {
+        console.warn('reCAPTCHA not ready or site key missing');
         onError?.();
         return null;
       }
 
-      try {
-        const token = await new Promise<string | null>((resolve) => {
-          try {
-            window.grecaptcha.ready(() => {
-              window.grecaptcha.execute(siteKey, { action })
-                .then((token: string) => {
-                  if (token && typeof token === 'string') {
-                    console.log(`✅ reCAPTCHA token received for action: ${action}`);
-                    resolve(token);
-                  } else {
-                    console.error('❌ reCAPTCHA returned invalid token for action:', action, 'Token:', token);
-                    onError?.();
-                    resolve(null);
-                  }
-                })
-                .catch((error: any) => {
-                  console.error('💥 reCAPTCHA execution failed for action:', action, 'Error:', error);
-                  onError?.();
-                  resolve(null);
-                });
-            });
-          } catch (readyError) {
-            console.error('🚫 reCAPTCHA ready callback failed:', readyError);
-            onError?.();
-            resolve(null);
-          }
-        });
-        
-        return token;
-      } catch (error) {
-        console.error('💣 reCAPTCHA execution outer catch error:', error);
-        onError?.();
+      if (isLoading) {
+        console.warn('reCAPTCHA execution already in progress');
         return null;
       }
-    }, [siteKey, action, onError]);
+
+      setIsLoading(true);
+
+      try {
+        return await new Promise<string | null>((resolve, reject) => {
+          // Set timeout to prevent hanging
+          executionTimeoutRef.current = setTimeout(() => {
+            reject(new Error('reCAPTCHA execution timeout'));
+          }, 10000); // 10 second timeout
+
+          window.grecaptcha.ready(async () => {
+            try {
+              const token = await window.grecaptcha.execute(siteKey, { action });
+              
+              if (executionTimeoutRef.current) {
+                clearTimeout(executionTimeoutRef.current);
+              }
+              
+              if (token && typeof token === 'string' && token.length > 0) {
+                resolve(token);
+              } else {
+                console.error('Invalid reCAPTCHA token received');
+                onError?.();
+                resolve(null);
+              }
+            } catch (executeError) {
+              if (executionTimeoutRef.current) {
+                clearTimeout(executionTimeoutRef.current);
+              }
+              console.error('reCAPTCHA execution failed:', executeError);
+              onError?.();
+              resolve(null);
+            }
+          });
+        });
+      } catch (error) {
+        console.error('reCAPTCHA execution error:', error);
+        onError?.();
+        return null;
+      } finally {
+        setIsLoading(false);
+        if (executionTimeoutRef.current) {
+          clearTimeout(executionTimeoutRef.current);
+        }
+      }
+    }, [siteKey, action, onError, isLoading]);
 
     useImperativeHandle(ref, () => ({
       execute: executeRecaptcha
@@ -80,22 +96,24 @@ const ReCAPTCHAV3Component = forwardRef<ReCAPTCHAV3Ref, ReCAPTCHAV3ComponentProp
     useEffect(() => {
       if (!siteKey) return;
 
-      // Check if reCAPTCHA is already ready
-      if (window.grecaptcha && window.recaptchaScriptReady) {
-        setIsLoaded(true);
-        setIsReady(true);
+      // Check if reCAPTCHA script is already loaded and ready
+      if (window.grecaptcha?.ready) {
+        window.grecaptcha.ready(() => {
+          setIsReady(true);
+        });
         return;
       }
 
-      // Check if script already exists or is loading
+      // Check if script already exists
       const existingScript = document.querySelector(`script[src*="recaptcha/api.js"]`);
       
-      if (existingScript || window.recaptchaScriptLoading) {
-        setIsLoaded(true);
-        // Wait for script to be ready
+      if (existingScript) {
+        // Script exists, wait for it to load
         const checkReady = () => {
-          if (window.grecaptcha && window.recaptchaScriptReady) {
-            setIsReady(true);
+          if (window.grecaptcha?.ready) {
+            window.grecaptcha.ready(() => {
+              setIsReady(true);
+            });
           } else {
             setTimeout(checkReady, 100);
           }
@@ -104,47 +122,42 @@ const ReCAPTCHAV3Component = forwardRef<ReCAPTCHAV3Ref, ReCAPTCHAV3ComponentProp
         return;
       }
 
-      // Mark as loading to prevent multiple script loads
-      window.recaptchaScriptLoading = true;
-
+      // Load the reCAPTCHA script
       const script = document.createElement('script');
       script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
       script.async = true;
-      script.defer = true;
 
       script.onload = () => {
-        setIsLoaded(true);
-        if (window.grecaptcha) {
+        if (window.grecaptcha?.ready) {
           window.grecaptcha.ready(() => {
-            window.recaptchaScriptReady = true;
-            window.recaptchaScriptLoading = false;
             setIsReady(true);
           });
         } else {
           console.error('reCAPTCHA not available after script load');
-          window.recaptchaScriptLoading = false;
           onError?.();
         }
       };
 
-      script.onerror = (error) => {
-        console.error('❌ Failed to load reCAPTCHA script:', error);
-        window.recaptchaScriptLoading = false;
+      script.onerror = () => {
+        console.error('Failed to load reCAPTCHA script');
         onError?.();
       };
 
       document.head.appendChild(script);
 
+      // Cleanup function
       return () => {
-        // Don't remove script on unmount as it might be used by other components
+        // Clear timeout if component unmounts
+        if (executionTimeoutRef.current) {
+          clearTimeout(executionTimeoutRef.current);
+        }
       };
     }, [siteKey, onError]);
 
 
     // Auto-execute when component mounts and becomes ready (if enabled)
     useEffect(() => {
-      if (autoExecute && isReady && isLoaded && !hasAutoExecutedRef.current) {
-        console.log(`🔄 Auto-executing reCAPTCHA for action: ${action}`);
+      if (autoExecute && isReady && !hasAutoExecutedRef.current && !isLoading) {
         hasAutoExecutedRef.current = true;
         
         const autoExecuteRecaptcha = async () => {
@@ -152,18 +165,17 @@ const ReCAPTCHAV3Component = forwardRef<ReCAPTCHAV3Ref, ReCAPTCHAV3ComponentProp
             const token = await executeRecaptcha();
             onVerify(token);
           } catch (error) {
-            console.error('💥 Auto-execute reCAPTCHA failed:', error);
+            console.error('Auto-execute reCAPTCHA failed:', error);
             onVerify(null);
           }
         };
         
-        // Execute with error handling
-        autoExecuteRecaptcha().catch((error) => {
-          console.error('🚨 Auto-execute promise rejected:', error);
-          onVerify(null);
-        });
+        // Small delay to ensure DOM is ready
+        const timeoutId = setTimeout(autoExecuteRecaptcha, 100);
+        
+        return () => clearTimeout(timeoutId);
       }
-    }, [autoExecute, isReady, isLoaded]);
+    }, [autoExecute, isReady, isLoading, executeRecaptcha, onVerify]);
 
     if (!siteKey) {
       return (
@@ -181,6 +193,9 @@ const ReCAPTCHAV3Component = forwardRef<ReCAPTCHAV3Ref, ReCAPTCHAV3ComponentProp
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Shield className="w-4 h-4" />
           <span>Protected by reCAPTCHA v3</span>
+          {isLoading && (
+            <div className="w-3 h-3 border border-primary/30 border-t-primary rounded-full animate-spin ml-2" />
+          )}
         </div>
       </div>
     );

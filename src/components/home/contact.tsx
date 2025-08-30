@@ -21,8 +21,6 @@ import {
   validatePhoneNumber,
   type Country,
 } from "@/lib/phone-utils";
-import { createClient } from "@/utils/supabase/client";
-const supabase = createClient();
 import { motion } from "framer-motion";
 import {
   AlertCircle,
@@ -211,17 +209,26 @@ export default function Contact({
         ? getFullPhoneNumber(formData.phone, selectedCountry.dialCode)
         : null;
 
-      const { error } = await supabase.from("contact_messages").insert({
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        phone: fullPhoneNumber,
-        subject: formData.subject.trim(),
-        message: formData.message.trim(),
-        status: "pending",
-        recaptcha_token: recaptchaToken,
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: fullPhoneNumber,
+          subject: formData.subject.trim(),
+          message: formData.message.trim(),
+          recaptcha_token: recaptchaToken,
+        }),
       });
 
-      if (error) throw error;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.details || result.error || 'Failed to send message');
+      }
 
       setSubmitStatus({
         success: true,
