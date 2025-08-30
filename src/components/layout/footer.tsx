@@ -64,10 +64,11 @@ export function Footer() {
   );
   const [stats, setStats] = useState<FooterStats | null>(null);
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
-  const [currentYear] = useState(new Date().getFullYear());
+  const [currentYear, setCurrentYear] = useState<number | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
     fetchFooterData();
 
     const handleScroll = () => {
@@ -383,7 +384,7 @@ export function Footer() {
             viewport={{ once: true }}
             className="flex items-center gap-2 text-sm text-muted-foreground"
           >
-            <span>© {currentYear} Raihan Sharif. All rights reserved.</span>
+            <span>© {currentYear || new Date().getFullYear()} Raihan Sharif. All rights reserved.</span>
           </motion.div>
 
           <motion.div

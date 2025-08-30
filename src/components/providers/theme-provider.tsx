@@ -10,27 +10,27 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 }
 
 // Enhanced theme hook with additional utilities
+import { useTheme } from "next-themes";
+
 export function useThemeEnhanced() {
   const [mounted, setMounted] = React.useState(false);
+  const { theme, setTheme, systemTheme, resolvedTheme, themes } = useTheme();
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
 
+  // Return consistent values on server and first render
   if (!mounted) {
     return {
       theme: "system",
-      setTheme: () => {},
+      setTheme: (() => {}) as (theme: string) => void,
       systemTheme: undefined,
       resolvedTheme: undefined,
       themes: ["light", "dark", "system"],
       mounted: false,
     };
   }
-
-  // Import next-themes hook only on client side
-  const { theme, setTheme, systemTheme, resolvedTheme, themes } =
-    require("next-themes").useTheme();
 
   return {
     theme,

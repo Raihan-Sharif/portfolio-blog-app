@@ -3,6 +3,7 @@ import {
   SkillCategorySkeleton,
   SkillsHeroSkeleton,
 } from "@/components/ui/loading-states";
+import { getSkeletonWidth } from "@/lib/utils";
 
 export default function SkillsLoading() {
   return (
@@ -58,7 +59,7 @@ export default function SkillsLoading() {
                   <div className="w-full bg-muted rounded-full h-2">
                     <div
                       className="h-2 bg-primary/20 rounded-full animate-pulse"
-                      style={{ width: `${60 + Math.random() * 40}%` }}
+                      style={{ width: getSkeletonWidth(i) }}
                     ></div>
                   </div>
                 </div>
@@ -86,7 +87,7 @@ export default function SkillsLoading() {
                   <div className="w-full bg-muted rounded-full h-2">
                     <div
                       className="h-2 bg-primary/20 rounded-full animate-pulse"
-                      style={{ width: `${60 + Math.random() * 40}%` }}
+                      style={{ width: getSkeletonWidth(i) }}
                     ></div>
                   </div>
                 </div>

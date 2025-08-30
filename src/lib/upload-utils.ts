@@ -16,9 +16,10 @@ export async function uploadImage(
   try {
     // Generate a unique filename
     const fileExt = file.name.split(".").pop();
-    const fileName = `${Date.now()}-${Math.random()
-      .toString(36)
-      .substring(2, 15)}.${fileExt}`;
+    // Generate deterministic filename to avoid hydration issues
+    const timestamp = Date.now();
+    const randomSuffix = Math.floor(timestamp % 100000).toString(36);
+    const fileName = `${timestamp}-${randomSuffix}.${fileExt}`;
     const filePath = `${folder}/${fileName}`;
 
     // Upload to Supabase storage

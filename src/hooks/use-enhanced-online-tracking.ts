@@ -25,29 +25,40 @@ interface OnlineUserStats {
 
 // Generate a unique session ID for the browser
 function generateSessionId(): string {
+  if (typeof window === 'undefined') return '';
+  
   const stored = localStorage.getItem('portfolio_session_id');
   if (stored) return stored;
   
-  const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const timestamp = Date.now();
+  const randomSuffix = Math.floor(timestamp % 100000).toString(36);
+  const sessionId = `session_${timestamp}_${randomSuffix}`;
   localStorage.setItem('portfolio_session_id', sessionId);
   return sessionId;
 }
 
 // Generate a simple browser fingerprint
 function getBrowserFingerprint(): string {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  ctx?.fillText('fingerprint', 2, 2);
+  if (typeof window === 'undefined') return '';
   
-  const fingerprint = [
-    navigator.userAgent,
-    navigator.language,
-    screen.width + 'x' + screen.height,
-    new Date().getTimezoneOffset(),
-    canvas.toDataURL(),
-  ].join('|');
-  
-  return btoa(fingerprint).substr(0, 32);
+  try {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx?.fillText('fingerprint', 2, 2);
+    
+    const fingerprint = [
+      navigator.userAgent,
+      navigator.language,
+      screen.width + 'x' + screen.height,
+      Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      canvas.toDataURL(),
+    ].join('|');
+    
+    return btoa(fingerprint).substr(0, 32);
+  } catch (error) {
+    // Fallback fingerprint
+    return btoa('fallback-fingerprint').substr(0, 32);
+  }
 }
 
 export function useEnhancedOnlineTracking() {

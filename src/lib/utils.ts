@@ -18,13 +18,62 @@ export function slugify(text: string): string {
     .replace(/\-\-+/g, "-"); // Replace multiple - with single -
 }
 
-// Format date
+// Format date - hydration-safe
 export function formatDate(date: string | Date): string {
-  return new Date(date).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  try {
+    const dateObj = new Date(date);
+    // Check if date is valid
+    if (isNaN(dateObj.getTime())) {
+      return "Invalid Date";
+    }
+    return dateObj.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch {
+    return "Invalid Date";
+  }
+}
+
+// Hydration-safe date formatter that returns consistent results
+export function formatDateSafe(date: string | Date): string {
+  if (typeof window === 'undefined') {
+    // Server-side: return a simple format to avoid hydration mismatch
+    try {
+      const dateObj = new Date(date);
+      if (isNaN(dateObj.getTime())) return "Invalid Date";
+      return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+    } catch {
+      return "Invalid Date";
+    }
+  }
+  
+  // Client-side: use the full formatter
+  return formatDate(date);
+}
+
+// Generate consistent random-like values for hydration
+export function createStableRandom(seed: string): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash) / 2147483647; // Normalize to 0-1
+}
+
+// Generate loading skeleton widths that are consistent during SSR
+export function getSkeletonWidth(index: number, baseWidth = 60): string {
+  const variation = createStableRandom(`skeleton-${index}`) * 40;
+  return `${baseWidth + variation}%`;
+}
+
+// Generate loading skeleton heights that are consistent during SSR  
+export function getSkeletonHeight(index: number, baseHeight = 40): string {
+  const variation = createStableRandom(`skeleton-height-${index}`) * 60;
+  return `${baseHeight + variation}%`;
 }
 
 // Read time estimator for blog posts

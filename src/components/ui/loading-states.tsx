@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { cn, getSkeletonWidth, getSkeletonHeight } from "@/lib/utils";
 import { Loader2, RefreshCcw, WifiOff } from "lucide-react";
 import { Button } from "./button";
 
@@ -316,7 +316,7 @@ export function SkillCategorySkeleton() {
               <div className="w-full bg-muted rounded-full h-2">
                 <Skeleton
                   className="h-2 rounded-full"
-                  style={{ width: `${60 + Math.random() * 40}%` }}
+                  style={{ width: getSkeletonWidth(i) }}
                 />
               </div>
             </CardContent>
@@ -381,7 +381,7 @@ export function ChartCardSkeleton() {
             <Skeleton
               key={i}
               className="w-8 rounded-t"
-              style={{ height: `${40 + Math.random() * 60}%` }}
+              style={{ height: getSkeletonHeight(i) }}
             />
           ))}
         </div>

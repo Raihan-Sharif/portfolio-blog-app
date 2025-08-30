@@ -411,12 +411,13 @@ export default function DashboardPage() {
         })) || [],
       };
 
-      // Calculate growth metrics (simplified for demo)
+      // Calculate growth metrics (simplified for demo) - use stable values for hydration
+      const seedValue = (totalPosts || 0) + (totalProjects || 0) + (totalUsers || 0);
       const growthMetrics = {
-        postsGrowth: Math.floor(Math.random() * 20) + 5,
-        projectsGrowth: Math.floor(Math.random() * 15) + 3,
-        viewsGrowth: Math.floor(Math.random() * 25) + 8,
-        usersGrowth: Math.floor(Math.random() * 10) + 2,
+        postsGrowth: Math.floor((seedValue * 7) % 20) + 5,
+        projectsGrowth: Math.floor((seedValue * 11) % 15) + 3,
+        viewsGrowth: Math.floor((seedValue * 13) % 25) + 8,
+        usersGrowth: Math.floor((seedValue * 17) % 10) + 2,
       };
 
       // Initial load with default period

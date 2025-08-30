@@ -1,7 +1,7 @@
 // src/components/ui/dashboard-skeleton.tsx
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn, getSkeletonHeight } from "@/lib/utils";
 import { Skeleton } from "./skeleton";
 
 // Dashboard Stat Card Skeleton
@@ -67,7 +67,7 @@ export function ChartSkeleton({ className, height = 300 }: { className?: string;
                 <Skeleton 
                   key={j} 
                   className="flex-1 bg-gradient-to-t from-primary/20 to-primary/5" 
-                  style={{ height: `${Math.random() * 60 + 20}%` }}
+                  style={{ height: getSkeletonHeight(i * 7 + j, 20) }}
                 />
               ))}
             </div>

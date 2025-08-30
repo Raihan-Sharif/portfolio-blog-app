@@ -42,17 +42,17 @@ export function useOnlineTracking(
       try {
         let storedSessionId = sessionStorage.getItem("user_session_id");
         if (!storedSessionId) {
-          storedSessionId = `session_${Date.now()}_${Math.random()
-            .toString(36)
-            .substr(2, 9)}`;
+          const timestamp = Date.now();
+          const randomSuffix = Math.floor(timestamp % 100000).toString(36);
+          storedSessionId = `session_${timestamp}_${randomSuffix}`;
           sessionStorage.setItem("user_session_id", storedSessionId);
         }
         currentSessionId.current = storedSessionId;
       } catch (error) {
         // Fallback if sessionStorage is not available
-        currentSessionId.current = `session_${Date.now()}_${Math.random()
-          .toString(36)
-          .substr(2, 9)}`;
+        const timestamp = Date.now();
+        const randomSuffix = Math.floor(timestamp % 100000).toString(36);
+        currentSessionId.current = `session_${timestamp}_${randomSuffix}`;
       }
     }
 

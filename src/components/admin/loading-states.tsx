@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { cn, getSkeletonHeight } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
@@ -201,7 +201,7 @@ export function ChartSkeleton({ className }: { className?: string }) {
               key={i}
               className="bg-muted rounded-t animate-pulse"
               style={{
-                height: `${Math.random() * 80 + 20}%`,
+                height: getSkeletonHeight(i, 20),
                 width: "100%",
               }}
               initial={{ scaleY: 0 }}
