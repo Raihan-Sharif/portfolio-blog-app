@@ -384,7 +384,7 @@ export function Footer() {
             viewport={{ once: true }}
             className="flex items-center gap-2 text-sm text-muted-foreground"
           >
-            <span>© {currentYear || new Date().getFullYear()} Raihan Sharif. All rights reserved.</span>
+            <span suppressHydrationWarning>© {currentYear || new Date().getFullYear()} Raihan Sharif. All rights reserved.</span>
           </motion.div>
 
           <motion.div

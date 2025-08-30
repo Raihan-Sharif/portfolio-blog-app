@@ -56,27 +56,40 @@ const useAdvancedConfetti = (trigger: boolean, shouldLoop: boolean = false) => {
     '#FF9800', '#795548', '#607D8B', '#F44336', '#9E9E9E'
   ];
 
-  const createParticle = useCallback((x: number, y: number, burstIntensity: number = 1): Particle => {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = (Math.random() * 12 + 6) * burstIntensity;
-    const life = Math.random() * 240 + 180; // 3-7 seconds at 60fps
+  const createParticle = useCallback((x: number, y: number, burstIntensity: number = 1, seedOffset: number = 0): Particle => {
+    // Create deterministic "random" values using a simple seed-based approach
+    const seed1 = (x * 9301 + y * 49297 + seedOffset * 233280) % 233280;
+    const seed2 = (seed1 * 9301 + 49297) % 233280;
+    const seed3 = (seed2 * 9301 + 49297) % 233280;
+    const seed4 = (seed3 * 9301 + 49297) % 233280;
+    const seed5 = (seed4 * 9301 + 49297) % 233280;
+    
+    const rand1 = seed1 / 233280;
+    const rand2 = seed2 / 233280;
+    const rand3 = seed3 / 233280;
+    const rand4 = seed4 / 233280;
+    const rand5 = seed5 / 233280;
+    
+    const angle = rand1 * Math.PI * 2;
+    const speed = (rand2 * 12 + 6) * burstIntensity;
+    const life = rand3 * 240 + 180; // 3-7 seconds at 60fps
     
     return {
       x,
       y,
-      vx: Math.cos(angle) * speed + (Math.random() - 0.5) * 4,
-      vy: Math.sin(angle) * speed - Math.random() * 8 - 6, // Strong upward velocity
-      size: Math.random() * 10 + 5,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      shape: ['circle', 'square', 'triangle', 'star', 'heart', 'diamond'][Math.floor(Math.random() * 6)] as Particle['shape'],
-      rotation: Math.random() * 360,
-      rotationSpeed: (Math.random() - 0.5) * 12,
+      vx: Math.cos(angle) * speed + (rand4 - 0.5) * 4,
+      vy: Math.sin(angle) * speed - rand5 * 8 - 6, // Strong upward velocity
+      size: rand1 * 10 + 5,
+      color: colors[Math.floor(rand2 * colors.length)],
+      shape: ['circle', 'square', 'triangle', 'star', 'heart', 'diamond'][Math.floor(rand3 * 6)] as Particle['shape'],
+      rotation: rand4 * 360,
+      rotationSpeed: (rand5 - 0.5) * 12,
       opacity: 1,
       life,
       maxLife: life,
-      gravity: 0.2 + Math.random() * 0.15,
-      drift: (Math.random() - 0.5) * 0.03,
-      glowIntensity: Math.random() * 0.8 + 0.2
+      gravity: 0.2 + rand1 * 0.15,
+      drift: (rand2 - 0.5) * 0.03,
+      glowIntensity: rand3 * 0.8 + 0.2
     };
   }, []);
 
@@ -222,9 +235,9 @@ const useAdvancedConfetti = (trigger: boolean, shouldLoop: boolean = false) => {
     
     burstPoints.forEach((point, index) => {
       setTimeout(() => {
-        const particleCount = Math.floor((25 + Math.random() * 20) * intensity);
+        const particleCount = Math.floor((25 + (((point.x + point.y + index) % 100) / 100) * 20) * intensity);
         for (let i = 0; i < particleCount; i++) {
-          particlesRef.current.push(createParticle(point.x, point.y, intensity));
+          particlesRef.current.push(createParticle(point.x, point.y, intensity, i));
         }
       }, index * 80);
     });
@@ -381,8 +394,8 @@ const CelebrationAwardCard = ({
               key={i}
               className="absolute w-2 h-2 bg-yellow-400 rounded-full"
               style={{
-                top: `${20 + Math.random() * 60}%`,
-                left: `${10 + Math.random() * 80}%`,
+                top: `${20 + ((i * 37 + index * 17) % 60)}%`,
+                left: `${10 + ((i * 47 + index * 23) % 80)}%`,
               }}
               initial={{ scale: 0, opacity: 0 }}
               animate={{

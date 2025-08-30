@@ -15,11 +15,7 @@ export function ModeToggle() {
   }, []);
 
   if (!mounted) {
-    return (
-      <Button variant="outline" size="sm" disabled className="w-16">
-        <Sun className="h-4 w-4" />
-      </Button>
-    );
+    return null;
   }
 
   const toggleTheme = () => {

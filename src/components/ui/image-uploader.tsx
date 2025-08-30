@@ -222,6 +222,7 @@ export function ImageUploader({
               src={imageUrl}
               alt="Current image"
               fill
+              sizes="(max-width: 768px) 100vw, 400px"
               className="object-cover"
             />
             <Button
@@ -290,6 +291,7 @@ export function ImageUploader({
                   src={previewUrl}
                   alt="Preview"
                   fill
+                  sizes="(max-width: 768px) 100vw, 400px"
                   className="object-cover"
                 />
               </div>

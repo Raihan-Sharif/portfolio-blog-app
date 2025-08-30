@@ -19,23 +19,23 @@ export function ViewTracker({
   delay = 3000, // 3 seconds
   debug = false, // Disabled by default for production
 }: ViewTrackerProps) {
-  const [isClient, setIsClient] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const debugMountedRef = useRef(false);
 
   // Only run on client side
   useEffect(() => {
-    setIsClient(true);
+    setMounted(true);
   }, []);
 
   const { triggerView, isTracked, isTracking, error, timeSpent } =
     useViewTracking(type, id, {
-      enabled: enabled && !!id && isClient,
+      enabled: enabled && !!id && mounted,
       delay,
     });
 
   // Enhanced debug logging with Firefox-specific information
   useEffect(() => {
-    if (!debug || !id || !isClient) return;
+    if (!debug || !id || !mounted) return;
 
     const debugInfo = {
       isTracked,
@@ -72,12 +72,12 @@ export function ViewTracker({
     error,
     enabled,
     delay,
-    isClient,
+    mounted,
   ]);
 
   // Mount/unmount logging for debugging
   useEffect(() => {
-    if (debug && id && isClient && !debugMountedRef.current) {
+    if (debug && id && mounted && !debugMountedRef.current) {
       console.log(`🎬 ViewTracker mounted for ${type}:${id}`);
       debugMountedRef.current = true;
     }
@@ -88,10 +88,15 @@ export function ViewTracker({
         debugMountedRef.current = false;
       }
     };
-  }, [debug, type, id, isClient]);
+  }, [debug, type, id, mounted]);
+
+  // Don't render anything on server
+  if (!mounted) {
+    return null;
+  }
 
   // Show debug UI only in development mode and when explicitly enabled
-  if (debug && process.env.NODE_ENV === "development" && id && isClient) {
+  if (debug && process.env.NODE_ENV === "development" && id) {
     return (
       <div className="fixed bottom-4 left-4 z-50 bg-black/90 text-white text-xs p-4 rounded-lg max-w-sm border border-gray-600">
         <div className="font-bold text-green-400 mb-2">

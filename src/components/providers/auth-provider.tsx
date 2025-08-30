@@ -184,25 +184,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         setLoading(true);
         
-        // Always use getUser() as recommended by Supabase
-        const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
-        
-        if (userError) {
-          console.error("Auth initialization error:", userError);
-          setAuthState(null, null);
-          return;
-        }
-
-        if (!authUser) {
-          setAuthState(null, null);
-          return;
-        }
-
-        // Get session
+        // First check if we have a session
         const { data: { session: authSession }, error: sessionError } = await supabase.auth.getSession();
         
-        if (sessionError || !authSession) {
+        if (sessionError) {
           console.error("Session error:", sessionError);
+          setAuthState(null, null);
+          return;
+        }
+
+        if (!authSession) {
+          // No session exists, user is not authenticated
+          console.log("🔔 Auth state changed: INITIAL_SESSION User ID: undefined");
+          setAuthState(null, null);
+          return;
+        }
+
+        // If we have a session, get the user
+        const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError || !authUser) {
+          console.error("Auth initialization error:", userError);
           setAuthState(null, null);
           return;
         }

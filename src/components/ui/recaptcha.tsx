@@ -27,12 +27,8 @@ const ReCAPTCHAV3Component = forwardRef<ReCAPTCHAV3Ref, ReCAPTCHAV3ComponentProp
     const hasAutoExecutedRef = useRef(false);
     const executionTimeoutRef = useRef<NodeJS.Timeout>();
     
-    // Get site key from config - ensure client-side only access
-    const [siteKey, setSiteKey] = useState<string | undefined>(undefined);
-    
-    useEffect(() => {
-      setSiteKey(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY);
-    }, []);
+    // Get site key from config
+    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
     
 
     const executeRecaptcha = useCallback(async (): Promise<string | null> => {

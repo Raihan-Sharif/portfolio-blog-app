@@ -204,6 +204,7 @@ export default function Hero({
                   src={settings.background_svg_url}
                   alt="Background design"
                   fill
+                  sizes="100vw"
                   className="object-contain"
                   style={{ filter: "hue-rotate(45deg) saturate(0.7)" }}
                 />
@@ -222,6 +223,7 @@ export default function Hero({
                   src={settings.background_svg_url}
                   alt="Background design overlay"
                   fill
+                  sizes="100vw"
                   className="object-contain"
                   style={{
                     filter: "hue-rotate(120deg) saturate(0.5) blur(1px)",
@@ -410,6 +412,7 @@ export default function Hero({
                         src={settings.hero_image_url}
                         alt="Raihan Sharif"
                         fill
+                        sizes="(max-width: 768px) 100vw, 50vw"
                         className="object-cover"
                         priority
                       />

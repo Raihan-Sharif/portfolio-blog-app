@@ -162,6 +162,7 @@ export default function ProfilePage() {
                     src={formState.avatar_url}
                     alt="Avatar"
                     fill
+                    sizes="120px"
                     className="object-cover"
                   />
                 ) : (

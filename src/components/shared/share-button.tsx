@@ -28,15 +28,17 @@ export default function ShareButton({
   const [copied, setCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [hasWebShare, setHasWebShare] = useState(false);
+  const [currentUrl, setCurrentUrl] = useState(url || "");
 
-  const shareUrl =
-    url || (typeof window !== "undefined" ? window.location.href : "");
   const shareText = description || title;
 
-  // Check if Web Share API is available
+  // Check if Web Share API is available and set current URL
   useEffect(() => {
     setHasWebShare(typeof navigator !== "undefined" && "share" in navigator);
-  }, []);
+    if (!url && typeof window !== "undefined") {
+      setCurrentUrl(window.location.href);
+    }
+  }, [url]);
 
   const handleShare = async () => {
     if (isSharing) return;
@@ -49,11 +51,11 @@ export default function ShareButton({
         await navigator.share({
           title,
           text: shareText,
-          url: shareUrl,
+          url: currentUrl,
         });
       } else {
         // Fallback: copy to clipboard
-        await navigator.clipboard.writeText(shareUrl);
+        await navigator.clipboard.writeText(currentUrl);
         setCopied(true);
 
         // Reset copied state after 2 seconds
@@ -62,7 +64,7 @@ export default function ShareButton({
     } catch (err) {
       // If Web Share API fails or user cancels, try clipboard
       try {
-        await navigator.clipboard.writeText(shareUrl);
+        await navigator.clipboard.writeText(currentUrl);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       } catch (clipboardErr) {

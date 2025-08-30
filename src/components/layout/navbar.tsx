@@ -34,6 +34,8 @@ export function Navbar() {
 
   // Handle scroll effect
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
     };
