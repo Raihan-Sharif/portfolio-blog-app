@@ -1,92 +1,192 @@
 'use client';
 
-import { useRef, forwardRef, useImperativeHandle, useEffect, useState } from 'react';
-import ReCAPTCHA from 'react-google-recaptcha';
+import { forwardRef, useImperativeHandle, useEffect, useState, useCallback, useRef } from 'react';
 import { Shield } from 'lucide-react';
-import { useTheme } from 'next-themes';
 
-interface ReCAPTCHAComponentProps {
+interface ReCAPTCHAV3ComponentProps {
   onVerify: (token: string | null) => void;
-  onExpired?: () => void;
   onError?: () => void;
-  size?: 'compact' | 'normal' | 'invisible';
-  theme?: 'light' | 'dark' | 'auto';
+  action?: string;
+  autoExecute?: boolean;
 }
 
-export interface ReCAPTCHARef {
-  reset: () => void;
-  execute: () => void;
+export interface ReCAPTCHAV3Ref {
+  execute: () => Promise<string | null>;
 }
 
-const ReCAPTCHAComponent = forwardRef<ReCAPTCHARef, ReCAPTCHAComponentProps>(
-  ({ onVerify, onExpired, onError, size = 'normal', theme = 'auto' }, ref) => {
-    const recaptchaRef = useRef<ReCAPTCHA>(null);
-    const { theme: systemTheme, resolvedTheme } = useTheme();
-    const [mounted, setMounted] = useState(false);
+declare global {
+  interface Window {
+    grecaptcha: any;
+    recaptchaScriptLoading?: boolean;
+    recaptchaScriptReady?: boolean;
+  }
+}
 
-    useEffect(() => {
-      setMounted(true);
-    }, []);
+const ReCAPTCHAV3Component = forwardRef<ReCAPTCHAV3Ref, ReCAPTCHAV3ComponentProps>(
+  ({ onVerify, onError, action = 'submit', autoExecute = false }, ref) => {
+    const [isLoaded, setIsLoaded] = useState(false);
+    const [isReady, setIsReady] = useState(false);
+    const hasAutoExecutedRef = useRef(false);
+    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+    
+
+    const executeRecaptcha = useCallback(async (): Promise<string | null> => {
+      if (!window.grecaptcha || !window.grecaptcha.ready || !siteKey) {
+        console.warn('❌ reCAPTCHA not ready or site key missing');
+        onError?.();
+        return null;
+      }
+
+      try {
+        const token = await new Promise<string | null>((resolve) => {
+          try {
+            window.grecaptcha.ready(() => {
+              window.grecaptcha.execute(siteKey, { action })
+                .then((token: string) => {
+                  if (token && typeof token === 'string') {
+                    console.log(`✅ reCAPTCHA token received for action: ${action}`);
+                    resolve(token);
+                  } else {
+                    console.error('❌ reCAPTCHA returned invalid token for action:', action, 'Token:', token);
+                    onError?.();
+                    resolve(null);
+                  }
+                })
+                .catch((error: any) => {
+                  console.error('💥 reCAPTCHA execution failed for action:', action, 'Error:', error);
+                  onError?.();
+                  resolve(null);
+                });
+            });
+          } catch (readyError) {
+            console.error('🚫 reCAPTCHA ready callback failed:', readyError);
+            onError?.();
+            resolve(null);
+          }
+        });
+        
+        return token;
+      } catch (error) {
+        console.error('💣 reCAPTCHA execution outer catch error:', error);
+        onError?.();
+        return null;
+      }
+    }, [siteKey, action, onError]);
 
     useImperativeHandle(ref, () => ({
-      reset: () => {
-        recaptchaRef.current?.reset();
-      },
-      execute: () => {
-        recaptchaRef.current?.execute();
-      }
+      execute: executeRecaptcha
     }));
 
-    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+    useEffect(() => {
+      if (!siteKey) return;
 
-    // Determine the actual theme to use
-    const getTheme = (): 'light' | 'dark' => {
-      if (theme === 'auto') {
-        return resolvedTheme === 'dark' ? 'dark' : 'light';
+      // Check if reCAPTCHA is already ready
+      if (window.grecaptcha && window.recaptchaScriptReady) {
+        setIsLoaded(true);
+        setIsReady(true);
+        return;
       }
-      return theme;
-    };
+
+      // Check if script already exists or is loading
+      const existingScript = document.querySelector(`script[src*="recaptcha/api.js"]`);
+      
+      if (existingScript || window.recaptchaScriptLoading) {
+        setIsLoaded(true);
+        // Wait for script to be ready
+        const checkReady = () => {
+          if (window.grecaptcha && window.recaptchaScriptReady) {
+            setIsReady(true);
+          } else {
+            setTimeout(checkReady, 100);
+          }
+        };
+        checkReady();
+        return;
+      }
+
+      // Mark as loading to prevent multiple script loads
+      window.recaptchaScriptLoading = true;
+
+      const script = document.createElement('script');
+      script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
+      script.async = true;
+      script.defer = true;
+
+      script.onload = () => {
+        setIsLoaded(true);
+        if (window.grecaptcha) {
+          window.grecaptcha.ready(() => {
+            window.recaptchaScriptReady = true;
+            window.recaptchaScriptLoading = false;
+            setIsReady(true);
+          });
+        } else {
+          console.error('reCAPTCHA not available after script load');
+          window.recaptchaScriptLoading = false;
+          onError?.();
+        }
+      };
+
+      script.onerror = (error) => {
+        console.error('❌ Failed to load reCAPTCHA script:', error);
+        window.recaptchaScriptLoading = false;
+        onError?.();
+      };
+
+      document.head.appendChild(script);
+
+      return () => {
+        // Don't remove script on unmount as it might be used by other components
+      };
+    }, [siteKey, onError]);
+
+
+    // Auto-execute when component mounts and becomes ready (if enabled)
+    useEffect(() => {
+      if (autoExecute && isReady && isLoaded && !hasAutoExecutedRef.current) {
+        console.log(`🔄 Auto-executing reCAPTCHA for action: ${action}`);
+        hasAutoExecutedRef.current = true;
+        
+        const autoExecuteRecaptcha = async () => {
+          try {
+            const token = await executeRecaptcha();
+            onVerify(token);
+          } catch (error) {
+            console.error('💥 Auto-execute reCAPTCHA failed:', error);
+            onVerify(null);
+          }
+        };
+        
+        // Execute with error handling
+        autoExecuteRecaptcha().catch((error) => {
+          console.error('🚨 Auto-execute promise rejected:', error);
+          onVerify(null);
+        });
+      }
+    }, [autoExecute, isReady, isLoaded]);
 
     if (!siteKey) {
       return (
         <div className="flex items-center justify-center p-4 border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 rounded-lg">
           <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
             <Shield className="w-5 h-5" />
-            <span className="text-sm">reCAPTCHA configuration required</span>
-          </div>
-        </div>
-      );
-    }
-
-    // Don't render until mounted to avoid hydration mismatch
-    if (!mounted) {
-      return (
-        <div className="flex justify-center">
-          <div className="w-[304px] h-[78px] bg-muted/50 animate-pulse rounded border flex items-center justify-center">
-            <Shield className="w-5 h-5 text-muted-foreground" />
+            <span className="text-sm">reCAPTCHA v3 configuration required</span>
           </div>
         </div>
       );
     }
 
     return (
-      <div className="flex justify-center">
-        <div className="p-2 rounded-lg bg-background border border-border shadow-sm">
-          <ReCAPTCHA
-            ref={recaptchaRef}
-            sitekey={siteKey}
-            onChange={onVerify}
-            onExpired={onExpired}
-            onError={onError}
-            size={size}
-            theme={getTheme()}
-          />
+      <div className="flex items-center justify-center">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Shield className="w-4 h-4" />
+          <span>Protected by reCAPTCHA v3</span>
         </div>
       </div>
     );
   }
 );
 
-ReCAPTCHAComponent.displayName = 'ReCAPTCHAComponent';
+ReCAPTCHAV3Component.displayName = 'ReCAPTCHAV3Component';
 
-export default ReCAPTCHAComponent;
+export default ReCAPTCHAV3Component;

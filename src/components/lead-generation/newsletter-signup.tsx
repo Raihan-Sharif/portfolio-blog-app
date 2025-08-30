@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import ReCAPTCHAComponent, { ReCAPTCHARef } from '@/components/ui/recaptcha';
+import ReCAPTCHAComponent, { ReCAPTCHAV3Ref } from '@/components/ui/recaptcha';
 import { 
   Mail, 
   Send, 
@@ -79,7 +79,7 @@ export default function NewsletterSignup({
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
-  const recaptchaRef = useRef<ReCAPTCHARef>(null);
+  const recaptchaRef = useRef<ReCAPTCHAV3Ref>(null);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -121,7 +121,7 @@ export default function NewsletterSignup({
         setEmail('');
         setFirstName('');
         setRecaptchaToken(null);
-        recaptchaRef.current?.reset();
+        // Auto-execute will be triggered by the component
       } else {
         throw new Error(data.error || 'Failed to subscribe');
       }
@@ -129,7 +129,7 @@ export default function NewsletterSignup({
       setSubmitStatus('error');
       setErrorMessage(error instanceof Error ? error.message : 'Failed to subscribe. Please try again.');
       setRecaptchaToken(null);
-      recaptchaRef.current?.reset();
+      // Auto-execute will be triggered by the component
     } finally {
       setIsSubmitting(false);
     }
@@ -381,10 +381,9 @@ export default function NewsletterSignup({
               <ReCAPTCHAComponent
                 ref={recaptchaRef}
                 onVerify={setRecaptchaToken}
-                onExpired={() => setRecaptchaToken(null)}
                 onError={() => setRecaptchaToken(null)}
-                theme="auto"
-                size="normal"
+                action="newsletter_signup"
+                autoExecute={true}
               />
             </div>
 

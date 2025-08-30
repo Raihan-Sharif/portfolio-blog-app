@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { ServiceInquiryFormData } from '@/types/services';
-import { verifyRecaptcha } from '@/lib/recaptcha';
+import { verifyRecaptchaV3 } from '@/lib/recaptcha';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -65,13 +65,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }, { status: 400 });
     }
 
-    // Verify reCAPTCHA
+    // Verify reCAPTCHA v3
     if (body.recaptcha_token) {
-      const isValidRecaptcha = await verifyRecaptcha(body.recaptcha_token);
-      if (!isValidRecaptcha) {
+      const recaptchaResult = await verifyRecaptchaV3(
+        body.recaptcha_token, 
+        'service_inquiry', 
+        0.5
+      );
+      if (!recaptchaResult.success) {
         return NextResponse.json({ 
           error: 'reCAPTCHA verification failed',
-          details: 'Please complete the security verification'
+          details: recaptchaResult.errors?.[0] || 'Please complete the security verification',
+          score: recaptchaResult.score
         }, { status: 400 });
       }
     } else if (process.env.NODE_ENV === 'production') {

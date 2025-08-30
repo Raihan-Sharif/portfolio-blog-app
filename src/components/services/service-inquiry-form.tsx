@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MessageCircle, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import ReCAPTCHAComponent, { ReCAPTCHARef } from '@/components/ui/recaptcha';
+import ReCAPTCHAComponent, { ReCAPTCHAV3Ref } from '@/components/ui/recaptcha';
 
 interface ServiceInquiryFormProps {
   service: Service;
@@ -39,7 +39,7 @@ export default function ServiceInquiryForm({ service, selectedPackageId }: Servi
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string>('');
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
-  const recaptchaRef = useRef<ReCAPTCHARef>(null);
+  const recaptchaRef = useRef<ReCAPTCHAV3Ref>(null);
 
   // Update form data when selectedPackageId changes
   useEffect(() => {
@@ -104,7 +104,7 @@ export default function ServiceInquiryForm({ service, selectedPackageId }: Servi
           urgency: 'normal'
         });
         setRecaptchaToken(null);
-        recaptchaRef.current?.reset();
+        // Auto-execute will be triggered by the component
       } else {
         console.error('Server error:', responseData);
         setSubmitStatus('error');
@@ -116,7 +116,7 @@ export default function ServiceInquiryForm({ service, selectedPackageId }: Servi
       setSubmitError('Network error. Please check your connection and try again.');
       // Reset reCAPTCHA on error so user can try again
       setRecaptchaToken(null);
-      recaptchaRef.current?.reset();
+      // Auto-execute will be triggered by the component
     } finally {
       setIsSubmitting(false);
     }
@@ -351,9 +351,9 @@ export default function ServiceInquiryForm({ service, selectedPackageId }: Servi
             <ReCAPTCHAComponent
               ref={recaptchaRef}
               onVerify={setRecaptchaToken}
-              onExpired={() => setRecaptchaToken(null)}
               onError={() => setRecaptchaToken(null)}
-              theme="auto"
+              action="service_inquiry"
+              autoExecute={true}
             />
             {errors.recaptcha && <p className="text-sm text-red-500">{errors.recaptcha}</p>}
           </div>

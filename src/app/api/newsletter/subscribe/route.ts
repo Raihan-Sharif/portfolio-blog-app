@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { verifyRecaptcha } from '@/lib/recaptcha';
+import { verifyRecaptchaV3 } from '@/lib/recaptcha';
 
 interface SubscribeRequest {
   email: string;
@@ -40,12 +40,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }, { status: 400 });
     }
 
-    // Verify reCAPTCHA
+    // Verify reCAPTCHA v3
     if (body.recaptcha_token) {
-      const isValidRecaptcha = await verifyRecaptcha(body.recaptcha_token);
-      if (!isValidRecaptcha) {
+      const recaptchaResult = await verifyRecaptchaV3(
+        body.recaptcha_token, 
+        'newsletter_signup', 
+        0.5
+      );
+      if (!recaptchaResult.success) {
         return NextResponse.json({ 
-          error: 'reCAPTCHA verification failed' 
+          error: 'reCAPTCHA verification failed',
+          details: recaptchaResult.errors?.[0] || 'Please complete the security verification',
+          score: recaptchaResult.score
         }, { status: 400 });
       }
     } else if (process.env.NODE_ENV === 'production') {

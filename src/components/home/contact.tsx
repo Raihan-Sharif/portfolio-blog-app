@@ -43,7 +43,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useRef } from "react";
-import ReCAPTCHAComponent, { ReCAPTCHARef } from "@/components/ui/recaptcha";
+import ReCAPTCHAComponent, { ReCAPTCHAV3Ref } from "@/components/ui/recaptcha";
 
 // Interfaces
 interface ContactInfo {
@@ -124,7 +124,7 @@ export default function Contact({
   }>({});
   const [phoneError, setPhoneError] = useState<string>("");
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
-  const recaptchaRef = useRef<ReCAPTCHARef>(null);
+  const recaptchaRef = useRef<ReCAPTCHAV3Ref>(null);
 
   // Form handlers (keep the same logic as your original)
   const handleChange = (
@@ -231,7 +231,16 @@ export default function Contact({
 
       setFormData({ name: "", email: "", phone: "", subject: "", message: "" });
       setRecaptchaToken(null);
-      recaptchaRef.current?.reset();
+      // For v3, automatically get a new token for next submission
+      try {
+        if (recaptchaRef.current) {
+          const newToken = await recaptchaRef.current.execute();
+          setRecaptchaToken(newToken);
+        }
+      } catch (error) {
+        console.warn('Failed to get new reCAPTCHA token:', error);
+        // Don't block the success flow for this
+      }
     } catch (submitError: any) {
       setSubmitStatus({
         success: false,
@@ -241,7 +250,15 @@ export default function Contact({
       });
       // Reset reCAPTCHA on error so user can try again
       setRecaptchaToken(null);
-      recaptchaRef.current?.reset();
+      try {
+        if (recaptchaRef.current) {
+          const newToken = await recaptchaRef.current.execute();
+          setRecaptchaToken(newToken);
+        }
+      } catch (error) {
+        console.warn('Failed to get new reCAPTCHA token after error:', error);
+        // User can still retry form submission
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -695,9 +712,9 @@ export default function Contact({
                     <ReCAPTCHAComponent
                       ref={recaptchaRef}
                       onVerify={setRecaptchaToken}
-                      onExpired={() => setRecaptchaToken(null)}
                       onError={() => setRecaptchaToken(null)}
-                      theme="auto"
+                      action="contact_form"
+                      autoExecute={true}
                     />
                   </div>
 

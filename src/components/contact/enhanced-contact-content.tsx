@@ -40,7 +40,7 @@ import {
   User,
 } from "lucide-react";
 import { useState, useRef } from "react";
-import ReCAPTCHAComponent, { ReCAPTCHARef } from "@/components/ui/recaptcha";
+import ReCAPTCHAComponent, { ReCAPTCHAV3Ref } from "@/components/ui/recaptcha";
 
 // interfaces remain the same as in your original contact component
 interface ContactInfo {
@@ -127,7 +127,7 @@ export default function EnhancedContactContent({
   }>({});
   const [phoneError, setPhoneError] = useState<string>("");
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
-  const recaptchaRef = useRef<ReCAPTCHARef>(null);
+  const recaptchaRef = useRef<ReCAPTCHAV3Ref>(null);
 
   // Form handlers (keep the same logic as your original)
   const handleChange = (
@@ -234,7 +234,16 @@ export default function EnhancedContactContent({
 
       setFormData({ name: "", email: "", phone: "", subject: "", message: "" });
       setRecaptchaToken(null);
-      recaptchaRef.current?.reset();
+      // For v3, automatically get a new token for next submission
+      try {
+        if (recaptchaRef.current) {
+          const newToken = await recaptchaRef.current.execute();
+          setRecaptchaToken(newToken);
+        }
+      } catch (error) {
+        console.warn('Failed to get new reCAPTCHA token:', error);
+        // Don't block the flow for this
+      }
     } catch (submitError: any) {
       setSubmitStatus({
         success: false,
@@ -244,7 +253,15 @@ export default function EnhancedContactContent({
       });
       // Reset reCAPTCHA on error so user can try again
       setRecaptchaToken(null);
-      recaptchaRef.current?.reset();
+      try {
+        if (recaptchaRef.current) {
+          const newToken = await recaptchaRef.current.execute();
+          setRecaptchaToken(newToken);
+        }
+      } catch (error) {
+        console.warn('Failed to get new reCAPTCHA token:', error);
+        // Don't block the flow for this
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -696,9 +713,9 @@ export default function EnhancedContactContent({
                       <ReCAPTCHAComponent
                         ref={recaptchaRef}
                         onVerify={setRecaptchaToken}
-                        onExpired={() => setRecaptchaToken(null)}
                         onError={() => setRecaptchaToken(null)}
-                        theme="auto"
+                        action="contact_form"
+                        autoExecute={true}
                       />
                     </div>
 

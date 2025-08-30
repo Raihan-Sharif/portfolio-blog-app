@@ -60,11 +60,11 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://accounts.google.com https://www.recaptcha.net",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://accounts.google.com https://www.recaptcha.net https://www.gstatic.com/recaptcha/",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: https: blob:",
-              "connect-src 'self' https://*.supabase.co https://api.emailjs.com https://www.google.com https://www.recaptcha.net",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.emailjs.com https://www.google.com https://www.recaptcha.net https://www.gstatic.com",
               "frame-src https://www.google.com https://www.recaptcha.net",
               "object-src 'none'",
               "base-uri 'self'",
