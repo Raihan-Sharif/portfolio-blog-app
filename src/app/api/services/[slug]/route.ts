@@ -35,28 +35,39 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to fetch service' }, { status: 500 });
     }
 
-    // Track service view
+    // Track service view with enhanced analytics
     try {
-      await supabase.rpc('increment_service_views', { service_slug: slug });
-      
-      // Also track detailed view analytics
       const clientIp = request.headers.get('x-forwarded-for') || 
                       request.headers.get('x-real-ip') || 
                       '127.0.0.1';
       const userAgent = request.headers.get('user-agent') || '';
       const referrer = request.headers.get('referer') || '';
       
-      await supabase
-        .from('service_views')
-        .insert([{
-          service_id: service.id,
-          client_ip: clientIp,
-          user_agent: userAgent,
-          referrer: referrer,
-          device_type: userAgent.includes('Mobile') ? 'mobile' : 'desktop'
-        }]);
+      // Determine device type
+      const ua = userAgent.toLowerCase();
+      let deviceType = 'desktop';
+      if (ua.includes('mobile') || ua.includes('android')) {
+        deviceType = 'mobile';
+      } else if (ua.includes('tablet') || ua.includes('ipad')) {
+        deviceType = 'tablet';
+      }
+
+      // Use enhanced tracking function
+      await supabase.rpc('track_service_view_detailed', {
+        service_slug: slug,
+        p_client_ip: clientIp,
+        p_user_agent: userAgent,
+        p_referrer: referrer,
+        p_device_type: deviceType
+      });
     } catch (viewError) {
       console.warn('Failed to track service view:', viewError);
+      // Fallback to basic tracking
+      try {
+        await supabase.rpc('increment_service_views', { service_slug: slug });
+      } catch (fallbackError) {
+        console.error('Failed to track service view with fallback:', fallbackError);
+      }
     }
 
     return NextResponse.json({ service });

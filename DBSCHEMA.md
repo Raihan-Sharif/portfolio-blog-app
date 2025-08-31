@@ -2874,25 +2874,332 @@ CREATE TABLE service_views (
 
 ### Services Database Functions
 ```sql
--- Function to increment service view count
+-- Enhanced function to increment service view count with proper error handling
 CREATE OR REPLACE FUNCTION increment_service_views(service_slug TEXT)
 RETURNS void AS $$
+DECLARE
+  service_record RECORD;
 BEGIN
+  -- Get service info and increment view count
+  SELECT id INTO service_record FROM services 
+  WHERE slug = service_slug AND is_active = true;
+  
+  IF service_record.id IS NOT NULL THEN
+    -- Increment the view count
     UPDATE services 
-    SET view_count = view_count + 1 
-    WHERE slug = service_slug AND is_active = true;
+    SET 
+      view_count = view_count + 1,
+      updated_at = NOW()
+    WHERE id = service_record.id;
+  END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function to increment service inquiry count
+-- Enhanced function to increment service inquiry count with proper error handling
 CREATE OR REPLACE FUNCTION increment_service_inquiries(service_slug TEXT)
 RETURNS void AS $$
+DECLARE
+  service_record RECORD;
 BEGIN
+  -- Get service info and increment inquiry count
+  SELECT id INTO service_record FROM services 
+  WHERE slug = service_slug AND is_active = true;
+  
+  IF service_record.id IS NOT NULL THEN
+    -- Increment the inquiry count
     UPDATE services 
-    SET inquiry_count = inquiry_count + 1 
-    WHERE slug = service_slug AND is_active = true;
+    SET 
+      inquiry_count = inquiry_count + 1,
+      updated_at = NOW()
+    WHERE id = service_record.id;
+  END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Enhanced function to track service views with detailed analytics
+CREATE OR REPLACE FUNCTION track_service_view_detailed(
+  service_slug TEXT,
+  p_client_ip INET DEFAULT NULL,
+  p_user_agent TEXT DEFAULT NULL,
+  p_referrer TEXT DEFAULT NULL,
+  p_device_type TEXT DEFAULT 'desktop'
+)
+RETURNS void AS $$
+DECLARE
+  service_record RECORD;
+BEGIN
+  -- Get service info
+  SELECT id INTO service_record FROM services 
+  WHERE slug = service_slug AND is_active = true;
+  
+  IF service_record.id IS NOT NULL THEN
+    -- Insert detailed view record
+    INSERT INTO service_views (
+      service_id,
+      client_ip,
+      user_agent,
+      referrer,
+      device_type,
+      viewed_at
+    ) VALUES (
+      service_record.id,
+      p_client_ip,
+      p_user_agent,
+      p_referrer,
+      p_device_type,
+      NOW()
+    );
+
+    -- Increment service view count
+    UPDATE services 
+    SET 
+      view_count = view_count + 1,
+      updated_at = NOW()
+    WHERE id = service_record.id;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get service analytics summary
+CREATE OR REPLACE FUNCTION get_service_analytics_summary()
+RETURNS TABLE (
+  total_services INTEGER,
+  active_services INTEGER,
+  total_views BIGINT,
+  total_inquiries BIGINT,
+  views_today BIGINT,
+  inquiries_today BIGINT,
+  conversion_rate NUMERIC
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    (SELECT COUNT(*)::INTEGER FROM services) as total_services,
+    (SELECT COUNT(*)::INTEGER FROM services WHERE is_active = true AND status = 'active') as active_services,
+    (SELECT COALESCE(SUM(view_count), 0) FROM services) as total_views,
+    (SELECT COALESCE(SUM(inquiry_count), 0) FROM services) as total_inquiries,
+    (SELECT COUNT(*) FROM service_views WHERE viewed_at >= CURRENT_DATE) as views_today,
+    (SELECT COUNT(*) FROM service_inquiries WHERE created_at >= CURRENT_DATE) as inquiries_today,
+    (SELECT 
+      CASE 
+        WHEN COALESCE(SUM(view_count), 0) = 0 THEN 0
+        ELSE ROUND((COALESCE(SUM(inquiry_count), 0)::NUMERIC / COALESCE(SUM(view_count), 1)::NUMERIC) * 100, 2)
+      END
+    FROM services) as conversion_rate;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get top performing services
+CREATE OR REPLACE FUNCTION get_top_performing_services(p_limit INTEGER DEFAULT 10)
+RETURNS TABLE (
+  id UUID,
+  title TEXT,
+  slug TEXT,
+  view_count INTEGER,
+  inquiry_count INTEGER,
+  performance_score INTEGER,
+  is_featured BOOLEAN,
+  category_name TEXT
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    s.id,
+    s.title,
+    s.slug,
+    s.view_count,
+    s.inquiry_count,
+    (s.view_count + s.inquiry_count * 10) as performance_score,
+    s.is_featured,
+    COALESCE(sc.name, 'Uncategorized') as category_name
+  FROM services s
+  LEFT JOIN service_categories sc ON s.category_id = sc.id
+  WHERE s.is_active = true
+  ORDER BY (s.view_count + s.inquiry_count * 10) DESC
+  LIMIT p_limit;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get device analytics
+CREATE OR REPLACE FUNCTION get_device_analytics(p_days INTEGER DEFAULT 30)
+RETURNS TABLE (
+  device_type TEXT,
+  view_count BIGINT,
+  percentage NUMERIC
+) AS $$
+BEGIN
+  RETURN QUERY
+  WITH device_stats AS (
+    SELECT 
+      COALESCE(sv.device_type, 'unknown') as device_type,
+      COUNT(*) as view_count
+    FROM service_views sv
+    WHERE sv.viewed_at >= (CURRENT_DATE - INTERVAL '1 day' * p_days)
+    GROUP BY COALESCE(sv.device_type, 'unknown')
+  ),
+  total_views AS (
+    SELECT COALESCE(SUM(view_count), 0) as total FROM device_stats
+  )
+  SELECT 
+    ds.device_type,
+    ds.view_count,
+    CASE 
+      WHEN tv.total = 0 OR tv.total IS NULL THEN 0
+      ELSE ROUND((ds.view_count::NUMERIC / tv.total::NUMERIC) * 100, 2)
+    END as percentage
+  FROM device_stats ds
+  CROSS JOIN total_views tv
+  ORDER BY ds.view_count DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get monthly trends
+CREATE OR REPLACE FUNCTION get_monthly_service_trends(p_months INTEGER DEFAULT 6)
+RETURNS TABLE (
+  month_year TEXT,
+  views BIGINT,
+  inquiries BIGINT,
+  conversion_rate NUMERIC
+) AS $$
+BEGIN
+  RETURN QUERY
+  WITH months AS (
+    SELECT 
+      generate_series(
+        date_trunc('month', CURRENT_DATE) - INTERVAL '1 month' * (p_months - 1),
+        date_trunc('month', CURRENT_DATE),
+        INTERVAL '1 month'
+      ) as month_start
+  ),
+  monthly_views AS (
+    SELECT 
+      date_trunc('month', sv.viewed_at) as month_start,
+      COUNT(*) as views
+    FROM service_views sv
+    WHERE sv.viewed_at >= (date_trunc('month', CURRENT_DATE) - INTERVAL '1 month' * (p_months - 1))
+    GROUP BY date_trunc('month', sv.viewed_at)
+  ),
+  monthly_inquiries AS (
+    SELECT 
+      date_trunc('month', si.created_at) as month_start,
+      COUNT(*) as inquiries
+    FROM service_inquiries si
+    WHERE si.created_at >= (date_trunc('month', CURRENT_DATE) - INTERVAL '1 month' * (p_months - 1))
+    GROUP BY date_trunc('month', si.created_at)
+  )
+  SELECT 
+    to_char(m.month_start, 'Mon YYYY') as month_year,
+    COALESCE(mv.views, 0) as views,
+    COALESCE(mi.inquiries, 0) as inquiries,
+    CASE 
+      WHEN COALESCE(mv.views, 0) = 0 THEN 0
+      ELSE ROUND((COALESCE(mi.inquiries, 0)::NUMERIC / COALESCE(mv.views, 1)::NUMERIC) * 100, 2)
+    END as conversion_rate
+  FROM months m
+  LEFT JOIN monthly_views mv ON m.month_start = mv.month_start
+  LEFT JOIN monthly_inquiries mi ON m.month_start = mi.month_start
+  ORDER BY m.month_start;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get inquiry status distribution
+CREATE OR REPLACE FUNCTION get_inquiry_status_distribution()
+RETURNS TABLE (
+  status TEXT,
+  count BIGINT,
+  percentage NUMERIC
+) AS $$
+BEGIN
+  RETURN QUERY
+  WITH status_counts AS (
+    SELECT 
+      COALESCE(si.status, 'unknown') as status,
+      COUNT(*) as count
+    FROM service_inquiries si
+    GROUP BY COALESCE(si.status, 'unknown')
+  ),
+  total_inquiries AS (
+    SELECT COALESCE(SUM(count), 0) as total FROM status_counts
+  )
+  SELECT 
+    sc.status,
+    sc.count,
+    CASE 
+      WHEN ti.total = 0 OR ti.total IS NULL THEN 0
+      ELSE ROUND((sc.count::NUMERIC / ti.total::NUMERIC) * 100, 2)
+    END as percentage
+  FROM status_counts sc
+  CROSS JOIN total_inquiries ti
+  ORDER BY sc.count DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get recent activity feed
+CREATE OR REPLACE FUNCTION get_recent_service_activity(p_limit INTEGER DEFAULT 20)
+RETURNS TABLE (
+  activity_type TEXT,
+  service_id UUID,
+  service_title TEXT,
+  activity_timestamp TIMESTAMPTZ,
+  details JSONB
+) AS $$
+BEGIN
+  RETURN QUERY
+  (
+    SELECT 
+      'view'::TEXT as activity_type,
+      sv.service_id,
+      COALESCE(s.title, 'Unknown Service') as service_title,
+      sv.viewed_at as activity_timestamp,
+      jsonb_build_object(
+        'device_type', COALESCE(sv.device_type, 'unknown'),
+        'client_ip', sv.client_ip::TEXT,
+        'referrer', sv.referrer
+      ) as details
+    FROM service_views sv
+    LEFT JOIN services s ON sv.service_id = s.id
+    WHERE sv.viewed_at >= (NOW() - INTERVAL '7 days')
+  )
+  UNION ALL
+  (
+    SELECT 
+      'inquiry'::TEXT as activity_type,
+      si.service_id,
+      COALESCE(s.title, 'General Inquiry') as service_title,
+      si.created_at as activity_timestamp,
+      jsonb_build_object(
+        'status', COALESCE(si.status, 'unknown'),
+        'name', si.name,
+        'email', si.email,
+        'urgency', COALESCE(si.urgency, 'normal')
+      ) as details
+    FROM service_inquiries si
+    LEFT JOIN services s ON si.service_id = s.id
+    WHERE si.created_at >= (NOW() - INTERVAL '7 days')
+  )
+  ORDER BY activity_timestamp DESC
+  LIMIT p_limit;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create indexes for better performance (only if they don't exist)
+CREATE INDEX IF NOT EXISTS idx_service_views_service_id ON service_views(service_id);
+CREATE INDEX IF NOT EXISTS idx_service_views_viewed_at ON service_views(viewed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_service_views_device_type ON service_views(device_type);
+CREATE INDEX IF NOT EXISTS idx_service_inquiries_service_id ON service_inquiries(service_id);
+CREATE INDEX IF NOT EXISTS idx_service_inquiries_status ON service_inquiries(status);
+CREATE INDEX IF NOT EXISTS idx_service_inquiries_created_at ON service_inquiries(created_at DESC);
+
+-- Grant permissions
+GRANT EXECUTE ON FUNCTION increment_service_views(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION increment_service_inquiries(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION track_service_view_detailed(TEXT, INET, TEXT, TEXT, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_service_analytics_summary() TO authenticated;
+GRANT EXECUTE ON FUNCTION get_top_performing_services(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_device_analytics(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_monthly_service_trends(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_inquiry_status_distribution() TO authenticated;
+GRANT EXECUTE ON FUNCTION get_recent_service_activity(INTEGER) TO authenticated;
 ```
 
 ### Default Service Categories

@@ -11,6 +11,7 @@ import ServicePackages from './service-packages';
 import ServiceTestimonials from './service-testimonials';
 import ServiceFAQs from './service-faqs';
 import RelatedServices from './related-services';
+import ServiceViewTracker from './service-view-tracker';
 import { 
   ArrowLeft, 
   Clock, 
@@ -71,6 +72,11 @@ export default function ServiceDetailPage({
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/10">
+      {/* Service View Tracker - tracks views automatically */}
+      <ServiceViewTracker 
+        serviceId={service.id} 
+        serviceSlug={service.slug} 
+      />
       {/* Back Navigation */}
       <div className="container mx-auto px-4 py-6">
         <Button asChild variant="ghost" className="mb-6">
