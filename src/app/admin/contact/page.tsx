@@ -36,8 +36,10 @@ import { formatDistanceToNow } from "date-fns";
 import {
   AlertCircle,
   Eye,
+  Globe,
   Mail,
   MessageSquare,
+  Monitor,
   Search,
   Trash2,
 } from "lucide-react";
@@ -56,6 +58,8 @@ interface ContactMessage {
   resolved_at?: string;
   resolved_by?: string;
   notes?: string;
+  client_ip?: string;
+  user_agent?: string;
 }
 
 export default function AdminContactPage() {
@@ -75,10 +79,96 @@ export default function AdminContactPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [notes, setNotes] = useState("");
+  const [locationData, setLocationData] = useState<Record<string, any>>({});
 
   useEffect(() => {
     fetchMessages();
   }, []);
+
+  // Function to get location from IP
+  const getLocationFromIP = async (ip: string): Promise<string> => {
+    if (!ip || ip === '::1' || ip === '127.0.0.1') {
+      return 'Local';
+    }
+    
+    if (locationData[ip]) {
+      return locationData[ip];
+    }
+
+    try {
+      const response = await fetch(`https://ipapi.co/${ip}/json/`);
+      const data = await response.json();
+      
+      if (data.error) {
+        return 'Unknown';
+      }
+
+      const location = `${data.city || 'Unknown'}, ${data.country_name || 'Unknown'}`;
+      setLocationData(prev => ({
+        ...prev,
+        [ip]: location
+      }));
+      
+      return location;
+    } catch (error) {
+      console.error('Error fetching location:', error);
+      return 'Unknown';
+    }
+  };
+
+  // Function to extract device info from user agent
+  const getDeviceInfo = (userAgent?: string): { device: string; browser: string } => {
+    if (!userAgent) {
+      return { device: 'Unknown', browser: 'Unknown' };
+    }
+
+    const ua = userAgent.toLowerCase();
+    
+    let device = 'Desktop';
+    if (ua.includes('mobile') || ua.includes('android')) {
+      device = 'Mobile';
+    } else if (ua.includes('tablet') || ua.includes('ipad')) {
+      device = 'Tablet';
+    }
+
+    let browser = 'Unknown';
+    if (ua.includes('chrome')) {
+      browser = 'Chrome';
+    } else if (ua.includes('firefox')) {
+      browser = 'Firefox';
+    } else if (ua.includes('safari') && !ua.includes('chrome')) {
+      browser = 'Safari';
+    } else if (ua.includes('edge')) {
+      browser = 'Edge';
+    }
+
+    return { device, browser };
+  };
+
+  // Component for IP/Location display
+  const IPLocationCell = ({ message }: { message: ContactMessage }) => {
+    const [location, setLocation] = useState<string>('Loading...');
+
+    useEffect(() => {
+      if (message.client_ip) {
+        getLocationFromIP(message.client_ip).then(setLocation);
+      } else {
+        setLocation('Not available');
+      }
+    }, [message.client_ip]);
+
+    return (
+      <TableCell>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <Globe size={14} className="text-muted-foreground" />
+            <span className="text-xs font-mono">{message.client_ip || 'N/A'}</span>
+          </div>
+          <span className="text-xs text-muted-foreground">{location}</span>
+        </div>
+      </TableCell>
+    );
+  };
 
   const fetchMessages = async () => {
     try {
@@ -125,6 +215,11 @@ export default function AdminContactPage() {
     setSelectedMessage(message);
     setNotes(message.notes || "");
     setViewDialogOpen(true);
+
+    // Fetch location if IP is available and not already cached
+    if (message.client_ip && !locationData[message.client_ip]) {
+      getLocationFromIP(message.client_ip);
+    }
 
     // Mark as viewed if it's pending
     if (message.status === "pending") {
@@ -295,6 +390,8 @@ export default function AdminContactPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Subject</TableHead>
+                  <TableHead>IP/Location</TableHead>
+                  <TableHead>Device</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Actions</TableHead>
@@ -303,13 +400,13 @@ export default function AdminContactPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : filteredMessages.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       No messages found
                     </TableCell>
                   </TableRow>
@@ -333,6 +430,18 @@ export default function AdminContactPage() {
                       </TableCell>
                       <TableCell className="max-w-xs truncate">
                         {message.subject}
+                      </TableCell>
+                      <IPLocationCell message={message} />
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <Monitor size={14} className="text-muted-foreground" />
+                            <span className="text-xs">{getDeviceInfo(message.user_agent).device}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {getDeviceInfo(message.user_agent).browser}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(message.status)}>
@@ -396,6 +505,32 @@ export default function AdminContactPage() {
                     <p className="text-sm">{selectedMessage.email}</p>
                   </div>
                 </div>
+
+                {selectedMessage.client_ip && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <Globe size={14} />
+                        IP Address
+                      </Label>
+                      <p className="text-sm font-mono">{selectedMessage.client_ip}</p>
+                      {locationData[selectedMessage.client_ip] && (
+                        <p className="text-xs text-muted-foreground">
+                          📍 {locationData[selectedMessage.client_ip]}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <Monitor size={14} />
+                        Device Info
+                      </Label>
+                      <p className="text-sm">
+                        {getDeviceInfo(selectedMessage.user_agent).device} • {getDeviceInfo(selectedMessage.user_agent).browser}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <Label className="text-sm font-medium">Subject</Label>
