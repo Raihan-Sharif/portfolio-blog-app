@@ -343,6 +343,8 @@ CREATE TABLE contact_messages (
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'read', 'replied', 'resolved')),
   priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
   recaptcha_token TEXT,
+  client_ip INET, -- IP address of the client who submitted the form
+  user_agent TEXT, -- User agent string of the client browser
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -846,6 +848,9 @@ subject TEXT NOT NULL,
 message TEXT NOT NULL,
 status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'viewed', 'in_progress', 'resolved')),
 priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+recaptcha_token TEXT, -- reCAPTCHA token for spam protection
+client_ip INET, -- IP address of the client who submitted the form
+user_agent TEXT, -- User agent string of the client browser
 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 resolved_at TIMESTAMP WITH TIME ZONE,
