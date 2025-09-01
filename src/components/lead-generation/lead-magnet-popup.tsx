@@ -18,17 +18,14 @@ import {
   Clock
 } from 'lucide-react';
 import { ANIMATIONS } from '@/lib/design-constants';
+import { useLeadMagnets } from '@/hooks/use-lead-magnets';
+import { LeadMagnet } from '@/types/newsletter';
 
 interface LeadMagnetPopupProps {
   isOpen: boolean;
   onClose: () => void;
   trigger?: 'scroll' | 'time' | 'exit-intent' | 'manual';
-  leadMagnet?: {
-    title: string;
-    description: string;
-    benefits: string[];
-    type: 'ebook' | 'checklist' | 'template' | 'course';
-  };
+  leadMagnetId?: string;
 }
 
 const defaultLeadMagnet = {
@@ -48,12 +45,25 @@ export default function LeadMagnetPopup({
   isOpen, 
   onClose, 
   trigger = 'manual',
-  leadMagnet = defaultLeadMagnet 
+  leadMagnetId 
 }: LeadMagnetPopupProps): JSX.Element {
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes countdown
+  
+  const { leadMagnets, loading } = useLeadMagnets();
+  const selectedMagnet = leadMagnets.find(lm => lm.id === leadMagnetId) || leadMagnets[0];
+  
+  // Use default fallback if no dynamic lead magnets are available
+  const leadMagnet = selectedMagnet ? {
+    title: selectedMagnet.title,
+    description: selectedMagnet.description || '',
+    benefits: selectedMagnet.form_fields ? 
+      (typeof selectedMagnet.form_fields === 'string' ? 
+        JSON.parse(selectedMagnet.form_fields) : selectedMagnet.form_fields) || [] : [],
+    type: selectedMagnet.file_type?.toLowerCase() as 'ebook' | 'checklist' | 'template' | 'course' || 'checklist'
+  } : defaultLeadMagnet;
 
   // Countdown timer for limited time offers
   useEffect(() => {
@@ -84,7 +94,7 @@ export default function LeadMagnetPopup({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.toLowerCase().trim(),
-          leadMagnet: 'popup-checklist',
+          leadMagnet: selectedMagnet?.id || 'popup-checklist',
           source: `popup-${trigger}`
         })
       });

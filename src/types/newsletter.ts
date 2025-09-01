@@ -27,6 +27,12 @@ export interface NewsletterCampaign {
   subject: string;
   content?: string;
   html_content?: string;
+  preview_text?: string;
+  featured_image?: string;
+  lead_magnet_file?: string;
+  campaign_type: 'promotional' | 'newsletter' | 'announcement' | 'lead_magnet';
+  target_audience?: string;
+  automation_trigger?: string;
   status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused' | 'cancelled';
   scheduled_at?: string;
   sent_at?: string;
@@ -78,4 +84,78 @@ export interface NewsletterSubscriptionRequest {
   leadMagnet?: string;
   source?: string;
   recaptcha_token?: string;
+}
+
+export interface NewsletterSettings {
+  id?: string;
+  enabled: boolean;
+  from_name: string;
+  from_email: string;
+  reply_to_email?: string;
+  company_address?: string;
+  double_opt_in: boolean;
+  welcome_email_enabled: boolean;
+  welcome_email_subject?: string;
+  welcome_email_content?: string;
+  unsubscribe_page_content?: string;
+  footer_content?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CampaignFormData {
+  name: string;
+  subject: string;
+  preview_text?: string;
+  content: string;
+  html_content?: string;
+  featured_image?: string;
+  lead_magnet_file?: string;
+  campaign_type: 'promotional' | 'newsletter' | 'announcement' | 'lead_magnet';
+  target_audience?: string;
+  automation_trigger?: string;
+  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused' | 'cancelled';
+  scheduled_at?: string;
+}
+
+export interface LeadMagnet {
+  id: string;
+  name: string;
+  title: string;
+  description?: string;
+  file_url?: string;
+  file_type?: string;
+  thumbnail_image?: string;
+  download_count: number;
+  conversion_count: number;
+  is_active: boolean;
+  form_fields: FormField[];
+  thank_you_message?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FormField {
+  id: string;
+  label: string;
+  type: 'text' | 'email' | 'textarea' | 'select' | 'checkbox';
+  required: boolean;
+  options?: string[]; // for select fields
+  placeholder?: string;
+}
+
+export interface SubscriberLeadMagnet {
+  id: string;
+  subscriber_id: string;
+  lead_magnet_id: string;
+  downloaded_at: string;
+  download_ip?: string;
+  created_at: string;
+}
+
+export interface SubscriptionPageData {
+  lead_magnet: LeadMagnet;
+  form_fields: FormField[];
+  subscriber_count: number;
+  social_proof_text: string;
 }

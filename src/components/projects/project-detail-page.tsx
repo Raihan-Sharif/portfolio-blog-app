@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ViewTracker } from "@/components/view-tracker";
+import ScrollTriggeredPopup from "@/components/lead-generation/scroll-triggered-popup";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { ConfettiAwardsSection } from "./confetti-awards-section";
@@ -1647,6 +1648,7 @@ export default function ProjectDetailPage({
                   </Card>
                 </motion.div>
               )}
+
             </div>
           </div>
         </div>
@@ -1659,6 +1661,9 @@ export default function ProjectDetailPage({
         onClose={() => setIsGalleryModalOpen(false)}
         initialIndex={selectedGalleryImage}
       />
+
+      {/* Scroll Triggered Popup */}
+      <ScrollTriggeredPopup scrollPercentage={70} enabled={true} />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import EnhancedFeaturedProjects from "@/components/home/enhanced-featured-projec
 import Hero from "@/components/home/hero";
 import LatestBlogPosts from "@/components/home/latest-blog-posts";
 import Skills from "@/components/home/skills";
+import ScrollTriggeredPopup from "@/components/lead-generation/scroll-triggered-popup";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { Metadata } from "next";
 
@@ -134,6 +135,7 @@ export default async function HomePage() {
           businessHours={businessHours || []}
           availability={availability}
         />
+        <ScrollTriggeredPopup scrollPercentage={70} enabled={true} />
       </>
     );
   } catch (error) {
@@ -152,6 +154,7 @@ export default async function HomePage() {
         <Skills skills={[]} />
         <LatestBlogPosts posts={[]} />
         <Contact contactInfo={[]} businessHours={[]} availability={null} />
+        <ScrollTriggeredPopup scrollPercentage={70} enabled={true} />
       </>
     );
   }

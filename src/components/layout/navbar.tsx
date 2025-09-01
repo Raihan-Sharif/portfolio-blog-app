@@ -73,6 +73,7 @@ export function Navbar() {
     },
     { name: "Services", href: "/services", current: pathname.startsWith("/services") },
     { name: "Blog", href: "/blog", current: pathname.startsWith("/blog") },
+    { name: "Newsletter", href: "/subscribe", current: pathname === "/subscribe" },
     { name: "Contact", href: "/contact", current: pathname === "/contact" },
   ];
 

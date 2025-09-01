@@ -79,14 +79,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           message: 'This email is already subscribed to our newsletter.'
         }, { status: 409 });
       } else {
+        // Check if lead magnet exists if provided
+        let leadMagnetId = null;
+        if (body.leadMagnet) {
+          const { data: magnet } = await supabase
+            .from('lead_magnets')
+            .select('id')
+            .eq('id', body.leadMagnet)
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (magnet) {
+            leadMagnetId = magnet.id;
+          }
+        }
+
         // Reactivate subscription
         const { error: updateError } = await supabase
           .from('newsletter_subscribers')
           .update({
             status: 'active',
             resubscribed_at: new Date().toISOString(),
-            lead_magnet: body.leadMagnet,
-            first_name: body.firstName?.trim() || null
+            lead_magnet_id: leadMagnetId,
+            first_name: body.firstName?.trim() || null,
+            updated_at: new Date().toISOString()
           })
           .eq('id', existingSubscriber.id);
 
@@ -104,16 +120,32 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Check if lead magnet exists if provided
+    let leadMagnetId = null;
+    if (body.leadMagnet) {
+      const { data: magnet } = await supabase
+        .from('lead_magnets')
+        .select('id')
+        .eq('id', body.leadMagnet)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (magnet) {
+        leadMagnetId = magnet.id;
+      }
+    }
+
     // Create new subscription
     const subscriptionData = {
       email: body.email.toLowerCase().trim(),
       first_name: body.firstName?.trim() || null,
-      lead_magnet: body.leadMagnet || null,
+      lead_magnet_id: leadMagnetId,
       status: 'active',
       source: 'website',
       client_ip: clientIp,
       user_agent: userAgent,
-      subscribed_at: new Date().toISOString()
+      subscribed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
     const { data: subscription, error } = await supabase
@@ -127,6 +159,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ 
         error: 'Failed to subscribe to newsletter' 
       }, { status: 500 });
+    }
+
+    // Track lead magnet download if applicable
+    if (leadMagnetId && subscription) {
+      try {
+        // Insert download tracking record
+        await supabase
+          .from('subscriber_lead_magnets')
+          .insert({
+            subscriber_id: subscription.id,
+            lead_magnet_id: leadMagnetId,
+            download_ip: clientIp,
+            downloaded_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+          });
+
+        // Increment download count using RPC function
+        await supabase.rpc('increment_download_count', {
+          lead_magnet_id: leadMagnetId
+        });
+      } catch (trackError) {
+        console.warn('Failed to track lead magnet download:', trackError);
+        // Don't fail the whole operation if tracking fails
+      }
     }
 
     // TODO: Send welcome email with lead magnet

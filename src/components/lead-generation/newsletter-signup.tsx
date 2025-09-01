@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,16 +25,13 @@ import {
   Zap
 } from 'lucide-react';
 import { ANIMATIONS, GRADIENTS } from '@/lib/design-constants';
+import { useLeadMagnets } from '@/hooks/use-lead-magnets';
+import { LeadMagnet } from '@/types/newsletter';
 
 interface NewsletterSignupProps {
   variant?: 'default' | 'compact' | 'featured';
   showBenefits?: boolean;
-  leadMagnet?: {
-    id: string;
-    title: string;
-    description: string;
-    type: 'ebook' | 'checklist' | 'template' | 'course';
-  };
+  leadMagnetId?: string;
 }
 
 const leadMagnets = [
@@ -70,16 +67,29 @@ const leadMagnets = [
 export default function NewsletterSignup({ 
   variant = 'default', 
   showBenefits = true,
-  leadMagnet 
+  leadMagnetId 
 }: NewsletterSignupProps): JSX.Element {
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
-  const [selectedMagnet, setSelectedMagnet] = useState(leadMagnet || leadMagnets[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const recaptchaRef = useRef<ReCAPTCHAV3Ref>(null);
+  
+  const { leadMagnets, loading } = useLeadMagnets();
+  
+  // Get the selected lead magnet or default to first available
+  const selectedMagnet = leadMagnets.find(lm => lm.id === leadMagnetId) || leadMagnets[0];
+  const [currentMagnet, setCurrentMagnet] = useState(selectedMagnet);
+  
+  // Update current magnet when lead magnets are loaded or selection changes
+  useEffect(() => {
+    const magnet = leadMagnets.find(lm => lm.id === leadMagnetId) || leadMagnets[0];
+    if (magnet) {
+      setCurrentMagnet(magnet);
+    }
+  }, [leadMagnets, leadMagnetId]);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -109,7 +119,7 @@ export default function NewsletterSignup({
         body: JSON.stringify({
           email: email.toLowerCase().trim(),
           firstName: firstName.trim(),
-          leadMagnet: selectedMagnet.id,
+          leadMagnet: currentMagnet?.id || 'newsletter-signup',
           recaptcha_token: recaptchaToken
         })
       });
@@ -175,16 +185,13 @@ export default function NewsletterSignup({
               
               <div className="bg-white/50 dark:bg-green-950/30 p-4 rounded-lg border border-green-200 dark:border-green-800 mb-6">
                 <div className="flex items-center gap-3 mb-2">
-                  {(() => {
-                    const MagnetIcon = leadMagnets.find(m => m.id === selectedMagnet.id)?.icon || CheckCircle;
-                    return <MagnetIcon className="w-5 h-5 text-green-600" />;
-                  })()}
+                  <CheckCircle className="w-5 h-5 text-green-600" />
                   <span className="font-semibold text-green-800 dark:text-green-200">
-                    {selectedMagnet.title}
+                    {currentMagnet?.title || 'Newsletter Subscription'}
                   </span>
                 </div>
                 <p className="text-sm text-green-700 dark:text-green-300 text-left">
-                  {selectedMagnet.description}
+                  {currentMagnet?.description || 'Thank you for subscribing to our newsletter!'}
                 </p>
               </div>
             </div>
@@ -259,50 +266,64 @@ export default function NewsletterSignup({
               </h4>
               
               <div className="grid gap-3">
-                {leadMagnets.map((magnet) => (
-                  <motion.div
-                    key={magnet.id}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
-                      selectedMagnet.id === magnet.id
-                        ? 'border-primary bg-primary/5 shadow-md'
-                        : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                    }`}
-                    onClick={() => setSelectedMagnet(magnet)}
-                  >
+                {loading ? (
+                  <div className="p-4 rounded-lg border animate-pulse">
                     <div className="flex items-start gap-3">
-                      <div className={`p-2 rounded-lg ${
-                        selectedMagnet.id === magnet.id 
-                          ? 'bg-primary/20 text-primary' 
-                          : 'bg-muted text-muted-foreground'
-                      }`}>
-                        <magnet.icon className="w-5 h-5" />
-                      </div>
+                      <div className="w-10 h-10 bg-muted rounded-lg" />
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h5 className="font-medium">{magnet.title}</h5>
-                          <Badge variant="outline" className="text-xs">
-                            {magnet.fileSize}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {magnet.description}
-                        </p>
-                        <div className="flex flex-wrap gap-1">
-                          {magnet.benefits.map((benefit, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
-                              {benefit}
-                            </Badge>
-                          ))}
+                        <div className="h-4 bg-muted rounded w-3/4 mb-2" />
+                        <div className="h-3 bg-muted rounded w-full mb-2" />
+                        <div className="flex gap-1">
+                          <div className="h-5 bg-muted rounded w-16" />
+                          <div className="h-5 bg-muted rounded w-20" />
                         </div>
                       </div>
-                      {selectedMagnet.id === magnet.id && (
-                        <CheckCircle className="w-5 h-5 text-primary" />
-                      )}
                     </div>
-                  </motion.div>
-                ))}
+                  </div>
+                ) : (
+                  leadMagnets.map((magnet) => (
+                    <motion.div
+                      key={magnet.id}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
+                        currentMagnet?.id === magnet.id
+                          ? 'border-primary bg-primary/5 shadow-md'
+                          : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                      }`}
+                      onClick={() => setCurrentMagnet(magnet)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`p-2 rounded-lg ${
+                          currentMagnet?.id === magnet.id 
+                            ? 'bg-primary/20 text-primary' 
+                            : 'bg-muted text-muted-foreground'
+                        }`}>
+                          <Gift className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h5 className="font-medium">{magnet.title}</h5>
+                            <Badge variant="outline" className="text-xs">
+                              {magnet.file_type || 'Resource'}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            {magnet.description}
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="secondary" className="text-xs">
+                              {magnet.download_count} downloads
+                            </Badge>
+                          </div>
+                        </div>
+                        {currentMagnet?.id === magnet.id && (
+                          <CheckCircle className="w-5 h-5 text-primary" />
+                        )}
+                      </div>
+                    </motion.div>
+                  ))
+                )}
               </div>
             </motion.div>
           )}
@@ -418,9 +439,11 @@ export default function NewsletterSignup({
                 ) : (
                   <>
                     <Send className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
-                    Get My Free {selectedMagnet.type === 'ebook' ? 'eBook' : 
-                                selectedMagnet.type === 'checklist' ? 'Checklist' :
-                                selectedMagnet.type === 'template' ? 'Template' : 'Course'}
+                    Get My Free {currentMagnet ? 
+                      (currentMagnet.file_type?.toLowerCase() === 'pdf' ? 'eBook' : 
+                       currentMagnet.file_type?.toLowerCase() === 'checklist' ? 'Checklist' :
+                       currentMagnet.file_type?.toLowerCase() === 'template' ? 'Template' : 'Resource') : 
+                      'Newsletter'}
                   </>
                 )}
               </span>

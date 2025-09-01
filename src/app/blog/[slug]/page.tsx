@@ -9,6 +9,7 @@ import {
 import ShareButton from "@/components/shared/share-button";
 import { Button } from "@/components/ui/button";
 import { ViewTracker } from "@/components/view-tracker";
+import ScrollTriggeredPopup from "@/components/lead-generation/scroll-triggered-popup";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getReadTime } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -523,6 +524,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                   </div>
                 </div>
               </div>
+
             </div>
 
             {/* Sidebar */}
@@ -551,6 +553,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           </div>
         </div>
       </div>
+      <ScrollTriggeredPopup scrollPercentage={70} enabled={true} />
     </div>
   );
 }
