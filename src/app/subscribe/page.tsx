@@ -18,7 +18,6 @@ import {
   Download,
   Users,
   CheckCircle,
-  Star,
   ArrowRight,
   Mail,
   Sparkles,

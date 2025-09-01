@@ -139,7 +139,6 @@ const TIME_PERIODS = [
   { key: "all" as TimePeriod, label: "All", days: 999 },
 ];
 
-// const CHART_COLORS = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444"]; // Keeping for future use
 
 export default function DashboardPage() {
   const { user, session, loading: authLoading } = useAuth();

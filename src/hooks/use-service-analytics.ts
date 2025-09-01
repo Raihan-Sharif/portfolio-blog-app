@@ -20,6 +20,8 @@ export interface ServiceAnalyticsData {
     view_count: number;
     inquiry_count: number;
     performance_score: number;
+    is_featured: boolean;
+    is_popular: boolean;
   }>;
   recentActivity: Array<{
     type: 'view' | 'inquiry';

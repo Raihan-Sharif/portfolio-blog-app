@@ -74,12 +74,6 @@ export default function SignUpPage() {
     return "Strong";
   };
 
-  const getPasswordStrengthColor = (score: number): string => {
-    if (score < 40) return "bg-red-500";
-    if (score < 70) return "bg-yellow-500";
-    if (score < 90) return "bg-blue-500";
-    return "bg-green-500";
-  };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();

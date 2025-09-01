@@ -17,9 +17,7 @@ import {
   Heart,
   Mail,
   Pause,
-  Settings,
   Trash2,
-  User,
   AlertCircle,
   ArrowLeft
 } from 'lucide-react';

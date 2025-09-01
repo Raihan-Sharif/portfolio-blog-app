@@ -15,16 +15,13 @@ import { LeadMagnets } from '@/components/admin/newsletter/lead-magnets';
 import { createClient } from '@/utils/supabase/client';
 import { NewsletterStats } from '@/types/newsletter';
 import { 
-  MailOpen, 
   Settings as SettingsIcon, 
   BarChart3, 
   Users, 
   Send,
   Plus,
-  TrendingUp,
   UserCheck,
   UserX,
-  Mail,
   Gift
 } from 'lucide-react';
 

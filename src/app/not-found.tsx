@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Home, ArrowLeft, Search, Mail } from 'lucide-react';
+import { Home, Search, Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function NotFound(): JSX.Element {
