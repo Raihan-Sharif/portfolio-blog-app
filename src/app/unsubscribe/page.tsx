@@ -1,11 +1,10 @@
 // src/app/unsubscribe/page.tsx
 "use client";
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -79,7 +78,7 @@ function UnsubscribePageContent(): JSX.Element {
 
   const supabase = createClient();
 
-  const verifyUnsubscribeToken = async (): Promise<void> => {
+  const verifyUnsubscribeToken = useCallback(async (): Promise<void> => {
     if (!email || !token) {
       setError('Invalid unsubscribe link. Please check your email for the correct link.');
       setLoading(false);
@@ -110,7 +109,7 @@ function UnsubscribePageContent(): JSX.Element {
     } finally {
       setLoading(false);
     }
-  };
+  }, [email, token, supabase]);
 
   const handleUnsubscribe = async (): Promise<void> => {
     if (!subscriberData) return;
@@ -188,7 +187,7 @@ function UnsubscribePageContent(): JSX.Element {
 
   useEffect(() => {
     verifyUnsubscribeToken();
-  }, [email, token]);
+  }, [verifyUnsubscribeToken]);
 
   if (loading) {
     return (

@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { Service, ServiceWithRelations } from '@/types/services';
+import { ServiceWithRelations } from '@/types/services';
 import ServiceDetailPage from '@/components/services/service-detail-page';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';

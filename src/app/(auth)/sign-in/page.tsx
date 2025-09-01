@@ -93,7 +93,7 @@ function SignInForm() {
       } else {
         setError(result.error || "Failed to send reset email");
       }
-    } catch (err) {
+    } catch {
       setError("Failed to send reset email. Please try again.");
     } finally {
       setIsResettingPassword(false);

@@ -49,7 +49,7 @@ export default function NewsletterSubscription(): JSX.Element {
 
       <div className="container mx-auto px-4 relative z-10">
         <motion.div
-          {...ANIMATIONS.fadeInUp}
+          {...ANIMATIONS.fadeIn}
           className="text-center mb-12"
         >
           <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-slate-900 via-slate-700 to-slate-600 dark:from-white dark:via-slate-200 dark:to-slate-300 bg-clip-text text-transparent">
@@ -61,7 +61,7 @@ export default function NewsletterSubscription(): JSX.Element {
         </motion.div>
 
         <motion.div
-          {...ANIMATIONS.fadeInUp}
+          {...ANIMATIONS.fadeIn}
           transition={{ delay: 0.2 }}
           className="max-w-4xl mx-auto"
         >

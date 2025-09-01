@@ -11,7 +11,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle, Save, Settings as SettingsIcon } from 'lucide-react';
-import { createClient } from '@/utils/supabase/client';
 import { NewsletterSettings as INewsletterSettings } from '@/types/newsletter';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -39,7 +38,6 @@ export function NewsletterSettings({ onRefresh }: NewsletterSettingsProps): JSX.
   const [hasChanges, setHasChanges] = useState(false);
   
   const { toast } = useToast();
-  const supabase = createClient();
 
   const fetchSettings = async (): Promise<void> => {
     try {

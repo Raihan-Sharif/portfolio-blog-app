@@ -3,27 +3,20 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   BarChart3,
   TrendingUp,
   TrendingDown,
-  Calendar,
   Users,
   Mail,
   MousePointer,
   Eye,
-  UserX,
-  Target,
-  Clock
+  Target
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { NewsletterStats, LeadMagnetStats } from '@/types/newsletter';
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
   XAxis,
@@ -126,7 +119,7 @@ export function NewsletterAnalytics({ stats }: NewsletterAnalyticsProps): JSX.El
           }));
           setLeadMagnetStats(statsData);
         }
-      } catch (error) {
+      } catch {
         console.log('Lead magnet stats not available');
       }
 
@@ -143,7 +136,7 @@ export function NewsletterAnalytics({ stats }: NewsletterAnalyticsProps): JSX.El
           }));
           setSourceData(sources);
         }
-      } catch (error) {
+      } catch {
         console.log('Subscription sources not available');
       }
 

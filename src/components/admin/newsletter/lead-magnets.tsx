@@ -1,7 +1,8 @@
 // src/components/admin/newsletter/lead-magnets.tsx
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,9 +53,7 @@ import {
   Eye,
   FileText,
   Image as ImageIcon,
-  Link as LinkIcon,
   TrendingUp,
-  Users,
   X
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
@@ -101,7 +100,7 @@ export function LeadMagnets({ onRefresh }: LeadMagnetsProps): JSX.Element {
   const { toast } = useToast();
   const supabase = createClient();
 
-  const fetchLeadMagnets = async (): Promise<void> => {
+  const fetchLeadMagnets = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
       
@@ -123,7 +122,7 @@ export function LeadMagnets({ onRefresh }: LeadMagnetsProps): JSX.Element {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, toast]);
 
   const handleSave = async (): Promise<void> => {
     try {
@@ -310,7 +309,7 @@ export function LeadMagnets({ onRefresh }: LeadMagnetsProps): JSX.Element {
 
   useEffect(() => {
     fetchLeadMagnets();
-  }, []);
+  }, [fetchLeadMagnets]);
 
   if (loading) {
     return (
@@ -467,9 +466,11 @@ export function LeadMagnets({ onRefresh }: LeadMagnetsProps): JSX.Element {
                 
                 {formData.thumbnail_image ? (
                   <div className="relative w-full max-w-md">
-                    <img
+                    <Image
                       src={formData.thumbnail_image}
                       alt="Thumbnail"
+                      width={400}
+                      height={192}
                       className="w-full h-48 object-cover rounded-lg border shadow-sm"
                     />
                     <Button
@@ -583,9 +584,11 @@ export function LeadMagnets({ onRefresh }: LeadMagnetsProps): JSX.Element {
                     <TableCell>
                       <div className="flex items-center space-x-3">
                         {magnet.thumbnail_image ? (
-                          <img 
+                          <Image 
                             src={magnet.thumbnail_image} 
                             alt=""
+                            width={40}
+                            height={40}
                             className="w-10 h-10 rounded object-cover"
                           />
                         ) : (

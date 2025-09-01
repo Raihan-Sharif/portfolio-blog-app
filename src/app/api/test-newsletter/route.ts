@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     console.log('🧪 Testing newsletter subscription with:', { testEmail, testMagnetId });
 
     // Test 1: Check if lead magnets table exists and has data
-    const { data: leadMagnets, error: magnetError } = await supabase
+    const { data: leadMagnets } = await supabase
       .from('lead_magnets')
       .select('*')
       .eq('is_active', true)

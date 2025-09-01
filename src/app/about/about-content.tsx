@@ -216,21 +216,6 @@ export default function AboutContent({
     }
   };
 
-  const renderStars = (rating?: number) => {
-    if (!rating) return null;
-    return (
-      <div className="flex space-x-1">
-        {[...Array(5)].map((_, i) => (
-          <Star
-            key={i}
-            className={`w-4 h-4 ${
-              i < rating ? "text-yellow-400 fill-current" : "text-gray-300"
-            }`}
-          />
-        ))}
-      </div>
-    );
-  };
 
   return (
     <div

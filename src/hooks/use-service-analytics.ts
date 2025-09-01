@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase/client';
-import { Service, ServiceInquiry } from '@/types/services';
 
 export interface ServiceAnalyticsData {
   totalServices: number;
@@ -50,7 +49,7 @@ export interface ServiceAnalyticsData {
   }>;
 }
 
-export function useServiceAnalytics(initialData?: any) {
+export function useServiceAnalytics() {
   const [analytics, setAnalytics] = useState<ServiceAnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +103,8 @@ export function useServiceAnalytics(initialData?: any) {
       const topPerformingServices = services
         ?.map(service => ({
           ...service,
-          performance_score: (service.view_count || 0) + (service.inquiry_count || 0) * 10
+          performance_score: (service.view_count || 0) + (service.inquiry_count || 0) * 10,
+          is_popular: (service.view_count || 0) > 100 || (service.inquiry_count || 0) > 5
         }))
         .sort((a, b) => b.performance_score - a.performance_score)
         .slice(0, 5) || [];
@@ -113,7 +113,7 @@ export function useServiceAnalytics(initialData?: any) {
       const recentViews = serviceViews?.slice(0, 10).map(view => ({
         type: 'view' as const,
         service_id: view.service_id,
-        service_title: view.service?.title || 'Unknown Service',
+        service_title: (view.service as any)?.title || 'Unknown Service',
         timestamp: view.viewed_at,
         details: { device_type: view.device_type }
       })) || [];
@@ -121,7 +121,7 @@ export function useServiceAnalytics(initialData?: any) {
       const recentInquiries = inquiries?.slice(0, 10).map(inquiry => ({
         type: 'inquiry' as const,
         service_id: inquiry.service_id || '',
-        service_title: inquiry.service?.title || 'General Inquiry',
+        service_title: (inquiry.service as any)?.title || 'General Inquiry',
         timestamp: inquiry.created_at,
         details: { status: inquiry.status }
       })) || [];

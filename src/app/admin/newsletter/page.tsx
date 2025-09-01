@@ -1,9 +1,9 @@
 // src/app/admin/newsletter/page.tsx
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '@/components/admin/admin-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -42,7 +42,7 @@ function NewsletterPageContent(): JSX.Element {
   
   const supabase = createClient();
 
-  const fetchNewsletterData = async (): Promise<void> => {
+  const fetchNewsletterData = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
 
@@ -87,11 +87,11 @@ function NewsletterPageContent(): JSX.Element {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     fetchNewsletterData();
-  }, []);
+  }, [fetchNewsletterData]);
 
   if (loading) {
     return (

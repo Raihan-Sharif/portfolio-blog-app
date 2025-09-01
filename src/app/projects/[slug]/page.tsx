@@ -79,8 +79,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     // Now fetch all data with the project ID
     const [
       { data: project, error: projectError },
-      { data: projectTechnologies, error: techError },
-      { data: projectAwards, error: awardsError },
+      { data: projectTechnologies },
+      { data: projectAwards },
     ] = await Promise.all([
       // Main project data with category
       supabase

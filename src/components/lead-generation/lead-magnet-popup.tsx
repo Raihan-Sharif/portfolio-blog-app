@@ -218,7 +218,7 @@ export default function LeadMagnetPopup({
                         What You'll Get:
                       </h4>
                       <ul className="space-y-2">
-                        {leadMagnet.benefits.map((benefit, index) => (
+                        {leadMagnet.benefits.map((benefit: string, index: number) => (
                           <motion.li
                             key={index}
                             initial={{ opacity: 0, x: -20 }}

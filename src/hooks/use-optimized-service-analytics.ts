@@ -90,7 +90,7 @@ export function useOptimizedServiceAnalytics() {
       
       if (errors.length > 0) {
         console.error('Analytics fetch errors:', errors);
-        throw new Error(`Failed to fetch analytics: ${errors[0].error.message}`);
+        throw new Error(`Failed to fetch analytics: ${errors[0].error?.message || 'Unknown error'}`);
       }
 
       // Extract summary data

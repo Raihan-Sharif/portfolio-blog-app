@@ -86,7 +86,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const supabase = createServerSupabaseClient();
     const body = await request.json();
     const { action, serviceSlug } = body;
     
@@ -96,7 +95,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       headers: request.headers
     }));
     
-  } catch (error) {
+  } catch {
     return NextResponse.json({
       success: false,
       error: 'Invalid request body'

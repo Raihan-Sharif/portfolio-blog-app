@@ -25,7 +25,7 @@ interface ServicesPageProps {
   };
 }
 
-async function getServicesData(searchParams: ServicesPageProps['searchParams']) {
+async function getServicesData() {
   const supabase = createServerSupabaseClient();
 
   const [categoriesResult, servicesResult] = await Promise.all([
@@ -54,7 +54,7 @@ async function getServicesData(searchParams: ServicesPageProps['searchParams']) 
 }
 
 export default async function ServicesPage({ searchParams }: ServicesPageProps): Promise<JSX.Element> {
-  const { categories, services } = await getServicesData(searchParams);
+  const { categories, services } = await getServicesData();
 
   const featuredServices = services.filter(service => service.is_featured);
   const popularServices = services.filter(service => service.is_popular);

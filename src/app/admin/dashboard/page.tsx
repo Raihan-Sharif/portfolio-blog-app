@@ -452,7 +452,6 @@ export default function DashboardPage() {
     const periodConfig = TIME_PERIODS.find((p) => p.key === period);
     if (!periodConfig) return [];
 
-    const monthlyStatsResult = [];
     const monthlyStatsPromises = [];
     
     // Calculate number of months to show based on period
@@ -497,7 +496,7 @@ export default function DashboardPage() {
     const resolvedMonthlyStats = await Promise.all(monthlyStatsPromises);
     return resolvedMonthlyStats.sort((a, b) => 
       new Date(a.monthDate).getTime() - new Date(b.monthDate).getTime()
-    ).map(({monthDate, ...rest}) => rest);
+    ).map(({monthDate: _, ...rest}) => rest);
   };
 
   const fetchMonthlyStats = async () => {

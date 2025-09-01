@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,6 @@ import {
   Mail, 
   TrendingUp, 
   TrendingDown,
-  Search,
   Download,
   Plus,
   Eye,
@@ -35,12 +34,11 @@ export default function NewsletterDashboard({
   initialSubscribers = [],
   initialLeadMagnetStats = []
 }: NewsletterDashboardProps): JSX.Element {
-  const [stats, setStats] = useState<NewsletterStats | null>(initialStats || null);
-  const [subscribers, setSubscribers] = useState<NewsletterSubscriber[]>(initialSubscribers);
-  const [leadMagnetStats, setLeadMagnetStats] = useState<LeadMagnetStats[]>(initialLeadMagnetStats);
+  const [stats] = useState<NewsletterStats | null>(initialStats || null);
+  const [subscribers] = useState<NewsletterSubscriber[]>(initialSubscribers);
+  const [leadMagnetStats] = useState<LeadMagnetStats[]>(initialLeadMagnetStats);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [isLoading, setIsLoading] = useState(false);
 
   const filteredSubscribers = subscribers.filter(subscriber => {
     const matchesSearch = subscriber.email.toLowerCase().includes(searchTerm.toLowerCase()) ||

@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     const supabase = createServerSupabaseClient() as any;
     const body = await request.json();
 
-    const { sessionId, userId } = body;
+    const { sessionId } = body;
 
     if (!sessionId) {
       return NextResponse.json(

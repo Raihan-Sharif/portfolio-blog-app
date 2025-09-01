@@ -18,7 +18,10 @@ export default function TestServiceTracking() {
       const data = await response.json();
       setResults({ ...data, timestamp: new Date().toISOString() });
     } catch (error) {
-      setResults({ error: error.message, timestamp: new Date().toISOString() });
+      setResults({ 
+        error: error instanceof Error ? error.message : 'Unknown error occurred', 
+        timestamp: new Date().toISOString() 
+      });
     } finally {
       setLoading(false);
     }

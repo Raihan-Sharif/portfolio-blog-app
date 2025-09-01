@@ -36,7 +36,6 @@ import {
   Menu,
   MessageSquare,
   Phone,
-  Send,
   Settings,
   Shield,
   Star,
@@ -81,7 +80,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const supabase = createClient();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [adminLoading, setAdminLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -122,7 +120,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       console.error("Error checking admin status:", err);
       return false;
     }
-  }, []);
+  }, [CACHE_DURATION, supabase]);
 
 
   // Fetch notifications with proper error handling and read status
@@ -174,7 +172,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     } catch (error) {
       console.error("Error fetching notifications:", error);
     }
-  }, [user, isAdmin]);
+  }, [user, isAdmin, supabase]);
 
 
   // Mark notification as read with proper implementation
@@ -201,7 +199,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         console.error("Error marking notification as read:", error);
       }
     },
-    [user]
+    [user, supabase]
   );
 
   // FIXED: Initialize admin status only once, not on every navigation
@@ -236,7 +234,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     };
 
     initializeAdmin();
-  }, [user, loading, router, checkAdminStatus]); // REMOVED: pathname dependency to prevent re-runs on navigation
+  }, [user, loading, router, checkAdminStatus, pathname]);
 
   // Fetch notifications for admin users
   useEffect(() => {
