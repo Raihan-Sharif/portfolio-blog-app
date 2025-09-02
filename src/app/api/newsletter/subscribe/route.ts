@@ -7,6 +7,7 @@ interface SubscribeRequest {
   firstName?: string;
   leadMagnet?: string;
   recaptcha_token?: string;
+  recaptcha_version?: 'v2' | 'v3';
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -40,18 +41,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }, { status: 400 });
     }
 
-    // Verify reCAPTCHA v3
+    // Verify reCAPTCHA (v2 or v3)
     if (body.recaptcha_token) {
+      const isV2 = body.recaptcha_version === 'v2';
+      const minimumScore = isV2 ? 0.0 : 0.5; // v2 doesn't use scores, v3 needs minimum 0.5
+      const expectedAction = isV2 ? undefined : 'newsletter_signup'; // v2 doesn't use actions
+      
       const recaptchaResult = await verifyRecaptchaV3(
         body.recaptcha_token, 
-        'newsletter_signup', 
-        0.5
+        expectedAction, 
+        minimumScore
       );
+      
       if (!recaptchaResult.success) {
         return NextResponse.json({ 
           error: 'reCAPTCHA verification failed',
           details: recaptchaResult.errors?.[0] || 'Please complete the security verification',
-          score: recaptchaResult.score
+          score: recaptchaResult.score,
+          version: body.recaptcha_version || 'v3'
         }, { status: 400 });
       }
     } else if (process.env.NODE_ENV === 'production') {

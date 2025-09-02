@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ReCaptchaV3Provider } from '@/components/providers/recaptcha-provider';
-import { RecaptchaV3 } from '@/components/ui/recaptcha-v3';
+import { HybridRecaptcha } from '@/components/ui/hybrid-recaptcha';
 import { LeadMagnet } from '@/types/newsletter';
 import { 
   Gift,
@@ -30,6 +30,7 @@ interface SubscriptionFormData {
   firstName: string;
   lastName: string;
   recaptcha_token: string;
+  recaptcha_version?: 'v2' | 'v3';
 }
 
 function SubscribePageContent(): JSX.Element {
@@ -47,6 +48,7 @@ function SubscribePageContent(): JSX.Element {
     firstName: '',
     lastName: '',
     recaptcha_token: '',
+    recaptcha_version: undefined,
   });
 
   // Set selected magnet based on URL parameter or default to first available
@@ -106,8 +108,12 @@ function SubscribePageContent(): JSX.Element {
     }
   };
 
-  const handleRecaptchaVerify = useCallback((token: string): void => {
-    setFormData(prev => ({ ...prev, recaptcha_token: token }));
+  const handleRecaptchaVerify = useCallback((token: string, version: 'v2' | 'v3'): void => {
+    setFormData(prev => ({ ...prev, recaptcha_token: token, recaptcha_version: version }));
+  }, []);
+
+  const handleScoreTooLow = useCallback((score: number): void => {
+    setError(`Security score too low (${score.toFixed(2)}). Please complete the visual verification below.`);
   }, []);
 
   if (magnetsLoading) {
@@ -318,9 +324,10 @@ function SubscribePageContent(): JSX.Element {
                 </div>
               </div>
 
-              <RecaptchaV3 
+              <HybridRecaptcha 
                 action="newsletter_signup"
                 onVerify={handleRecaptchaVerify}
+                onScoreTooLow={handleScoreTooLow}
               />
 
               <Button
