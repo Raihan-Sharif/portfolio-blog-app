@@ -109,7 +109,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (updateError) {
           console.error('Error reactivating subscription:', updateError);
           return NextResponse.json({ 
-            error: 'Failed to reactivate subscription' 
+            error: 'Failed to reactivate subscription',
+            details: process.env.NODE_ENV === 'development' ? updateError.message : undefined
           }, { status: 500 });
         }
 
@@ -156,8 +157,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (error) {
       console.error('Error creating subscription:', error);
+      console.error('Subscription data attempted:', subscriptionData);
       return NextResponse.json({ 
-        error: 'Failed to subscribe to newsletter' 
+        error: 'Failed to subscribe to newsletter',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       }, { status: 500 });
     }
 
@@ -194,10 +197,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       subscriberId: subscription.id
     }, { status: 201 });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in newsletter subscription:', error);
     return NextResponse.json({ 
-      error: 'Internal server error' 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     }, { status: 500 });
   }
 }

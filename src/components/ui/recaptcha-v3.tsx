@@ -1,7 +1,7 @@
 // src/components/ui/recaptcha-v3.tsx
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 interface RecaptchaV3Props {
@@ -11,26 +11,37 @@ interface RecaptchaV3Props {
 
 export function RecaptchaV3({ action, onVerify }: RecaptchaV3Props): JSX.Element | null {
   const { executeRecaptcha } = useGoogleReCaptcha();
+  const hasExecuted = useRef(false);
+  const currentAction = useRef(action);
+
+  const verifyRecaptcha = useCallback(async () => {
+    if (!executeRecaptcha) {
+      console.warn('reCAPTCHA not loaded yet');
+      return;
+    }
+
+    if (hasExecuted.current && currentAction.current === action) {
+      return; // Prevent multiple executions for the same action
+    }
+
+    try {
+      const token = await executeRecaptcha(action);
+      if (token) {
+        hasExecuted.current = true;
+        currentAction.current = action;
+        onVerify(token);
+      }
+    } catch (error) {
+      console.error('reCAPTCHA verification failed:', error);
+    }
+  }, [executeRecaptcha, action, onVerify]);
 
   useEffect(() => {
-    const verifyRecaptcha = async () => {
-      if (!executeRecaptcha) {
-        console.warn('reCAPTCHA not loaded yet');
-        return;
-      }
-
-      try {
-        const token = await executeRecaptcha(action);
-        if (token) {
-          onVerify(token);
-        }
-      } catch (error) {
-        console.error('reCAPTCHA verification failed:', error);
-      }
-    };
-
-    verifyRecaptcha();
-  }, [executeRecaptcha, action, onVerify]);
+    if (executeRecaptcha && (!hasExecuted.current || currentAction.current !== action)) {
+      hasExecuted.current = false; // Reset if action changed
+      verifyRecaptcha();
+    }
+  }, [executeRecaptcha, action, verifyRecaptcha]);
 
   // This component doesn't render anything visible
   return null;

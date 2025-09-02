@@ -1,7 +1,7 @@
 // src/app/subscribe/page.tsx
 "use client";
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useLeadMagnets } from '@/hooks/use-lead-magnets';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -91,22 +91,24 @@ function SubscribePageContent(): JSX.Element {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to subscribe');
+        const errorMessage = result.details ? `${result.error}: ${result.details}` : result.error;
+        throw new Error(errorMessage || 'Failed to subscribe');
       }
 
       setSuccess(true);
 
     } catch (error: any) {
       console.error('Subscription error:', error);
+      console.error('Response details:', error.message);
       setError(error.message || 'Failed to subscribe. Please try again.');
     } finally {
       setSubscribing(false);
     }
   };
 
-  const handleRecaptchaVerify = (token: string): void => {
+  const handleRecaptchaVerify = useCallback((token: string): void => {
     setFormData(prev => ({ ...prev, recaptcha_token: token }));
-  };
+  }, []);
 
   if (magnetsLoading) {
     return (
