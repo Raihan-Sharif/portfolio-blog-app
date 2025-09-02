@@ -22,6 +22,7 @@ export function HybridRecaptcha({ action, onVerify, onScoreTooLow }: HybridRecap
   const [error, setError] = useState<string | null>(null);
   const recaptchaRef = useRef<ReCAPTCHA>(null);
   const hasTriedV3 = useRef(false);
+  const lastV3Token = useRef<string | null>(null);
 
   // Try reCAPTCHA v3 first
   const tryV3Verification = useCallback(async () => {
@@ -34,7 +35,8 @@ export function HybridRecaptcha({ action, onVerify, onScoreTooLow }: HybridRecap
       setError(null);
       
       const token = await executeRecaptcha(action);
-      if (token) {
+      if (token && token !== lastV3Token.current) {
+        lastV3Token.current = token;
         hasTriedV3.current = true;
         
         // Verify the token on our server to get the score
@@ -53,11 +55,19 @@ export function HybridRecaptcha({ action, onVerify, onScoreTooLow }: HybridRecap
           setV3Score(result.score);
           onVerify(token, 'v3');
         } else {
-          // Low score, show v2 fallback
-          setV3Score(result.score);
+          // Low score or other error, show v2 fallback
+          setV3Score(result.score || 0);
           setShowV2(true);
-          onScoreTooLow?.(result.score);
+          if (result.score !== undefined) {
+            onScoreTooLow?.(result.score);
+          } else {
+            setError(`Verification failed: ${result.errors?.[0] || 'Unknown error'}`);
+          }
         }
+      } else if (token === lastV3Token.current) {
+        // Token reuse, show v2 immediately
+        setError('Token expired or reused. Please complete the visual verification.');
+        setShowV2(true);
       }
     } catch (error) {
       console.error('reCAPTCHA v3 failed:', error);
@@ -87,6 +97,7 @@ export function HybridRecaptcha({ action, onVerify, onScoreTooLow }: HybridRecap
   // Retry with manual trigger
   const retryVerification = useCallback(() => {
     hasTriedV3.current = false;
+    lastV3Token.current = null;
     setShowV2(false);
     setError(null);
     setV3Score(null);
@@ -138,6 +149,30 @@ export function HybridRecaptcha({ action, onVerify, onScoreTooLow }: HybridRecap
         <AlertCircle className="h-4 w-4" />
         <AlertDescription className="text-orange-800 dark:text-orange-200">
           reCAPTCHA not configured
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  // Warning if v2 keys are missing
+  if (showV2 && !process.env.NEXT_PUBLIC_RECAPTCHA_V2_SITE_KEY) {
+    return (
+      <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription className="text-red-800 dark:text-red-200">
+          <strong>reCAPTCHA v2 keys required!</strong>
+          <br />
+          <span className="text-xs">
+            1. Go to: <a href="https://www.google.com/recaptcha/admin/" target="_blank" rel="noopener noreferrer" className="underline">Google reCAPTCHA Admin</a>
+            <br />
+            2. Create a new site with reCAPTCHA v2 "I'm not a robot" Checkbox
+            <br />
+            3. Add these to your .env.local:
+            <br />
+            NEXT_PUBLIC_RECAPTCHA_V2_SITE_KEY=your_v2_site_key
+            <br />
+            RECAPTCHA_V2_SECRET_KEY=your_v2_secret_key
+          </span>
         </AlertDescription>
       </Alert>
     );
@@ -217,7 +252,7 @@ export function HybridRecaptcha({ action, onVerify, onScoreTooLow }: HybridRecap
           <div className="flex justify-center">
             <ReCAPTCHA
               ref={recaptchaRef}
-              sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+              sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_V2_SITE_KEY || process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ''}
               onChange={handleV2Change}
               onError={handleV2Error}
               onExpired={handleV2Expired}

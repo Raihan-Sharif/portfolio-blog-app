@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyRecaptchaV3 } from '@/lib/recaptcha';
+import { verifyRecaptchaV2 } from '@/lib/recaptcha-v2';
 
 interface SubscribeRequest {
   email: string;
@@ -44,20 +45,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Verify reCAPTCHA (v2 or v3)
     if (body.recaptcha_token) {
       const isV2 = body.recaptcha_version === 'v2';
-      const minimumScore = isV2 ? 0.0 : 0.5; // v2 doesn't use scores, v3 needs minimum 0.5
-      const expectedAction = isV2 ? undefined : 'newsletter_signup'; // v2 doesn't use actions
       
-      const recaptchaResult = await verifyRecaptchaV3(
-        body.recaptcha_token, 
-        expectedAction, 
-        minimumScore
-      );
+      let recaptchaResult;
+      if (isV2) {
+        // Use v2 verification
+        recaptchaResult = await verifyRecaptchaV2(body.recaptcha_token);
+      } else {
+        // Use v3 verification
+        recaptchaResult = await verifyRecaptchaV3(
+          body.recaptcha_token, 
+          'newsletter_signup', 
+          0.5
+        );
+      }
       
       if (!recaptchaResult.success) {
         return NextResponse.json({ 
           error: 'reCAPTCHA verification failed',
           details: recaptchaResult.errors?.[0] || 'Please complete the security verification',
-          score: recaptchaResult.score,
+          score: 'score' in recaptchaResult ? recaptchaResult.score : undefined,
           version: body.recaptcha_version || 'v3'
         }, { status: 400 });
       }
