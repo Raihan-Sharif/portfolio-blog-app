@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,11 +15,13 @@ import {
   Star,
   Sparkles,
   ArrowRight,
-  Clock
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 import { ANIMATIONS } from '@/lib/design-constants';
 import { useLeadMagnets } from '@/hooks/use-lead-magnets';
 import { LeadMagnet } from '@/types/newsletter';
+import ReCAPTCHAComponent, { ReCAPTCHAV3Ref } from '@/components/ui/recaptcha';
 
 interface LeadMagnetPopupProps {
   isOpen: boolean;
@@ -51,6 +53,9 @@ export default function LeadMagnetPopup({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes countdown
+  const [errorMessage, setErrorMessage] = useState('');
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHAV3Ref>(null);
   
   const { leadMagnets, loading } = useLeadMagnets();
   const selectedMagnet = leadMagnets.find(lm => lm.id === leadMagnetId) || leadMagnets[0];
@@ -82,11 +87,26 @@ export default function LeadMagnetPopup({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    
+    if (!email || !validateEmail(email)) {
+      setErrorMessage('Please enter a valid email address');
+      return;
+    }
+
+    if (!recaptchaToken) {
+      setErrorMessage('Please complete the security verification');
+      return;
+    }
 
     setIsSubmitting(true);
+    setErrorMessage('');
     
     try {
       const response = await fetch('/api/newsletter/subscribe', {
@@ -95,20 +115,58 @@ export default function LeadMagnetPopup({
         body: JSON.stringify({
           email: email.toLowerCase().trim(),
           leadMagnet: selectedMagnet?.id || 'popup-checklist',
-          source: `popup-${trigger}`
+          source: `popup-${trigger}`,
+          recaptcha_token: recaptchaToken
         })
       });
 
+      const data = await response.json();
+
       if (response.ok) {
         setIsSuccess(true);
+        setEmail('');
+        setRecaptchaToken(null);
         setTimeout(() => {
           onClose();
           setIsSuccess(false);
-          setEmail('');
         }, 3000);
+      } else {
+        throw new Error(data.error || 'Failed to subscribe');
       }
     } catch (error) {
       console.error('Subscription error:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to subscribe. Please try again.';
+      
+      // Handle specific reCAPTCHA errors
+      if (errorMsg.includes('Security verification expired')) {
+        setErrorMessage('Security verification expired. A new verification will be generated automatically.');
+      } else if (errorMsg.includes('Security verification failed')) {
+        setErrorMessage('Security verification failed. Please try again.');
+      } else if (errorMsg.includes('timeout-or-duplicate')) {
+        setErrorMessage('Security verification expired. Please try again.');
+      } else if (errorMsg.includes('reCAPTCHA verification')) {
+        setErrorMessage('Security verification failed. Please try again.');
+      } else {
+        setErrorMessage(errorMsg);
+      }
+      
+      setRecaptchaToken(null);
+      // Reset and trigger re-execution for reCAPTCHA errors
+      if (recaptchaRef.current && (
+        errorMsg.includes('Security verification') || 
+        errorMsg.includes('reCAPTCHA') ||
+        errorMsg.includes('timeout-or-duplicate')
+      )) {
+        recaptchaRef.current.reset();
+        setTimeout(() => {
+          recaptchaRef.current?.execute().then(token => {
+            if (token) {
+              setRecaptchaToken(token);
+              setErrorMessage(''); // Clear error when new token is obtained
+            }
+          });
+        }, 1500);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -252,9 +310,35 @@ export default function LeadMagnetPopup({
                         />
                       </div>
 
+                      {/* reCAPTCHA */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Security Verification</Label>
+                        <ReCAPTCHAComponent
+                          ref={recaptchaRef}
+                          onVerify={setRecaptchaToken}
+                          onError={() => setRecaptchaToken(null)}
+                          action="newsletter_popup"
+                          autoExecute={true}
+                        />
+                      </div>
+
+                      {/* Error Message */}
+                      {errorMessage && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="p-3 rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800 flex items-center gap-2"
+                        >
+                          <AlertCircle className="w-4 h-4 text-red-600" />
+                          <span className="text-sm text-red-700 dark:text-red-300">
+                            {errorMessage}
+                          </span>
+                        </motion.div>
+                      )}
+
                       <Button
                         type="submit"
-                        disabled={isSubmitting || !email}
+                        disabled={isSubmitting || !email || !recaptchaToken}
                         className="w-full bg-gradient-to-r from-primary via-purple-600 to-blue-600 hover:from-primary/90 hover:via-purple-600/90 hover:to-blue-600/90 text-white shadow-lg hover:shadow-xl transition-all duration-300 font-medium py-6"
                       >
                         {isSubmitting ? (

@@ -44,28 +44,79 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Verify reCAPTCHA (v2 or v3)
     if (body.recaptcha_token) {
-      const isV2 = body.recaptcha_version === 'v2';
-      
-      let recaptchaResult;
-      if (isV2) {
-        // Use v2 verification
-        recaptchaResult = await verifyRecaptchaV2(body.recaptcha_token);
+      // Skip verification if it's a development placeholder
+      if (process.env.NODE_ENV === 'development' && body.recaptcha_token === 'development') {
+        console.log('Development mode: skipping reCAPTCHA verification');
       } else {
-        // Use v3 verification
-        recaptchaResult = await verifyRecaptchaV3(
-          body.recaptcha_token, 
-          'newsletter_signup', 
-          0.5
-        );
-      }
-      
-      if (!recaptchaResult.success) {
-        return NextResponse.json({ 
-          error: 'reCAPTCHA verification failed',
-          details: recaptchaResult.errors?.[0] || 'Please complete the security verification',
-          score: 'score' in recaptchaResult ? recaptchaResult.score : undefined,
-          version: body.recaptcha_version || 'v3'
-        }, { status: 400 });
+        const isV2 = body.recaptcha_version === 'v2';
+        
+        let recaptchaResult;
+        try {
+          if (isV2) {
+            // Use v2 verification
+            recaptchaResult = await verifyRecaptchaV2(body.recaptcha_token);
+          } else {
+            // Use v3 verification with appropriate action
+            const action = body.leadMagnet ? 'newsletter_signup' : 'newsletter_subscription';
+            recaptchaResult = await verifyRecaptchaV3(
+              body.recaptcha_token, 
+              action, 
+              0.3 // Lower threshold to reduce false positives
+            );
+          }
+        } catch (verifyError) {
+          console.error('reCAPTCHA verification error:', verifyError);
+          return NextResponse.json({ 
+            error: 'reCAPTCHA verification failed',
+            details: 'verification-error',
+            version: body.recaptcha_version || 'v3'
+          }, { status: 400 });
+        }
+        
+        if (!recaptchaResult.success) {
+          const errorCode = recaptchaResult.errors?.[0];
+          let errorMessage = 'reCAPTCHA verification failed';
+          let errorDetails = 'Please complete the security verification';
+          
+          // Handle specific error codes
+          if (errorCode) {
+            switch (errorCode) {
+              case 'timeout-or-duplicate':
+                errorMessage = 'Security verification expired';
+                errorDetails = 'The security token has expired or been used. Please try again.';
+                break;
+              case 'invalid-input-response':
+                errorMessage = 'Security verification failed';
+                errorDetails = 'Invalid verification token. Please try again.';
+                break;
+              case 'missing-input-response':
+                errorMessage = 'Security verification required';
+                errorDetails = 'Please complete the security verification.';
+                break;
+              case 'bad-request':
+                errorMessage = 'Security verification failed';
+                errorDetails = 'Verification request malformed. Please refresh and try again.';
+                break;
+              default:
+                errorDetails = 'Verification failed. Please try again.';
+            }
+          }
+          
+          // Log for debugging but don't expose internal details
+          console.error('reCAPTCHA verification failed:', {
+            errorCode,
+            score: 'score' in recaptchaResult ? recaptchaResult.score : undefined,
+            action: 'action' in recaptchaResult ? recaptchaResult.action : undefined
+          });
+          
+          return NextResponse.json({ 
+            error: errorMessage,
+            details: errorDetails,
+            score: 'score' in recaptchaResult ? recaptchaResult.score : undefined,
+            version: body.recaptcha_version || 'v3',
+            shouldRetry: errorCode === 'timeout-or-duplicate' || errorCode === 'invalid-input-response'
+          }, { status: 400 });
+        }
       }
     } else if (process.env.NODE_ENV === 'production') {
       return NextResponse.json({ 

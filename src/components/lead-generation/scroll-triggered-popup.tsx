@@ -148,7 +148,37 @@ export default function ScrollTriggeredPopup({
 
     } catch (error) {
       console.error('Subscription error:', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to subscribe. Please try again.');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to subscribe. Please try again.';
+      
+      // Handle specific reCAPTCHA errors
+      if (errorMsg.includes('Security verification expired')) {
+        setErrorMessage('Security verification expired. A new verification will be generated automatically.');
+      } else if (errorMsg.includes('Security verification failed')) {
+        setErrorMessage('Security verification failed. Please try again.');
+      } else if (errorMsg.includes('timeout-or-duplicate')) {
+        setErrorMessage('Security verification expired. Please try again.');
+      } else if (errorMsg.includes('reCAPTCHA verification')) {
+        setErrorMessage('Security verification failed. Please try again.');
+      } else {
+        setErrorMessage(errorMsg);
+      }
+      
+      // Reset and trigger re-execution for reCAPTCHA errors
+      if (recaptchaRef.current && (
+        errorMsg.includes('Security verification') || 
+        errorMsg.includes('reCAPTCHA') ||
+        errorMsg.includes('timeout-or-duplicate')
+      )) {
+        recaptchaRef.current.reset();
+        setTimeout(() => {
+          recaptchaRef.current?.execute().then(token => {
+            if (token) {
+              setRecaptchaToken(token);
+              setErrorMessage(''); // Clear error when new token is obtained
+            }
+          });
+        }, 1500);
+      }
     } finally {
       setIsSubmitting(false);
       setRecaptchaToken(null);
