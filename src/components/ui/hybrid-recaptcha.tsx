@@ -12,9 +12,10 @@ interface HybridRecaptchaProps {
   action: string;
   onVerify: (token: string, version: 'v2' | 'v3') => void;
   onScoreTooLow?: (score: number) => void;
+  onV3Failed?: () => void;
 }
 
-export function HybridRecaptcha({ action, onVerify, onScoreTooLow }: HybridRecaptchaProps): JSX.Element {
+export function HybridRecaptcha({ action, onVerify, onScoreTooLow, onV3Failed }: HybridRecaptchaProps): JSX.Element {
   const { executeRecaptcha } = useGoogleReCaptcha();
   const [showV2, setShowV2] = useState(false);
   const [v3Score, setV3Score] = useState<number | null>(null);
@@ -39,31 +40,11 @@ export function HybridRecaptcha({ action, onVerify, onScoreTooLow }: HybridRecap
         lastV3Token.current = token;
         hasTriedV3.current = true;
         
-        // Verify the token on our server to get the score
-        const response = await fetch('/api/test-recaptcha', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ token, action }),
-        });
-
-        const result = await response.json();
-        
-        if (result.success && result.score >= 0.5) {
-          // Good score, use v3 token
-          setV3Score(result.score);
-          onVerify(token, 'v3');
-        } else {
-          // Low score or other error, show v2 fallback
-          setV3Score(result.score || 0);
-          setShowV2(true);
-          if (result.score !== undefined) {
-            onScoreTooLow?.(result.score);
-          } else {
-            setError(`Verification failed: ${result.errors?.[0] || 'Unknown error'}`);
-          }
-        }
+        // For reCAPTCHA v3, we trust the client-side execution
+        // and pass the token directly without pre-verification
+        // The actual verification will happen during form submission
+        setV3Score(0.8); // Assume good score for v3
+        onVerify(token, 'v3');
       } else if (token === lastV3Token.current) {
         // Token reuse, show v2 immediately
         setError('Token expired or reused. Please complete the visual verification.');
@@ -103,6 +84,25 @@ export function HybridRecaptcha({ action, onVerify, onScoreTooLow }: HybridRecap
     setV3Score(null);
     tryV3Verification();
   }, [tryV3Verification]);
+
+  // Method to trigger v2 fallback from external error
+  const triggerV2Fallback = useCallback(() => {
+    setShowV2(true);
+    setError('Security verification failed. Please complete the visual verification below.');
+    onV3Failed?.();
+  }, [onV3Failed]);
+
+  // Expose triggerV2Fallback method
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).triggerRecaptchaV2Fallback = triggerV2Fallback;
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete (window as any).triggerRecaptchaV2Fallback;
+      }
+    };
+  }, [triggerV2Fallback]);
 
   // Track user interactions to improve reCAPTCHA v3 scores
   useEffect(() => {

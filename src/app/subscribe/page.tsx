@@ -102,7 +102,23 @@ function SubscribePageContent(): JSX.Element {
     } catch (error: any) {
       console.error('Subscription error:', error);
       console.error('Response details:', error.message);
-      setError(error.message || 'Failed to subscribe. Please try again.');
+      
+      const errorMessage = error.message || 'Failed to subscribe. Please try again.';
+      
+      // Check if it's a reCAPTCHA v3 failure that should trigger v2 fallback
+      if (errorMessage.includes('Security verification expired') || 
+          errorMessage.includes('timeout-or-duplicate') ||
+          (errorMessage.includes('Security verification failed') && formData.recaptcha_version === 'v3')) {
+        // Trigger v2 fallback if available
+        if (typeof window !== 'undefined' && (window as any).triggerRecaptchaV2Fallback) {
+          (window as any).triggerRecaptchaV2Fallback();
+          setError('Security verification failed. Please complete the visual verification below.');
+        } else {
+          setError('Security verification failed. Please refresh the page and try again.');
+        }
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setSubscribing(false);
     }

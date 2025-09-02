@@ -6,7 +6,14 @@ import { verifyRecaptchaV2 } from '@/lib/recaptcha-v2';
 interface SubscribeRequest {
   email: string;
   firstName?: string;
+  lastName?: string;
   leadMagnet?: string;
+  source?: string;
+  preferences?: Record<string, any>;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  form_data?: Record<string, any>;
   recaptcha_token?: string;
   recaptcha_version?: 'v2' | 'v3';
 }
@@ -128,11 +135,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                     request.headers.get('x-real-ip') || 
                     '127.0.0.1';
     const userAgent = request.headers.get('user-agent') || '';
+    const referrer = request.headers.get('referer') || null;
 
     // Check if email already exists
     const { data: existingSubscriber } = await supabase
       .from('newsletter_subscribers')
-      .select('id, email, status')
+      .select('id, email, status, engagement_score')
       .eq('email', body.email.toLowerCase().trim())
       .single();
 
@@ -158,15 +166,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           }
         }
 
-        // Reactivate subscription
+        // Reactivate subscription with comprehensive data
         const { error: updateError } = await supabase
           .from('newsletter_subscribers')
           .update({
             status: 'active',
             resubscribed_at: new Date().toISOString(),
-            lead_magnet_id: leadMagnetId,
+            lead_magnet_id: leadMagnetId, // Use UUID reference to lead_magnets table
             first_name: body.firstName?.trim() || null,
-            updated_at: new Date().toISOString()
+            last_name: body.lastName?.trim() || null,
+            updated_at: new Date().toISOString(),
+            last_activity_at: new Date().toISOString(),
+            engagement_score: Math.min(100, (existingSubscriber.engagement_score || 50) + 10) // Boost engagement on resubscribe
           })
           .eq('id', existingSubscriber.id);
 
@@ -200,17 +211,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Create new subscription
+    // Create new subscription with comprehensive data
     const subscriptionData = {
       email: body.email.toLowerCase().trim(),
       first_name: body.firstName?.trim() || null,
-      lead_magnet_id: leadMagnetId,
+      last_name: body.lastName?.trim() || null,
+      lead_magnet_id: leadMagnetId, // Use UUID reference to lead_magnets table
       status: 'active',
-      source: 'website',
+      source: body.source || 'website',
       client_ip: clientIp,
       user_agent: userAgent,
+      referrer: referrer,
+      preferences: body.preferences || {},
       subscribed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      last_activity_at: new Date().toISOString(),
+      engagement_score: 50 // Default engagement score
     };
 
     const { data: subscription, error } = await supabase
@@ -228,24 +244,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }, { status: 500 });
     }
 
-    // Track lead magnet download if applicable
+    // Track lead magnet download if applicable using the comprehensive tracking system
     if (leadMagnetId && subscription) {
       try {
-        // Insert download tracking record
-        await supabase
-          .from('subscriber_lead_magnets')
-          .insert({
-            subscriber_id: subscription.id,
-            lead_magnet_id: leadMagnetId,
-            download_ip: clientIp,
-            downloaded_at: new Date().toISOString(),
-            created_at: new Date().toISOString(),
-          });
-
-        // Increment download count using RPC function
-        await supabase.rpc('increment_download_count', {
-          lead_magnet_id: leadMagnetId
+        // Use the advanced tracking function that handles all analytics
+        const { error: trackError } = await supabase.rpc('track_lead_magnet_download', {
+          p_subscriber_id: subscription.id,
+          p_lead_magnet_id: leadMagnetId,
+          p_download_ip: clientIp,
+          p_user_agent: userAgent,
+          p_referrer: referrer,
+          p_utm_source: body.utm_source || null,
+          p_utm_medium: body.utm_medium || null,
+          p_utm_campaign: body.utm_campaign || null,
+          p_form_data: body.form_data || {}
         });
+        
+        if (trackError) {
+          console.warn('Failed to track lead magnet download:', trackError);
+          // This is non-critical, continue with the subscription
+        }
       } catch (trackError) {
         console.warn('Failed to track lead magnet download:', trackError);
         // Don't fail the whole operation if tracking fails
