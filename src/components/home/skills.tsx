@@ -3,7 +3,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ANIMATIONS, GRADIENTS, SPACING } from "@/lib/design-constants";
-import { getProficiencyConfig, getSkillIcon } from "@/lib/skill-utils";
+import { getProficiencyConfig } from "@/lib/skill-utils";
+import { getSkillIcon } from "@/lib/skill-icons";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -26,6 +27,7 @@ interface Skill {
   category?: string;
   proficiency?: number;
   icon?: string;
+  show_percentage?: boolean;
   created_at: string;
 }
 
@@ -216,46 +218,150 @@ export default function Skills({ skills }: SkillsProps) {
                       {skill.name}
                     </h3>
 
-                    {/* Proficiency Bar */}
+                    {/* Professional Skill Display */}
                     {skill.proficiency !== null &&
                       skill.proficiency !== undefined && (
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-muted-foreground font-medium">
-                              Proficiency
-                            </span>
-                            <span className="font-bold">
-                              {skill.proficiency}%
-                            </span>
-                          </div>
-
-                          <div className="w-full h-2 bg-black/20 rounded-full overflow-hidden">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              whileInView={{ width: `${skill.proficiency}%` }}
-                              viewport={{ once: true }}
-                              transition={{
-                                duration: 1.2,
-                                delay: index * 0.1,
-                                ease: "easeOut",
-                              }}
-                              className={`h-full bg-gradient-to-r ${proficiencyConfig.color} rounded-full relative overflow-hidden`}
-                            >
-                              {/* Shine effect */}
-                              <motion.div
-                                animate={{
-                                  x: ["-100%", "200%"],
-                                }}
-                                transition={{
-                                  duration: 2,
-                                  repeat: Infinity,
-                                  repeatDelay: 4,
-                                  ease: "easeInOut",
-                                }}
-                                className="absolute top-0 left-0 h-full w-1/3 bg-white/40 transform skew-x-12"
-                              />
-                            </motion.div>
-                          </div>
+                        <div className="space-y-3">
+                          {skill.show_percentage === true ? (
+                            /* Percentage View */
+                            <>
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-medium text-muted-foreground">
+                                  Expertise Level
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+                                    {skill.proficiency}%
+                                  </span>
+                                  <Badge
+                                    variant="outline"
+                                    className={`${proficiencyConfig.textColor} border-current/30 text-xs px-2 py-0.5`}
+                                  >
+                                    {proficiencyConfig.level}
+                                  </Badge>
+                                </div>
+                              </div>
+                              
+                              <div className="relative">
+                                <div className="w-full h-2.5 bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-full overflow-hidden shadow-inner">
+                                  <motion.div
+                                    initial={{ width: 0 }}
+                                    whileInView={{ width: `${skill.proficiency}%` }}
+                                    viewport={{ once: true }}
+                                    transition={{
+                                      duration: 1.5,
+                                      delay: index * 0.1,
+                                      ease: "easeOut",
+                                    }}
+                                    className={`h-full bg-gradient-to-r ${proficiencyConfig.color} rounded-full relative overflow-hidden shadow-sm`}
+                                  >
+                                    {/* Enhanced shine effect */}
+                                    <motion.div
+                                      animate={{
+                                        x: ["-100%", "200%"],
+                                      }}
+                                      transition={{
+                                        duration: 2.5,
+                                        repeat: Infinity,
+                                        repeatDelay: 4,
+                                        ease: "easeInOut",
+                                      }}
+                                      className="absolute top-0 left-0 h-full w-1/3 bg-white/50 transform skew-x-12 blur-sm"
+                                    />
+                                    {/* Gradient overlay */}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-white/20 rounded-full"></div>
+                                  </motion.div>
+                                </div>
+                                
+                                {/* Progress indicators */}
+                                <div className="flex justify-between mt-1 text-xs text-muted-foreground/60">
+                                  <span>•</span>
+                                  <span>•</span>
+                                  <span>•</span>
+                                  <span>•</span>
+                                  <span>•</span>
+                                </div>
+                              </div>
+                            </>
+                          ) : skill.show_percentage === false ? (
+                            /* Hidden Mode - Professional display without labels */
+                            <div className="flex justify-center items-center py-6">
+                              <div className="relative group">
+                                <div className="w-14 h-14 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded-xl flex items-center justify-center shadow-lg border border-slate-200 dark:border-slate-600 group-hover:scale-110 transition-all duration-300">
+                                  <div className="text-xl opacity-70 group-hover:opacity-100 transition-opacity duration-300">
+                                    {getSkillIcon(skill.name, skill.icon, skill.category)}
+                                  </div>
+                                </div>
+                                {/* Subtle verification badge */}
+                                <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center shadow-md border-2 border-white dark:border-slate-900">
+                                  <div className="text-xs text-white font-bold">✓</div>
+                                </div>
+                                {/* Professional glow effect */}
+                                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-purple-600/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Professional Level View */
+                            <>
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-medium text-muted-foreground">
+                                  Skill Mastery
+                                </span>
+                                <Badge
+                                  variant="secondary"
+                                  className={`${proficiencyConfig.textColor} bg-gradient-to-r from-white/20 to-white/10 backdrop-blur-sm border border-white/30 font-semibold text-xs px-3 py-1 shadow-lg`}
+                                >
+                                  <div className="flex items-center gap-1.5">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${proficiencyConfig.color.includes('emerald') ? 'bg-emerald-400' : proficiencyConfig.color.includes('blue') ? 'bg-blue-400' : proficiencyConfig.color.includes('purple') ? 'bg-purple-400' : 'bg-orange-400'} animate-pulse`}></div>
+                                    {proficiencyConfig.icon}
+                                    {proficiencyConfig.level}
+                                  </div>
+                                </Badge>
+                              </div>
+                              
+                              {/* Professional skill visualization */}
+                              <div className="relative">
+                                <div className="w-full h-2 bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-full overflow-hidden shadow-inner">
+                                  <motion.div
+                                    initial={{ width: 0 }}
+                                    whileInView={{ width: `${skill.proficiency}%` }}
+                                    viewport={{ once: true }}
+                                    transition={{
+                                      duration: 1.5,
+                                      delay: index * 0.1,
+                                      ease: "easeOut",
+                                    }}
+                                    className={`h-full bg-gradient-to-r ${proficiencyConfig.color} rounded-full relative overflow-hidden`}
+                                  >
+                                    {/* Subtle pattern overlay */}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-white/15 rounded-full"></div>
+                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent)] rounded-full"></div>
+                                  </motion.div>
+                                </div>
+                                
+                                {/* Skill level markers */}
+                                <div className="flex justify-between mt-2">
+                                  {['Basic', 'Intermediate', 'Advanced', 'Expert', 'Master'].map((level, i) => {
+                                    const isActive = (skill.proficiency || 0) > i * 20;
+                                    return (
+                                      <div key={level} className="flex flex-col items-center">
+                                        <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${
+                                          isActive 
+                                            ? `${proficiencyConfig.color.includes('emerald') ? 'bg-emerald-400' : proficiencyConfig.color.includes('blue') ? 'bg-blue-400' : proficiencyConfig.color.includes('purple') ? 'bg-purple-400' : 'bg-orange-400'} shadow-sm` 
+                                            : 'bg-muted-foreground/20'
+                                        }`}></div>
+                                        <span className={`text-xs mt-1 transition-colors duration-500 ${
+                                          isActive ? 'text-foreground/80 font-medium' : 'text-muted-foreground/40'
+                                        }`}>
+                                          {level.slice(0, 3)}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
                       )}
 
@@ -329,7 +435,7 @@ export default function Skills({ skills }: SkillsProps) {
             <Button
               asChild
               size="lg"
-              className="gap-2 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 shadow-lg hover:shadow-xl transition-all duration-300"
+              className="gap-2 bg-gradient-to-r from-primary/90 to-purple-600/90 hover:from-primary hover:to-purple-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold px-8 py-3"
             >
               <Link href="/skills">
                 <Zap className="w-5 h-5" />
@@ -342,7 +448,7 @@ export default function Skills({ skills }: SkillsProps) {
               asChild
               variant="outline"
               size="lg"
-              className="gap-2 border-primary/20 hover:bg-primary/10 shadow-lg hover:shadow-xl transition-all duration-300"
+              className="gap-2 border-2 border-primary/30 hover:bg-primary/5 hover:border-primary/50 text-primary hover:text-primary shadow-lg hover:shadow-xl transition-all duration-300 font-semibold px-8 py-3 bg-white/5 backdrop-blur-sm"
             >
               <Link href="/projects">
                 <Code className="w-5 h-5" />

@@ -71,6 +71,11 @@ export function Navbar() {
       href: "/projects",
       current: pathname.startsWith("/projects"),
     },
+    {
+      name: "Skills",
+      href: "/skills",
+      current: pathname.startsWith("/skills"),
+    },
     { name: "Services", href: "/services", current: pathname.startsWith("/services") },
     { name: "Blog", href: "/blog", current: pathname.startsWith("/blog") },
     { name: "Newsletter", href: "/subscribe", current: pathname === "/subscribe" },

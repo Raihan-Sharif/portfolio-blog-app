@@ -321,9 +321,10 @@ export default function Hero({
                 <Link href={settings.cta_primary_url}>
                   <Button
                     size="lg"
-                    className="gap-2 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-full px-8"
+                    className="gap-2 bg-gradient-to-r from-primary/95 to-purple-600/95 hover:from-primary hover:to-purple-600 text-white font-semibold shadow-2xl hover:shadow-3xl transition-all duration-300 rounded-full px-10 py-4 border-0 backdrop-blur-sm relative overflow-hidden group"
                   >
-                    {settings.cta_primary_text}
+                    <span className="relative z-10">{settings.cta_primary_text}</span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   </Button>
                 </Link>
               )}
@@ -332,7 +333,7 @@ export default function Hero({
                   <Button
                     size="lg"
                     variant="outline"
-                    className="gap-2 rounded-full px-8 border-2 hover:bg-primary/10 transition-all duration-300"
+                    className="gap-2 rounded-full px-10 py-4 border-2 border-primary/40 hover:border-primary/70 bg-white/5 hover:bg-primary/10 text-primary hover:text-primary font-semibold shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm"
                   >
                     {settings.cta_secondary_text}
                   </Button>

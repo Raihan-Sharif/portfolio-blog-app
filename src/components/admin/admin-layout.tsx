@@ -27,6 +27,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
+  Code,
   FileText,
   Home,
   Info,
@@ -347,6 +348,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       name: "Projects",
       href: "/admin/projects",
       icon: <Briefcase size={20} />,
+      category: "content",
+    },
+    {
+      name: "Skills",
+      href: "/admin/skills",
+      icon: <Code size={20} />,
       category: "content",
     },
     {
