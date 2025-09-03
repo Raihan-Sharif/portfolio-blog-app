@@ -52,7 +52,7 @@ interface Achievement {
   description?: string;
   achievement_date?: string;
   organization?: string;
-  BadgeCheck_url?: string;
+  certificate_url?: string;
   achievement_url?: string;
   achievement_type?: string;
   display_order: number;
@@ -74,7 +74,7 @@ export default function AchievementsManager() {
     description: "",
     achievement_date: "",
     organization: "",
-    BadgeCheck_url: "",
+    certificate_url: "",
     achievement_url: "",
     achievement_type: "award",
     display_order: 0,
@@ -107,7 +107,7 @@ export default function AchievementsManager() {
       description: "",
       achievement_date: "",
       organization: "",
-      BadgeCheck_url: "",
+      certificate_url: "",
       achievement_url: "",
       achievement_type: "award",
       display_order: 0,
@@ -122,7 +122,7 @@ export default function AchievementsManager() {
       description: achievement.description || "",
       achievement_date: achievement.achievement_date || "",
       organization: achievement.organization || "",
-      BadgeCheck_url: achievement.BadgeCheck_url || "",
+      certificate_url: achievement.certificate_url || "",
       achievement_url: achievement.achievement_url || "",
       achievement_type: achievement.achievement_type || "award",
       display_order: achievement.display_order,
@@ -392,18 +392,18 @@ export default function AchievementsManager() {
                 </div>
 
                 <div>
-                  <Label htmlFor="BadgeCheck_url">BadgeCheck URL</Label>
+                  <Label htmlFor="certificate_url">Certificate URL</Label>
                   <Input
-                    id="BadgeCheck_url"
+                    id="certificate_url"
                     type="url"
-                    value={formData.BadgeCheck_url}
+                    value={formData.certificate_url}
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        BadgeCheck_url: e.target.value,
+                        certificate_url: e.target.value,
                       }))
                     }
-                    placeholder="https://BadgeCheck-link.com"
+                    placeholder="https://certificate-link.com"
                   />
                   <p className="text-sm text-muted-foreground mt-1">
                     Link to the BadgeCheck or proof document
@@ -547,9 +547,9 @@ export default function AchievementsManager() {
                         <Edit className="w-4 h-4" />
                       </Button>
 
-                      {achievement.BadgeCheck_url && (
+                      {achievement.certificate_url && (
                         <a
-                          href={achievement.BadgeCheck_url}
+                          href={achievement.certificate_url}
                           target="_blank"
                           rel="noopener noreferrer"
                         >

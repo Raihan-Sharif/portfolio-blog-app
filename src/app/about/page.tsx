@@ -45,12 +45,26 @@ export default async function AboutPage() {
       .from("workshops")
       .select("*")
       .eq("is_active", true)
-      .order("display_order, event_date", { ascending: false }),
+      .order("display_order, event_date", { ascending: false })
+      .then((result: any) => {
+        if (result.error) {
+          console.warn('Failed to load workshops:', result.error);
+          return { data: [] };
+        }
+        return result;
+      }),
     supabase
       .from("achievements")
       .select("*")
       .eq("is_active", true)
-      .order("display_order, achievement_date", { ascending: false }),
+      .order("display_order, achievement_date", { ascending: false })
+      .then((result: any) => {
+        if (result.error) {
+          console.warn('Failed to load achievements:', result.error);
+          return { data: [] };
+        }
+        return result;
+      }),
     supabase
       .from("certifications")
       .select("*")
