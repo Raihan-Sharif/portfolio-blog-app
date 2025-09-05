@@ -60,7 +60,6 @@ interface Skill {
   name: string;
   category: string;
   proficiency: number;
-  icon?: string;
   brand_logo?: string;
   show_percentage: boolean;
   created_at: string;
@@ -94,7 +93,6 @@ export default function AdminSkillsPage() {
     name: '',
     category: '',
     proficiency: 70,
-    icon: '',
     brand_logo: null as string | null,
     show_percentage: true
   });
@@ -142,7 +140,6 @@ export default function AdminSkillsPage() {
           name: newSkill.name.trim(),
           category: newSkill.category,
           proficiency: newSkill.proficiency,
-          icon: newSkill.icon.trim() || null,
           brand_logo: newSkill.brand_logo,
           show_percentage: newSkill.show_percentage
         }])
@@ -161,7 +158,6 @@ export default function AdminSkillsPage() {
         name: '',
         category: '',
         proficiency: 70,
-        icon: '',
         brand_logo: null,
         show_percentage: true
       });
@@ -185,7 +181,6 @@ export default function AdminSkillsPage() {
           name: skill.name.trim(),
           category: skill.category,
           proficiency: skill.proficiency,
-          icon: skill.icon?.trim() || null,
           brand_logo: skill.brand_logo,
           show_percentage: skill.show_percentage
         })
@@ -830,7 +825,6 @@ export default function AdminSkillsPage() {
                                               <SkillCardIcon
                                                 skillName={skill.name}
                                                 iconImage={skill.brand_logo}
-                                                textIcon={skill.icon}
                                                 category={skill.category}
                                                 size="md"
                                               />

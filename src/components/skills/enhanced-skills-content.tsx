@@ -28,7 +28,6 @@ interface Skill {
   name: string;
   category?: string;
   proficiency?: number;
-  icon?: string;
   brand_logo?: string;
   show_percentage?: boolean;
   created_at: string;
@@ -452,7 +451,6 @@ export default function EnhancedSkillsContent({ skills }: SkillsContentProps) {
                             <SkillCardIcon
                               skillName={skill.name}
                               iconImage={skill.brand_logo}
-                              textIcon={skill.icon}
                               category={skill.category}
                               showPercentage={skill.show_percentage}
                               size="lg"

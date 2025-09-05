@@ -376,7 +376,6 @@ export default function Skills({ skills }: SkillsProps) {
                         <SkillCardIcon
                           skillName={skill.name}
                           iconImage={skill.brand_logo}
-                          textIcon={skill.icon}
                           category={skill.category}
                           showPercentage={skill.show_percentage}
                           size="lg"
