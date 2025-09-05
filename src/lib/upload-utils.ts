@@ -59,13 +59,29 @@ export async function uploadImage(
  */
 export async function deleteImage(
   url: string,
-  bucket: string = "public"
+  bucket: string = "raihan-blog-app"
 ): Promise<void> {
   try {
     // Extract the file path from the URL
     const urlObj = new URL(url);
     const pathParts = urlObj.pathname.split("/");
-    const filePath = pathParts.slice(pathParts.indexOf(bucket) + 1).join("/");
+    
+    // For Supabase URLs, the structure is: /storage/v1/object/public/bucket-name/folder/file
+    // We need to find where the actual file path starts after the bucket name
+    const storageIndex = pathParts.indexOf("storage");
+    const publicIndex = pathParts.indexOf("public");
+    
+    let filePath = "";
+    if (storageIndex !== -1 && publicIndex !== -1) {
+      // Find the bucket name in the path
+      const bucketIndex = pathParts.findIndex((part, index) => 
+        index > publicIndex && part === bucket
+      );
+      
+      if (bucketIndex !== -1 && bucketIndex < pathParts.length - 1) {
+        filePath = pathParts.slice(bucketIndex + 1).join("/");
+      }
+    }
 
     if (!filePath) {
       throw new Error("Invalid file path");

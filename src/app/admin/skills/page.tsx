@@ -14,6 +14,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { createClient } from "@/utils/supabase/client";
 import { 
   Plus, 
@@ -41,7 +51,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getSkillIcon } from "@/lib/skill-icons";
+import { SkillImageUploader } from "@/components/ui/skill-image-uploader";
+import { EnhancedSkillIcon, SkillCardIcon } from "@/lib/enhanced-skill-icons";
 import { toast } from "sonner";
 
 interface Skill {
@@ -50,6 +61,7 @@ interface Skill {
   category: string;
   proficiency: number;
   icon?: string;
+  brand_logo?: string;
   show_percentage: boolean;
   created_at: string;
 }
@@ -76,12 +88,14 @@ export default function AdminSkillsPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showPercentageFilter, setShowPercentageFilter] = useState<string>('');
   const [isTogglingGlobal, setIsTogglingGlobal] = useState(false);
+  const [skillToDelete, setSkillToDelete] = useState<Skill | null>(null);
   
   const [newSkill, setNewSkill] = useState({
     name: '',
     category: '',
     proficiency: 70,
     icon: '',
+    brand_logo: null as string | null,
     show_percentage: true
   });
 
@@ -129,6 +143,7 @@ export default function AdminSkillsPage() {
           category: newSkill.category,
           proficiency: newSkill.proficiency,
           icon: newSkill.icon.trim() || null,
+          brand_logo: newSkill.brand_logo,
           show_percentage: newSkill.show_percentage
         }])
         .select()
@@ -147,6 +162,7 @@ export default function AdminSkillsPage() {
         category: '',
         proficiency: 70,
         icon: '',
+        brand_logo: null,
         show_percentage: true
       });
       toast.success('Skill created successfully! 🎉');
@@ -170,6 +186,7 @@ export default function AdminSkillsPage() {
           category: skill.category,
           proficiency: skill.proficiency,
           icon: skill.icon?.trim() || null,
+          brand_logo: skill.brand_logo,
           show_percentage: skill.show_percentage
         })
         .eq('id', skill.id);
@@ -243,16 +260,14 @@ export default function AdminSkillsPage() {
     }
   };
 
-  const handleDeleteSkill = async (skillId: number) => {
-    if (!confirm('Are you sure you want to delete this skill? This action cannot be undone.')) {
-      return;
-    }
+  const handleDeleteSkill = async () => {
+    if (!skillToDelete) return;
 
     try {
       const { error } = await supabase
         .from('skills')
         .delete()
-        .eq('id', skillId);
+        .eq('id', skillToDelete.id);
 
       if (error) {
         console.error('Error deleting skill:', error);
@@ -260,8 +275,9 @@ export default function AdminSkillsPage() {
         return;
       }
 
-      setSkills(skills.filter(s => s.id !== skillId));
-      toast.success('Skill deleted successfully');
+      setSkills(skills.filter(s => s.id !== skillToDelete.id));
+      setSkillToDelete(null);
+      toast.success(`"${skillToDelete.name}" skill deleted successfully! 🗑️`);
     } catch (error) {
       console.error('Error:', error);
       toast.error('An error occurred while deleting skill');
@@ -604,16 +620,10 @@ export default function AdminSkillsPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="icon" className="text-sm font-medium">Icon (optional)</Label>
-                        <Input
-                          id="icon"
-                          value={newSkill.icon}
-                          onChange={(e) => setNewSkill({...newSkill, icon: e.target.value})}
-                          placeholder="🚀 or text"
-                          className="border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-blue-500"
-                        />
-                      </div>
+                      <SkillImageUploader
+                        currentImage={newSkill.brand_logo}
+                        onImageChange={(imagePath) => setNewSkill({...newSkill, brand_logo: imagePath})}
+                      />
                     </div>
 
                     <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
@@ -775,11 +785,11 @@ export default function AdminSkillsPage() {
                                         />
                                       </div>
                                       
-                                      <Input
-                                        value={editingSkill.icon || ''}
-                                        onChange={(e) => setEditingSkill({...editingSkill, icon: e.target.value})}
-                                        placeholder="Icon"
-                                        className="text-sm border-blue-200 focus:border-blue-500"
+                                      <SkillImageUploader
+                                        skillId={editingSkill.id.toString()}
+                                        currentImage={editingSkill.brand_logo}
+                                        onImageChange={(imagePath) => setEditingSkill({...editingSkill, brand_logo: imagePath})}
+                                        compact={true}
                                       />
                                       
                                       <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
@@ -809,23 +819,79 @@ export default function AdminSkillsPage() {
                                     </CardContent>
                                   </Card>
                                 ) : (
-                                  <Card className={`h-full transition-all duration-300 hover:shadow-xl hover:scale-105 ${
-                                    viewMode === 'list' ? 'hover:bg-slate-50 dark:hover:bg-slate-800' : ''
-                                  } group-hover:border-blue-300 dark:group-hover:border-blue-700 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm`}>
-                                    <CardContent className={viewMode === 'list' ? "p-4" : "p-6"}>
+                                  <Card className="h-full transition-all duration-300 hover:shadow-lg hover:scale-[1.01] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm group">
+                                    <CardContent className={viewMode === 'list' ? "p-4" : "p-4"}>
                                       <div className={`flex ${viewMode === 'list' ? 'items-center gap-4' : 'flex-col gap-4'}`}>
-                                        {/* Skill Header */}
-                                        <div className={`flex items-start ${viewMode === 'list' ? 'gap-3 flex-1' : 'justify-between w-full'}`}>
-                                          <div className="flex items-center gap-3">
-                                            <div className="text-2xl">{getSkillIcon(skill.name, skill.icon, skill.category)}</div>
-                                            <div className={viewMode === 'list' ? '' : 'text-center'}>
-                                              <h4 className="font-bold text-lg">{skill.name}</h4>
-                                              <p className="text-xs text-muted-foreground">{skill.category}</p>
+                                        {/* Horizontal Card Layout */}
+                                        <div className="flex items-center gap-4">
+                                          {/* Brand Logo Section */}
+                                          <div className="flex-shrink-0">
+                                            <div className="relative">
+                                              <SkillCardIcon
+                                                skillName={skill.name}
+                                                iconImage={skill.brand_logo}
+                                                textIcon={skill.icon}
+                                                category={skill.category}
+                                                size="md"
+                                              />
+                                              <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-800 ${
+                                                skill.proficiency >= 90 ? 'bg-purple-500' :
+                                                skill.proficiency >= 75 ? 'bg-blue-500' :
+                                                skill.proficiency >= 60 ? 'bg-green-500' :
+                                                skill.proficiency >= 40 ? 'bg-yellow-500' : 'bg-gray-500'
+                                              } shadow-sm`}></div>
+                                            </div>
+                                          </div>
+                                          {/* Skill Info */}
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between mb-2">
+                                              <h4 className="font-semibold text-slate-900 dark:text-white truncate pr-2">
+                                                {skill.name}
+                                              </h4>
+                                              <div className="flex items-center gap-2">
+                                                <Badge 
+                                                  variant="secondary"
+                                                  className={`${proficiencyInfo.color} text-xs px-2 py-1 font-medium`}
+                                                >
+                                                  {skill.proficiency}%
+                                                </Badge>
+                                              </div>
+                                            </div>
+                                            
+                                            <div className="flex items-center justify-between">
+                                              <Badge variant="outline" className="text-xs px-2 py-0.5 text-slate-600 dark:text-slate-400">
+                                                {skill.category}
+                                              </Badge>
+                                              
+                                              <div className="flex items-center gap-1">
+                                                <Badge 
+                                                  variant={skill.show_percentage ? "default" : "secondary"}
+                                                  className="text-xs px-2 py-0.5"
+                                                >
+                                                  <div className="flex items-center gap-1">
+                                                    {skill.show_percentage ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                                    {skill.show_percentage ? "Shows %" : "Hidden"}
+                                                  </div>
+                                                </Badge>
+                                              </div>
+                                            </div>
+                                            
+                                            {/* Progress Bar */}
+                                            <div className="mt-3">
+                                              <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                <motion.div
+                                                  initial={{ width: 0 }}
+                                                  animate={{ width: `${skill.proficiency}%` }}
+                                                  transition={{ duration: 1, delay: index * 0.05, ease: "easeOut" }}
+                                                  className={`h-full bg-gradient-to-r ${categoryInfo.color} rounded-full`}
+                                                />
+                                              </div>
                                             </div>
                                           </div>
                                           
-                                          {viewMode === 'grid' && (
-                                            <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 flex gap-1">
+                                          {/* Action Buttons */}
+                                          <div className="flex-shrink-0">
+                                            <div className="flex gap-1">
                                               <Button
                                                 variant="ghost"
                                                 size="sm"
@@ -837,92 +903,109 @@ export default function AdminSkillsPage() {
                                               <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={() => handleDeleteSkill(skill.id)}
+                                                onClick={() => setSkillToDelete(skill)}
                                                 className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900 text-red-600"
                                               >
                                                 <Trash2 className="w-3 h-3" />
                                               </Button>
                                             </div>
-                                          )}
+                                          </div>
                                         </div>
 
-                                        {/* Skill Content */}
-                                        <div className={`space-y-3 ${viewMode === 'list' ? 'flex-1' : ''}`}>
-                                          <div className="flex justify-between items-center">
-                                            <span className="text-sm font-medium text-muted-foreground">
-                                              {skill.show_percentage ? 'Proficiency' : 'Level'}
-                                            </span>
+                                        {/* Skill Progress Section */}
+                                        {viewMode === 'grid' ? (
+                                          /* Grid View - Vertical Progress Display */
+                                          <div className="flex-grow flex flex-col justify-end space-y-4">
                                             {skill.show_percentage ? (
-                                              <span className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                                                {skill.proficiency}%
-                                              </span>
-                                            ) : (
-                                              <Badge
-                                                variant="secondary"
-                                                className={`${proficiencyInfo.color} bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm border border-current/20 font-semibold px-3 py-1`}
-                                              >
-                                                <div className="flex items-center gap-1.5">
-                                                  <ProficiencyIcon className="w-3 h-3" />
-                                                  {proficiencyInfo.level}
+                                              <>
+                                                {/* Percentage Badge */}
+                                                <div className="flex justify-center">
+                                                  <Badge
+                                                    variant="secondary"
+                                                    className={`${proficiencyInfo.color} bg-white dark:bg-slate-700 border border-current/30 font-semibold text-sm px-3 py-1.5 shadow-lg`}
+                                                  >
+                                                    <div className="flex items-center gap-2">
+                                                      <ProficiencyIcon className="w-4 h-4" />
+                                                      {skill.proficiency}%
+                                                    </div>
+                                                  </Badge>
                                                 </div>
-                                              </Badge>
+                                                
+                                                {/* Enhanced Progress Bar */}
+                                                <div className="relative">
+                                                  <div className="w-full h-3 bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600 rounded-full overflow-hidden shadow-inner">
+                                                    <motion.div
+                                                      initial={{ width: 0 }}
+                                                      animate={{ width: `${skill.proficiency}%` }}
+                                                      transition={{ duration: 1.5, delay: index * 0.05, ease: "easeOut" }}
+                                                      className={`h-full bg-gradient-to-r ${getCategoryInfo(skill.category).color} rounded-full relative overflow-hidden shadow-lg`}
+                                                    >
+                                                      <div className="absolute inset-0 bg-gradient-to-r from-white/40 via-white/20 to-transparent" />
+                                                      <motion.div
+                                                        animate={{ x: ["-100%", "100%"] }}
+                                                        transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                                                        className="absolute top-0 left-0 h-full w-1/3 bg-white/60 blur-sm skew-x-12"
+                                                      />
+                                                    </motion.div>
+                                                  </div>
+                                                </div>
+                                              </>
+                                            ) : (
+                                              <div className="text-center">
+                                                <Badge
+                                                  variant="secondary"
+                                                  className={`${proficiencyInfo.color} bg-white dark:bg-slate-700 border border-current/30 font-semibold px-3 py-1.5 shadow-lg`}
+                                                >
+                                                  <div className="flex items-center gap-2">
+                                                    <ProficiencyIcon className="w-4 h-4" />
+                                                    Professional
+                                                  </div>
+                                                </Badge>
+                                              </div>
                                             )}
                                           </div>
-
-                                          {/* Progress Bar */}
-                                          <div className="relative">
-                                            <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                              <motion.div
-                                                initial={{ width: 0 }}
-                                                animate={{ width: `${skill.proficiency}%` }}
-                                                transition={{ duration: 1, delay: index * 0.1 }}
-                                                className={`h-full bg-gradient-to-r ${categoryInfo.color} rounded-full relative overflow-hidden`}
-                                              >
-                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
-                                              </motion.div>
+                                        ) : (
+                                          /* List View - Horizontal Progress Display */
+                                          <div className="flex-1 space-y-2 ml-4">
+                                            <div className="flex justify-between items-center">
+                                              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                                                {skill.show_percentage ? 'Proficiency' : 'Level'}
+                                              </span>
+                                              {skill.show_percentage ? (
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-lg font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+                                                    {skill.proficiency}%
+                                                  </span>
+                                                  <Badge
+                                                    variant="secondary"
+                                                    className={`${proficiencyInfo.color} bg-white dark:bg-slate-700 border border-current/30 font-medium text-xs px-2 py-1 shadow-sm`}
+                                                  >
+                                                    <div className="flex items-center gap-1">
+                                                      <ProficiencyIcon className="w-3 h-3" />
+                                                      {proficiencyInfo.level}
+                                                    </div>
+                                                  </Badge>
+                                                </div>
+                                              ) : (
+                                                <Badge
+                                                  variant="secondary"
+                                                  className={`${proficiencyInfo.color} bg-white dark:bg-slate-700 border border-current/30 font-medium px-3 py-1.5 shadow-sm`}
+                                                >
+                                                  <div className="flex items-center gap-1">
+                                                    <ProficiencyIcon className="w-3 h-3" />
+                                                    Professional
+                                                  </div>
+                                                </Badge>
+                                              )}
                                             </div>
                                           </div>
-
-                                          {/* Status Badges */}
-                                          <div className="flex items-center justify-between pt-2">
-                                            <Badge 
-                                              variant={skill.show_percentage ? "default" : "secondary"}
-                                              className="text-xs px-2 py-0.5"
-                                            >
-                                              <div className="flex items-center gap-1">
-                                                {skill.show_percentage ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                                                {skill.show_percentage ? "Shows %" : "Hidden %"}
-                                              </div>
-                                            </Badge>
-                                            
-                                            {viewMode === 'list' && (
-                                              <div className="flex gap-1">
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  onClick={() => setEditingSkill(skill)}
-                                                  className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900"
-                                                >
-                                                  <Edit className="w-3 h-3" />
-                                                </Button>
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  onClick={() => handleDeleteSkill(skill.id)}
-                                                  className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900 text-red-600"
-                                                >
-                                                  <Trash2 className="w-3 h-3" />
-                                                </Button>
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
+                                        )}
                                       </div>
                                     </CardContent>
-                                  </Card>
-                                )}
-                              </motion.div>
-                            );
+                                    </Card>
+                                  )}
+                                </motion.div>
+                              );
                           })}
                         </AnimatePresence>
                       </div>
@@ -933,6 +1016,38 @@ export default function AdminSkillsPage() {
             })}
           </div>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={!!skillToDelete} onOpenChange={() => setSkillToDelete(null)}>
+          <AlertDialogContent className="border-0 shadow-2xl bg-white dark:bg-slate-900">
+            <AlertDialogHeader>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg bg-gradient-to-r from-red-500 to-rose-600 shadow-lg">
+                  <Trash2 className="w-5 h-5 text-white" />
+                </div>
+                <AlertDialogTitle className="text-xl">Delete Skill</AlertDialogTitle>
+              </div>
+              <AlertDialogDescription className="text-base leading-relaxed">
+                Are you sure you want to delete <span className="font-semibold text-red-600 dark:text-red-400">"{skillToDelete?.name}"</span>? 
+                This will permanently remove this skill from your portfolio.
+                <br /><br />
+                <span className="text-sm text-muted-foreground">This action cannot be undone.</span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2">
+              <AlertDialogCancel className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleDeleteSkill}
+                className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Skill
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AdminLayout>
   );

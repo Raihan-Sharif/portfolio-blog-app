@@ -269,8 +269,12 @@ CREATE TABLE skills (
   category TEXT,
   proficiency INTEGER CHECK (proficiency BETWEEN 1 AND 100),
   icon TEXT,
+  brand_logo TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+COMMENT ON COLUMN skills.brand_logo IS 
+'Path to uploaded brand/skill logo image';
 
 CREATE TABLE categories (
   id SERIAL PRIMARY KEY,

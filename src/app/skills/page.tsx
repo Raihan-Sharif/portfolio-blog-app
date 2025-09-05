@@ -39,5 +39,5 @@ export default async function SkillsPage() {
     });
   }
 
-  return <EnhancedSkillsContent skillsByCategory={skillsByCategory} />;
+  return <EnhancedSkillsContent skills={skills || []} />;
 }
