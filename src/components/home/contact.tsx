@@ -4,7 +4,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/input"; 
+import { useContactVisibility, filterContactsByVisibility } from "@/lib/hooks/useContactVisibility";
 import {
   Select,
   SelectContent,
@@ -104,6 +105,9 @@ export default function Contact({
   businessHours,
   availability,
 }: ContactProps) {
+  // Contact visibility hook
+  const { visibility, loading: visibilityLoading } = useContactVisibility();
+  
   // Form state
   const [formData, setFormData] = useState({
     name: "",
@@ -322,6 +326,11 @@ export default function Contact({
 
   const dayStatus = getCurrentDayStatus();
 
+  // Filter contacts based on visibility settings
+  const filteredContacts = visibilityLoading 
+    ? contactInfo 
+    : filterContactsByVisibility(contactInfo, 'homepage', visibility);
+
   return (
     <section
       className={`${SPACING.section} ${GRADIENTS.background} relative overflow-hidden`}
@@ -433,7 +442,7 @@ export default function Contact({
             )}
 
             {/* Contact Methods */}
-            {contactInfo && contactInfo.length > 0 && (
+            {filteredContacts && filteredContacts.length > 0 && (
               <Card className="bg-card/60 backdrop-blur-sm border-white/10 hover:shadow-lg transition-all duration-300">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -442,7 +451,7 @@ export default function Contact({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {contactInfo.map((contact, index) => (
+                  {filteredContacts.map((contact, index) => (
                     <motion.div
                       key={contact.id}
                       initial={{ opacity: 0, x: -20 }}

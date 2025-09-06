@@ -3,6 +3,7 @@
 import SharedButton from "@/components/shared/share-button";
 import { Button } from "@/components/ui/button";
 import { motion, useInView, useScroll, useTransform } from "framer-motion";
+import { useContactVisibility, shouldShowContactInAbout } from "@/lib/hooks/useContactVisibility";
 import {
   Award,
   BookOpen,
@@ -164,6 +165,9 @@ export default function AboutContent({
   const isHeroInView = useInView(heroRef, { once: true, amount: 0.3 });
   const [expandedSkills, setExpandedSkills] = useState<Set<number>>(new Set());
   const [expandedCourses, setExpandedCourses] = useState<Set<number>>(new Set());
+  
+  // Contact visibility hook
+  const { visibility, loading: visibilityLoading } = useContactVisibility();
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -544,7 +548,7 @@ export default function AboutContent({
                       <span>{aboutSettings.location}</span>
                     </motion.div>
                   )}
-                  {aboutSettings?.email && (
+                  {aboutSettings?.email && (visibilityLoading || shouldShowContactInAbout('email', visibility)) && (
                     <motion.div
                       whileHover={{ scale: 1.05 }}
                       className="flex items-center gap-2 text-muted-foreground bg-card/40 backdrop-blur-sm px-4 py-2 rounded-full border border-white/10"
@@ -559,7 +563,7 @@ export default function AboutContent({
                       </a>
                     </motion.div>
                   )}
-                  {aboutSettings?.phone && (
+                  {aboutSettings?.phone && (visibilityLoading || shouldShowContactInAbout('phone', visibility)) && (
                     <motion.div
                       whileHover={{ scale: 1.05 }}
                       className="flex items-center gap-2 text-muted-foreground bg-card/40 backdrop-blur-sm px-4 py-2 rounded-full border border-white/10"

@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { useState, useRef } from "react";
 import ReCAPTCHAComponent, { ReCAPTCHAV3Ref } from "@/components/ui/recaptcha";
+import { useContactVisibility, filterContactsByVisibility } from "@/lib/hooks/useContactVisibility";
 
 // interfaces remain the same as in your original contact component
 interface ContactInfo {
@@ -110,6 +111,9 @@ export default function EnhancedContactContent({
   availability,
   aboutSettings,
 }: EnhancedContactContentProps) {
+  // Contact visibility hook
+  const { visibility, loading: visibilityLoading } = useContactVisibility();
+  
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -306,6 +310,11 @@ export default function EnhancedContactContent({
 
   const dayStatus = getCurrentDayStatus();
 
+  // Filter contacts based on visibility settings
+  const filteredContacts = visibilityLoading 
+    ? contactInfo 
+    : filterContactsByVisibility(contactInfo, 'contact_page', visibility);
+
   return (
     <div
       className={`min-h-screen ${GRADIENTS.background} relative overflow-hidden`}
@@ -435,12 +444,13 @@ export default function EnhancedContactContent({
                 )}
 
                 {/* Contact Methods */}
-                <Card className="bg-card/60 backdrop-blur-sm border-white/10">
-                  <CardHeader>
-                    <CardTitle>Contact Methods</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {contactInfo.map((contact, index) => (
+                {filteredContacts && filteredContacts.length > 0 && (
+                  <Card className="bg-card/60 backdrop-blur-sm border-white/10">
+                    <CardHeader>
+                      <CardTitle>Contact Methods</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {filteredContacts.map((contact, index) => (
                       <motion.div
                         key={contact.id}
                         initial={{ opacity: 0, x: -20 }}
@@ -475,9 +485,10 @@ export default function EnhancedContactContent({
                         </div>
                         <ExternalLink className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                       </motion.div>
-                    ))}
-                  </CardContent>
-                </Card>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Business Hours */}
                 {businessHours.length > 0 && (

@@ -32,14 +32,18 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase/client";
+import { useContactVisibility, ContactVisibilitySettings } from "@/lib/hooks/useContactVisibility";
 import {
   AlertCircle,
   Clock,
   Contact,
   Edit,
+  Eye,
+  EyeOff,
   Plus,
   Save,
   Settings,
+  Shield,
   Star,
   Trash2,
 } from "lucide-react";
@@ -120,6 +124,16 @@ export default function AdminContactManagement() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Contact visibility hook
+  const {
+    settings: visibilitySettings,
+    visibility,
+    loading: visibilityLoading,
+    error: visibilityError,
+    refetch: refetchVisibility,
+    updateVisibility,
+  } = useContactVisibility();
 
   // Contact Info Form
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
@@ -475,7 +489,7 @@ export default function AdminContactManagement() {
         )}
 
         <Tabs defaultValue="contact-info" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger
               value="contact-info"
               className="flex items-center gap-2"
@@ -496,6 +510,13 @@ export default function AdminContactManagement() {
             >
               <Settings size={16} />
               Availability
+            </TabsTrigger>
+            <TabsTrigger
+              value="visibility"
+              className="flex items-center gap-2"
+            >
+              <Shield size={16} />
+              Visibility Settings
             </TabsTrigger>
           </TabsList>
 
@@ -1229,8 +1250,243 @@ export default function AdminContactManagement() {
               </Table>
             </div>
           </TabsContent>
+
+          {/* Visibility Settings Tab */}
+          <TabsContent value="visibility">
+            <div className="bg-card rounded-lg border shadow-sm overflow-hidden">
+              <div className="p-4 border-b">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold">Contact Visibility Settings</h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Control which contact information is displayed on different pages of your website.
+                    </p>
+                  </div>
+                  {visibilityError && (
+                    <div className="text-destructive text-sm flex items-center gap-2">
+                      <AlertCircle size={16} />
+                      {visibilityError}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {visibilityLoading ? (
+                <div className="p-8 text-center text-muted-foreground">
+                  Loading visibility settings...
+                </div>
+              ) : (
+                <div className="p-6">
+                  {/* Homepage Settings */}
+                  <div className="mb-8">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                      <h3 className="text-lg font-semibold">Homepage Contact Section</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {visibilitySettings
+                        .filter(setting => setting.page_context === 'homepage')
+                        .sort((a, b) => a.display_order - b.display_order)
+                        .map((setting) => (
+                          <VisibilityCard 
+                            key={setting.id} 
+                            setting={setting} 
+                            onToggle={updateVisibility}
+                          />
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* Contact Page Settings */}
+                  <div className="mb-8">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      <h3 className="text-lg font-semibold">Contact Page</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {visibilitySettings
+                        .filter(setting => setting.page_context === 'contact_page')
+                        .sort((a, b) => a.display_order - b.display_order)
+                        .map((setting) => (
+                          <VisibilityCard 
+                            key={setting.id} 
+                            setting={setting} 
+                            onToggle={updateVisibility}
+                          />
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* About Page Settings */}
+                  <div className="mb-8">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                      <h3 className="text-lg font-semibold">About Page</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {visibilitySettings
+                        .filter(setting => setting.page_context === 'about_page')
+                        .sort((a, b) => a.display_order - b.display_order)
+                        .map((setting) => (
+                          <VisibilityCard 
+                            key={setting.id} 
+                            setting={setting} 
+                            onToggle={updateVisibility}
+                          />
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* Live Preview */}
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Eye size={18} />
+                      Live Preview
+                    </h3>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <div className="border rounded-lg p-4">
+                        <h4 className="font-semibold text-blue-600 mb-2">Homepage</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className={`flex items-center gap-2 ${visibility.homepage.phone ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
+                            📞 Phone Numbers {!visibility.homepage.phone && '(Hidden)'}
+                          </div>
+                          <div className={`flex items-center gap-2 ${visibility.homepage.whatsapp ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
+                            💬 WhatsApp Numbers {!visibility.homepage.whatsapp && '(Hidden)'}
+                          </div>
+                          <div className={`flex items-center gap-2 ${visibility.homepage.email ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
+                            📧 Email Addresses {!visibility.homepage.email && '(Hidden)'}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="border rounded-lg p-4">
+                        <h4 className="font-semibold text-green-600 mb-2">Contact Page</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className={`flex items-center gap-2 ${visibility.contact_page.phone ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
+                            📞 Phone Numbers {!visibility.contact_page.phone && '(Hidden)'}
+                          </div>
+                          <div className={`flex items-center gap-2 ${visibility.contact_page.whatsapp ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
+                            💬 WhatsApp Numbers {!visibility.contact_page.whatsapp && '(Hidden)'}
+                          </div>
+                          <div className={`flex items-center gap-2 ${visibility.contact_page.email ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
+                            📧 Email Addresses {!visibility.contact_page.email && '(Hidden)'}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="border rounded-lg p-4">
+                        <h4 className="font-semibold text-purple-600 mb-2">About Page</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className={`flex items-center gap-2 ${visibility.about_page.phone ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
+                            📞 Phone Numbers {!visibility.about_page.phone && '(Hidden)'}
+                          </div>
+                          <div className={`flex items-center gap-2 ${visibility.about_page.email ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
+                            📧 Email Addresses {!visibility.about_page.email && '(Hidden)'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
     </AdminLayout>
+  );
+}
+
+// Visibility Card Component
+interface VisibilityCardProps {
+  setting: ContactVisibilitySettings;
+  onToggle: (settingKey: string, isVisible: boolean) => Promise<void>;
+}
+
+function VisibilityCard({ setting, onToggle }: VisibilityCardProps) {
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleToggle = async () => {
+    try {
+      setIsUpdating(true);
+      await onToggle(setting.setting_key, !setting.is_visible);
+    } catch (error) {
+      console.error('Failed to toggle visibility:', error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const getContactTypeIcon = (type: string) => {
+    switch (type) {
+      case 'phone': return '📞';
+      case 'whatsapp': return '💬';
+      case 'email': return '📧';
+      default: return '📱';
+    }
+  };
+
+  const getContactTypeColor = (type: string) => {
+    switch (type) {
+      case 'phone': return 'text-blue-600';
+      case 'whatsapp': return 'text-green-600';
+      case 'email': return 'text-purple-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  return (
+    <div className={`border rounded-lg p-4 transition-all duration-200 ${
+      setting.is_visible 
+        ? 'border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800' 
+        : 'border-gray-200 bg-gray-50 dark:bg-gray-950 dark:border-gray-800'
+    }`}>
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-lg">{getContactTypeIcon(setting.contact_type)}</span>
+            <h4 className={`font-medium ${getContactTypeColor(setting.contact_type)}`}>
+              {setting.setting_name}
+            </h4>
+          </div>
+          {setting.setting_description && (
+            <p className="text-xs text-muted-foreground mb-3">
+              {setting.setting_description}
+            </p>
+          )}
+        </div>
+        <div className="ml-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleToggle}
+            disabled={isUpdating}
+            className={`h-8 w-8 ${
+              setting.is_visible 
+                ? 'text-green-600 hover:text-green-700 hover:bg-green-100' 
+                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            {isUpdating ? (
+              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : setting.is_visible ? (
+              <Eye size={16} />
+            ) : (
+              <EyeOff size={16} />
+            )}
+          </Button>
+        </div>
+      </div>
+      
+      <div className="flex items-center justify-between mt-3">
+        <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+          setting.is_visible 
+            ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' 
+            : 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300'
+        }`}>
+          {setting.is_visible ? 'Visible' : 'Hidden'}
+        </span>
+      </div>
+    </div>
   );
 }

@@ -4246,3 +4246,68 @@ CREATE INDEX IF NOT EXISTS idx_online_users_is_authenticated ON online_users(is_
 -- Note: Automatic cleanup happens within upsert_online_user function
 -- No cron jobs needed - cleanup runs automatically with 10% probability on each upsert
 $$
+
+
+## Contact Visibility Settings Table
+
+```sql
+-- Contact visibility settings table
+-- This table controls the visibility of contact information (phone numbers and WhatsApp) across different pages
+
+CREATE TABLE IF NOT EXISTS contact_visibility_settings (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    setting_key text UNIQUE NOT NULL, -- e.g., 'homepage_phone', 'contact_page_whatsapp'
+    setting_name text NOT NULL, -- Human readable name e.g., 'Phone Number on Homepage'
+    setting_description text, -- Description of what this controls
+    is_visible boolean DEFAULT true NOT NULL, -- Whether to show or hide
+    page_context text NOT NULL, -- 'homepage', 'contact_page', 'about_page'
+    contact_type text NOT NULL, -- 'phone', 'whatsapp', 'email'
+    display_order integer DEFAULT 0,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT timezone('utc', now()) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone('utc', now()) NOT NULL
+);
+
+-- Add RLS policies
+ALTER TABLE contact_visibility_settings ENABLE ROW LEVEL SECURITY;
+
+-- Allow public to read active visibility settings
+CREATE POLICY "Public can view active visibility settings" 
+ON contact_visibility_settings 
+FOR SELECT 
+USING (is_active = true);
+
+-- Allow authenticated users to manage visibility settings
+CREATE POLICY "Authenticated users can manage visibility settings" 
+ON contact_visibility_settings 
+FOR ALL 
+USING (auth.role() = 'authenticated');
+
+-- Create updated_at trigger (reuse existing trigger function)
+CREATE TRIGGER set_timestamp
+    BEFORE UPDATE ON contact_visibility_settings
+    FOR EACH ROW
+    EXECUTE PROCEDURE trigger_set_timestamp();
+
+-- Insert default visibility settings for all pages and contact types
+INSERT INTO contact_visibility_settings (setting_key, setting_name, setting_description, is_visible, page_context, contact_type, display_order) VALUES
+-- Homepage settings
+('homepage_phone_visibility', 'Phone Numbers on Homepage', 'Show/hide phone numbers on the homepage contact section', true, 'homepage', 'phone', 1),
+('homepage_whatsapp_visibility', 'WhatsApp Numbers on Homepage', 'Show/hide WhatsApp numbers on the homepage contact section', true, 'homepage', 'whatsapp', 2),
+('homepage_email_visibility', 'Email Addresses on Homepage', 'Show/hide email addresses on the homepage contact section', true, 'homepage', 'email', 3),
+
+-- Contact page settings
+('contact_page_phone_visibility', 'Phone Numbers on Contact Page', 'Show/hide phone numbers on the contact page', true, 'contact_page', 'phone', 1),
+('contact_page_whatsapp_visibility', 'WhatsApp Numbers on Contact Page', 'Show/hide WhatsApp numbers on the contact page', true, 'contact_page', 'whatsapp', 2),
+('contact_page_email_visibility', 'Email Addresses on Contact Page', 'Show/hide email addresses on the contact page', true, 'contact_page', 'email', 3),
+
+-- About page settings
+('about_page_phone_visibility', 'Phone Numbers on About Page', 'Show/hide phone numbers on the about page', true, 'about_page', 'phone', 1),
+('about_page_email_visibility', 'Email Addresses on About Page', 'Show/hide email addresses on the about page', true, 'about_page', 'email', 2);
+
+-- Create indexes for better performance
+CREATE INDEX idx_contact_visibility_page_context ON contact_visibility_settings(page_context);
+CREATE INDEX idx_contact_visibility_contact_type ON contact_visibility_settings(contact_type);
+CREATE INDEX idx_contact_visibility_active ON contact_visibility_settings(is_active);
+```
+
