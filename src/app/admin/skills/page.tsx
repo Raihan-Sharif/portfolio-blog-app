@@ -783,7 +783,7 @@ export default function AdminSkillsPage() {
                                       <SkillImageUploader
                                         skillId={editingSkill.id.toString()}
                                         currentImage={editingSkill.brand_logo}
-                                        onImageChange={(imagePath) => setEditingSkill({...editingSkill, brand_logo: imagePath})}
+                                        onImageChange={(imagePath) => setEditingSkill({...editingSkill, brand_logo: imagePath || undefined})}
                                         compact={true}
                                       />
                                       

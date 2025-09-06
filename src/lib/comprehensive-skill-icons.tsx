@@ -9,14 +9,14 @@ import {
   SiFirebase, SiSupabase, SiPrisma, SiGraphql, SiDocker, SiKubernetes,
   SiAmazons3, SiGooglecloud, SiHeroku, SiVercel, SiNetlify,
   SiJenkins, SiGithubactions, SiTerraform, SiAnsible, SiGit, SiGithub,
-  SiGitlab, SiBitbucket, SiVisualstudiocode, SiPostman, SiFigma, SiAdobephotoshop,
+  SiGitlab, SiBitbucket, SiVscodium, SiPostman, SiFigma, SiAdobephotoshop,
   SiAdobeillustrator, SiAdobexd, SiFlutter, SiDart, SiSwift, SiKotlin,
-  SiXamarin, SiIonic, SiJest, SiCypress, SiSelenium, SiPlaywright,
-  SiWebpack, SiVite, SiRollup, SiBabel, SiEslint, SiPrettier, SiStorybook,
-  SiLinux, SiWindows, SiMacos, SiUbuntu, SiCentos, SiRedhat, SiDebian,
+  SiIonic, SiJest, SiCypress, SiSelenium, SiVitest,
+  SiWebpack, SiVite, SiRollupdotjs, SiBabel, SiEslint, SiPrettier, SiStorybook,
+  SiLinux, SiGitforwindows, SiMacos, SiUbuntu, SiCentos, SiRedhat, SiDebian,
   SiNginx, SiApache, SiElasticsearch, SiLogstash, SiKibana, SiPrometheus,
-  SiGrafana, SiJira, SiTrello, SiSlack, SiDiscord, SiNotable, SiObsidian,
-  SiConfluence, SiMiro, SiCanva, SiSketch, SiInvision, SiZeplin, SiFramer,
+  SiGrafana, SiJira, SiTrello, SiSlack, SiDiscord, SiObsidian,
+  SiConfluence, SiMiro, SiCanva, SiSketch, SiInvision, SiFramer,
   SiWordpress, SiShopify, SiMagento, SiWoocommerce, SiStripe, SiPaypal,
   // Additional specific skill icons
   SiTensorflow, SiPytorch, SiOpencv, SiNumpy, SiPandas, SiJupyter,
@@ -129,8 +129,8 @@ const COMPREHENSIVE_SKILL_ICONS: Record<string, { icon: React.ReactNode; categor
   'github': { icon: <SiGithub />, category: 'Tools', color: '#181717' },
   'gitlab': { icon: <SiGitlab />, category: 'Tools', color: '#FCA326' },
   'bitbucket': { icon: <SiBitbucket />, category: 'Tools', color: '#0052CC' },
-  'vscode': { icon: <SiVisualstudiocode />, category: 'Tools', color: '#007ACC' },
-  'visual studio code': { icon: <SiVisualstudiocode />, category: 'Tools', color: '#007ACC' },
+  'vscode': { icon: <SiVscodium />, category: 'Tools', color: '#007ACC' },
+  'visual studio code': { icon: <SiVscodium />, category: 'Tools', color: '#007ACC' },
   'postman': { icon: <SiPostman />, category: 'Tools', color: '#FF6C37' },
   'figma': { icon: <SiFigma />, category: 'Design', color: '#F24E1E' },
   'photoshop': { icon: <SiAdobephotoshop />, category: 'Design', color: '#31A8FF' },
@@ -144,19 +144,18 @@ const COMPREHENSIVE_SKILL_ICONS: Record<string, { icon: React.ReactNode; categor
   'dart': { icon: <SiDart />, category: 'Mobile', color: '#0175C2' },
   'swift': { icon: <SiSwift />, category: 'Mobile', color: '#FA7343' },
   'kotlin': { icon: <SiKotlin />, category: 'Mobile', color: '#7F52FF' },
-  'xamarin': { icon: <SiXamarin />, category: 'Mobile', color: '#3199DC' },
   'ionic': { icon: <SiIonic />, category: 'Mobile', color: '#3880FF' },
 
   // Testing
   'jest': { icon: <SiJest />, category: 'Tools', color: '#C21325' },
   'cypress': { icon: <SiCypress />, category: 'Tools', color: '#17202C' },
   'selenium': { icon: <SiSelenium />, category: 'Tools', color: '#43B02A' },
-  'playwright': { icon: <SiPlaywright />, category: 'Tools', color: '#2EAD33' },
+  'playwright': { icon: <SiVitest />, category: 'Tools', color: '#2EAD33' },
 
   // Build Tools & Bundlers
   'webpack': { icon: <SiWebpack />, category: 'Tools', color: '#8DD6F9' },
   'vite': { icon: <SiVite />, category: 'Tools', color: '#646CFF' },
-  'rollup': { icon: <SiRollup />, category: 'Tools', color: '#EC4A3F' },
+  'rollup': { icon: <SiRollupdotjs />, category: 'Tools', color: '#EC4A3F' },
   'babel': { icon: <SiBabel />, category: 'Tools', color: '#F9DC3E' },
   'eslint': { icon: <SiEslint />, category: 'Tools', color: '#4B32C3' },
   'prettier': { icon: <SiPrettier />, category: 'Tools', color: '#F7B93E' },
@@ -165,7 +164,7 @@ const COMPREHENSIVE_SKILL_ICONS: Record<string, { icon: React.ReactNode; categor
   // Operating Systems
   'linux': { icon: <SiLinux />, category: 'Infrastructure', color: '#FCC624' },
   'ubuntu': { icon: <SiUbuntu />, category: 'Infrastructure', color: '#E95420' },
-  'windows': { icon: <SiWindows />, category: 'Infrastructure', color: '#0078D6' },
+  'windows': { icon: <SiGitforwindows />, category: 'Infrastructure', color: '#0078D6' },
   'macos': { icon: <SiMacos />, category: 'Infrastructure', color: '#000000' },
 
   // Data Science & AI
