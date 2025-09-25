@@ -115,6 +115,26 @@ const config: Config = {
           from: { transform: "translateY(100%)" },
           to: { transform: "translateY(0)" },
         },
+        // Modern background animations
+        "subtle-float": {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "33%": { transform: "translate(1px, -1px) scale(1.001)" },
+          "66%": { transform: "translate(-1px, 1px) scale(0.999)" },
+        },
+        "gradient-float": {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "33%": { transform: "translate(20px, -10px) scale(1.1)" },
+          "66%": { transform: "translate(-15px, 15px) scale(0.9)" },
+        },
+        "gradient-float-delayed": {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "33%": { transform: "translate(-25px, 20px) scale(0.95)" },
+          "66%": { transform: "translate(18px, -18px) scale(1.05)" },
+        },
+        "gradient-float-slow": {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "50%": { transform: "translate(10px, -25px) scale(1.02)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -125,6 +145,11 @@ const config: Config = {
         "slide-in-from-left": "slide-in-from-left 0.3s ease-out",
         "slide-in-from-top": "slide-in-from-top 0.3s ease-out",
         "slide-in-from-bottom": "slide-in-from-bottom 0.3s ease-out",
+        // Modern background animations
+        "subtle-float": "subtle-float 20s ease-in-out infinite",
+        "gradient-float": "gradient-float 15s ease-in-out infinite",
+        "gradient-float-delayed": "gradient-float-delayed 18s ease-in-out infinite 3s",
+        "gradient-float-slow": "gradient-float-slow 25s ease-in-out infinite 8s",
       },
       typography: {
         DEFAULT: {
@@ -157,12 +182,20 @@ const config: Config = {
           },
         },
       },
-      // Add grid patterns for background
+      // Enhanced background patterns for modern aesthetic
       backgroundImage: {
         "dot-pattern":
           "radial-gradient(circle, currentColor 1px, transparent 1px)",
         "grid-pattern":
           "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)",
+        "modern-dots":
+          "radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)",
+        "tech-grid":
+          "linear-gradient(currentColor 0.5px, transparent 0.5px), linear-gradient(90deg, currentColor 0.5px, transparent 0.5px)",
+        "diamond-pattern":
+          "radial-gradient(circle at 0.5px 0.5px, currentColor 0.5px, transparent 0.5px), radial-gradient(circle at 12.5px 12.5px, currentColor 0.5px, transparent 0.5px)",
+        "wave-pattern":
+          "radial-gradient(ellipse 100% 20px at 50% 0%, currentColor, transparent), radial-gradient(ellipse 100% 20px at 50% 100%, currentColor, transparent)",
       },
       backgroundSize: {
         "dot-sm": "20px 20px",
@@ -171,6 +204,18 @@ const config: Config = {
         "grid-sm": "20px 20px",
         "grid-md": "30px 30px",
         "grid-lg": "40px 40px",
+        "modern-sm": "24px 24px",
+        "modern-md": "32px 32px",
+        "modern-lg": "48px 48px",
+        "tech-sm": "16px 16px",
+        "tech-md": "24px 24px",
+        "tech-lg": "32px 32px",
+        "diamond-sm": "20px 20px",
+        "diamond-md": "25px 25px",
+        "diamond-lg": "30px 30px",
+        "wave-sm": "60px 30px",
+        "wave-md": "80px 40px",
+        "wave-lg": "100px 50px",
       },
     },
   },

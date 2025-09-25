@@ -2,6 +2,7 @@
 import { NotificationManager } from "@/components/admin/notification-manager";
 import ConditionalLayout from "@/components/layout/conditional-layout";
 import { Footer } from "@/components/layout/footer";
+import PageBackground from "@/components/layout/page-background";
 import { Navbar } from "@/components/layout/navbar";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
@@ -129,8 +130,8 @@ export default function RootLayout({
           >
             <AuthProvider>
               <LeadGenerationProvider>
-                {/* Background pattern */}
-                <div className="fixed inset-0 bg-dot-pattern bg-dot-sm opacity-[0.02] dark:opacity-[0.05] pointer-events-none" />
+                {/* Modern Page-Specific Background System */}
+                <PageBackground />
 
                 {/* FIXED: Use ConditionalLayout to exclude navbar/footer for admin routes */}
                 <ConditionalLayout

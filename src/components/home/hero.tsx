@@ -2,6 +2,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import HeroBackground from "@/components/layout/hero-background";
 import { motion } from "framer-motion";
 import { ArrowDown, Github, Linkedin, Mail, Sparkles } from "lucide-react";
 import Image from "next/image";
@@ -95,153 +96,61 @@ export default function Hero({
 
   return (
     <section className="relative min-h-screen flex items-center py-16 overflow-hidden">
-      {/* Advanced Background System */}
-      <div className="absolute inset-0 z-0">
-        {/* Base gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-accent/20"></div>
+      {/* Modern Hero Background System */}
+      <HeroBackground variant="primary" intensity="medium" className="z-0" />
 
-        {/* Animated mesh gradient */}
-        <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/20 via-transparent to-purple-500/20"></div>
-          <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-bl from-blue-500/20 via-transparent to-cyan-500/20"></div>
-        </div>
-
-        {/* Dynamic floating elements */}
-        <div className="absolute inset-0">
-          {/* Large floating orbs */}
+      {/* Custom SVG Background Integration */}
+      {settings.background_svg_url && (
+        <div className="absolute inset-0 z-10">
           <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 0.15, scale: 1 }}
+            transition={{ duration: 2, ease: "easeOut" }}
+            className="absolute inset-0 flex items-center justify-center"
+          >
+            <div className="relative w-full h-full max-w-4xl max-h-4xl">
+              <Image
+                src={settings.background_svg_url}
+                alt="Background design"
+                fill
+                sizes="100vw"
+                className="object-contain"
+                style={{ filter: "hue-rotate(45deg) saturate(0.7)" }}
+              />
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Subtle interactive sparkles */}
+      <div className="absolute inset-0 z-20 pointer-events-none">
+        {[...Array(8)].map((_, i) => (
+          <motion.div
+            key={i}
             animate={{
-              x: [0, 100, 0],
-              y: [0, -50, 0],
-              scale: [1, 1.1, 1],
+              scale: [0, 1, 0],
+              opacity: [0, 0.8, 0],
             }}
             transition={{
-              duration: 20,
+              duration: 4,
               repeat: Infinity,
+              delay: i * 0.8,
               ease: "easeInOut",
             }}
-            className="absolute top-20 right-20 w-96 h-96 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-full blur-3xl"
+            className="absolute w-1.5 h-1.5 bg-primary/60 rounded-full"
+            style={{
+              top: `${15 + i * 10}%`,
+              left: `${8 + i * 11}%`,
+            }}
           />
-          <motion.div
-            animate={{
-              x: [0, -80, 0],
-              y: [0, 30, 0],
-              scale: [1, 0.8, 1],
-            }}
-            transition={{
-              duration: 25,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: 2,
-            }}
-            className="absolute bottom-20 left-20 w-80 h-80 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl"
-          />
-
-          {/* Medium floating elements */}
-          <motion.div
-            animate={{
-              x: [0, 60, 0],
-              y: [0, -30, 0],
-              rotate: [0, 180, 360],
-            }}
-            transition={{
-              duration: 15,
-              repeat: Infinity,
-              ease: "linear",
-            }}
-            className="absolute top-1/3 left-1/4 w-32 h-32 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full blur-2xl"
-          />
-          <motion.div
-            animate={{
-              x: [0, -40, 0],
-              y: [0, 50, 0],
-              rotate: [360, 180, 0],
-            }}
-            transition={{
-              duration: 18,
-              repeat: Infinity,
-              ease: "linear",
-              delay: 3,
-            }}
-            className="absolute bottom-1/3 right-1/4 w-24 h-24 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 rounded-full blur-2xl"
-          />
-
-          {/* Small sparkle effects */}
-          {[...Array(6)].map((_, i) => (
-            <motion.div
-              key={i}
-              animate={{
-                scale: [0, 1, 0],
-                opacity: [0, 1, 0],
-              }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-                delay: i * 0.5,
-                ease: "easeInOut",
-              }}
-              className="absolute w-2 h-2 bg-primary rounded-full"
-              style={{
-                top: `${20 + i * 15}%`,
-                left: `${10 + i * 12}%`,
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Custom SVG Background Integration */}
-        {settings.background_svg_url && (
-          <div className="absolute inset-0">
-            {/* Primary SVG layer */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 0.15, scale: 1 }}
-              transition={{ duration: 2, ease: "easeOut" }}
-              className="absolute inset-0 flex items-center justify-center"
-            >
-              <div className="relative w-full h-full max-w-4xl max-h-4xl">
-                <Image
-                  src={settings.background_svg_url}
-                  alt="Background design"
-                  fill
-                  sizes="100vw"
-                  className="object-contain"
-                  style={{ filter: "hue-rotate(45deg) saturate(0.7)" }}
-                />
-              </div>
-            </motion.div>
-
-            {/* Secondary SVG layer with different effects */}
-            <motion.div
-              initial={{ opacity: 0, scale: 1.2 }}
-              animate={{ opacity: 0.08, scale: 1 }}
-              transition={{ duration: 3, ease: "easeOut", delay: 1 }}
-              className="absolute inset-0 flex items-center justify-center"
-            >
-              <div className="relative w-full h-full max-w-5xl max-h-5xl">
-                <Image
-                  src={settings.background_svg_url}
-                  alt="Background design overlay"
-                  fill
-                  sizes="100vw"
-                  className="object-contain"
-                  style={{
-                    filter: "hue-rotate(120deg) saturate(0.5) blur(1px)",
-                    transform: "rotate(15deg)",
-                  }}
-                />
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {/* Gradient overlays for depth */}
-        <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-background/60"></div>
-        <div className="absolute inset-0 bg-gradient-to-r from-background/40 via-transparent to-background/40"></div>
+        ))}
       </div>
 
+      {/* Content backdrop for readability */}
+      <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-background/40 z-30"></div>
+
       {/* Content */}
-      <div className="container mx-auto px-4 z-10 relative">
+      <div className="container mx-auto px-4 z-40 relative">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           {/* Text Content */}
           <motion.div
