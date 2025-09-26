@@ -8,6 +8,7 @@ import {
 } from "@/components/blog/blog-sidebar-components";
 import ShareButton from "@/components/shared/share-button";
 import { Button } from "@/components/ui/button";
+import DotPatternBackground from "@/components/ui/dot-pattern-background";
 import { ViewTracker } from "@/components/view-tracker";
 import ScrollTriggeredPopup from "@/components/lead-generation/scroll-triggered-popup";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -245,7 +246,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   }));
 
   return (
-    <div className="min-h-screen bg-background">
+    <DotPatternBackground>
       {/* Fixed ViewTracker */}
       <ViewTracker type="post" id={post.id} />
 
@@ -554,6 +555,6 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         </div>
       </div>
       <ScrollTriggeredPopup scrollPercentage={70} enabled={true} />
-    </div>
+    </DotPatternBackground>
   );
 }

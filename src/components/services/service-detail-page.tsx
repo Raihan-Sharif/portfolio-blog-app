@@ -71,7 +71,7 @@ export default function ServiceDetailPage({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/50 dark:from-slate-900 dark:via-slate-800 dark:to-blue-950/50">
       {/* Service View Tracker - tracks views automatically */}
       <ServiceViewTracker 
         serviceId={service.id} 

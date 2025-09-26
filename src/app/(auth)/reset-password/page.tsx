@@ -39,7 +39,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-accent/20 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-blue-50/50 dark:from-slate-900 dark:via-slate-800 dark:to-blue-950/50 px-4">
       <div className="w-full max-w-md p-8 bg-card rounded-lg shadow-lg border">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold">Reset Password</h1>

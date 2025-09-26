@@ -2,6 +2,7 @@
 
 import SharedButton from "@/components/shared/share-button";
 import { Button } from "@/components/ui/button";
+import DotPatternBackground from "@/components/ui/dot-pattern-background";
 import { motion, useInView, useScroll, useTransform } from "framer-motion";
 import { useContactVisibility, shouldShowContactInAbout } from "@/lib/hooks/useContactVisibility";
 import {
@@ -222,10 +223,7 @@ export default function AboutContent({
 
 
   return (
-    <div
-      ref={containerRef}
-      className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background relative overflow-hidden"
-    >
+    <DotPatternBackground className="relative overflow-hidden" ref={containerRef}>
       {/* Enhanced Animated Background */}
       <motion.div
         style={{ y: backgroundY }}
@@ -1701,6 +1699,6 @@ export default function AboutContent({
           </div>
         </motion.section>
       </div>
-    </div>
+    </DotPatternBackground>
   );
 }

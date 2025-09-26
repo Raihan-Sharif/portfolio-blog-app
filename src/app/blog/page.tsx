@@ -3,6 +3,7 @@
 
 import BlogGrid from "@/components/blog/blog-grid";
 import BlogHeader from "@/components/blog/blog-header";
+import DotPatternBackground from "@/components/ui/dot-pattern-background";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { Metadata } from "next";
 
@@ -196,7 +197,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
     }
 
     return (
-      <div className="min-h-screen bg-background">
+      <DotPatternBackground>
         {/* Blog Header */}
         <BlogHeader
           categories={categories || []}
@@ -214,7 +215,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
           searchQuery={searchQuery}
           trendingPosts={trendingPosts}
         />
-      </div>
+      </DotPatternBackground>
     );
   } catch (error) {
     console.error("Error in blog page:", error);
@@ -236,7 +237,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
     }[] = [];
 
     return (
-      <div className="min-h-screen bg-background">
+      <DotPatternBackground>
         <BlogHeader
           categories={[]}
           selectedCategory={selectedCategory}
@@ -251,7 +252,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
           searchQuery={searchQuery}
           trendingPosts={emptyTrendingPosts}
         />
-      </div>
+      </DotPatternBackground>
     );
   }
 }

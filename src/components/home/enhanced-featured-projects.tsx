@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import DotPatternBackground from "@/components/ui/dot-pattern-background";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
 const supabase = createClient();
@@ -1036,7 +1037,7 @@ export default function EnhancedFeaturedProjects({
     searchQuery || selectedCategory || selectedPlatform || selectedStatus;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/30 to-background">
+    <DotPatternBackground>
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 right-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
@@ -1367,6 +1368,6 @@ export default function EnhancedFeaturedProjects({
           )}
         </div>
       </div>
-    </div>
+    </DotPatternBackground>
   );
 }

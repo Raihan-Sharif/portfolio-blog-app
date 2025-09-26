@@ -122,7 +122,7 @@ function SignInForm() {
       {/* Advanced Background System */}
       <div className="absolute inset-0 z-0">
         {/* Base gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20 dark:from-slate-950 dark:via-blue-950/20 dark:to-purple-950/10" />
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-blue-50/50 dark:from-slate-900 dark:via-slate-800 dark:to-blue-950/50" />
         
         {/* Animated gradients */}
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-r from-primary/20 via-purple-500/20 to-blue-500/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse" />

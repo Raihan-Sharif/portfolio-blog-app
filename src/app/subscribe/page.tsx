@@ -134,7 +134,7 @@ function SubscribePageContent(): JSX.Element {
 
   if (magnetsLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/50 dark:from-slate-900 dark:via-slate-800 dark:to-blue-950/50 flex items-center justify-center">
         <Card className="w-full max-w-lg mx-4">
           <CardContent className="p-8">
             <div className="space-y-4">
@@ -151,7 +151,7 @@ function SubscribePageContent(): JSX.Element {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 dark:from-green-900/20 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/50 dark:from-slate-900 dark:via-slate-800 dark:to-blue-950/50 flex items-center justify-center">
         <Card className="w-full max-w-lg mx-4 shadow-2xl border-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl">
           <CardContent className="p-8 text-center">
             <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -208,7 +208,7 @@ function SubscribePageContent(): JSX.Element {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/50 dark:from-slate-900 dark:via-slate-800 dark:to-blue-950/50">
       <div className="container mx-auto px-4 py-12 flex items-center justify-center min-h-screen">
         <Card className="w-full max-w-2xl shadow-2xl border-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl">
           <CardHeader className="text-center pb-8">
@@ -398,7 +398,7 @@ export default function SubscribePage(): JSX.Element {
   return (
     <ReCaptchaV3Provider>
       <Suspense fallback={
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/50 dark:from-slate-900 dark:via-slate-800 dark:to-blue-950/50 flex items-center justify-center">
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
         </div>
       }>

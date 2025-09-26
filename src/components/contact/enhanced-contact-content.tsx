@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import DotPatternBackground from "@/components/ui/dot-pattern-background";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -316,9 +317,7 @@ export default function EnhancedContactContent({
     : filterContactsByVisibility(contactInfo, 'contact_page', visibility);
 
   return (
-    <div
-      className={`min-h-screen ${GRADIENTS.background} relative overflow-hidden`}
-    >
+    <DotPatternBackground className="relative overflow-hidden">
       {/* Background Elements */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-20 right-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
@@ -806,6 +805,6 @@ export default function EnhancedContactContent({
           </motion.section>
         </motion.div>
       </div>
-    </div>
+    </DotPatternBackground>
   );
 }

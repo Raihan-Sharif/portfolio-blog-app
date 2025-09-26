@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import DotPatternBackground from "@/components/ui/dot-pattern-background";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import {
@@ -163,7 +164,7 @@ export default function EnhancedSkillsContent({ skills }: SkillsContentProps) {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-50/50 via-white to-blue-50/30 dark:from-slate-950/50 dark:via-slate-900 dark:to-slate-800/30">
+    <DotPatternBackground className="relative overflow-hidden">
       {/* Revolutionary Background Design */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         {/* Dynamic floating shapes */}
@@ -618,6 +619,6 @@ export default function EnhancedSkillsContent({ skills }: SkillsContentProps) {
           </p>
         </motion.div>
       </div>
-    </div>
+    </DotPatternBackground>
   );
 }
